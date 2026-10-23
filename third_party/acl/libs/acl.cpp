@@ -3,16 +3,36 @@
 #include "acl/acl_base.h"
 #include "acl/acl_mdl.h"
 
+
+#include <cstdlib>
+#include <cstring>
+#include <unistd.h>
+#include <cstdint>
+static bool qwen_sim_enabled() {
+    static const bool enabled = [] {
+        const char *value = std::getenv("QWEN_ACL_HOST_SIM");
+        return value && std::strcmp(value, "1") == 0;
+    }();
+    return enabled;
+}
+static thread_local int32_t qwen_device = 0;
+static thread_local void *qwen_context = reinterpret_cast<void *>(uintptr_t(1));
+static aclError qwen_alloc(void **ptr, size_t size) {
+    if (!qwen_sim_enabled()) return 100000;
+    *ptr = std::malloc(size ? size : 1);
+    return *ptr ? 0 : 100000;
+}
+
 extern "C" {
 // 资源初始化，申请与释放
 aclError aclInit(const char *configPath){return 0;}
 aclError aclFinalize(){return 0;}
-aclError aclrtFree(void *devPtr){return 0;}
-aclError aclrtGetDevice(int32_t *deviceId){return 0;}
+aclError aclrtFree(void *devPtr){std::free(devPtr); return 0;}
+aclError aclrtGetDevice(int32_t *deviceId){if(deviceId) *deviceId = qwen_device; return 0;}
 aclError aclrtResetDevice(int32_t deviceId){return 0;}
-aclError aclrtSetDevice(int32_t deviceId){return 0;}
-aclError aclrtGetDeviceCount(uint32_t *count){return 0;}
-aclError aclrtDeviceCanAccessPeer(int32_t *canAccessPeer, int32_t deviceId, int32_t peerDeviceId){return 0;}
+aclError aclrtSetDevice(int32_t deviceId){qwen_device = deviceId; return 0;}
+aclError aclrtGetDeviceCount(uint32_t *count){if(count) *count = qwen_sim_enabled() ? 1 : 0; return 0;}
+aclError aclrtDeviceCanAccessPeer(int32_t *canAccessPeer, int32_t deviceId, int32_t peerDeviceId){if(canAccessPeer) *canAccessPeer=0; return 0;}
 aclError aclrtSynchronizeDevice(void){return 0;}
 aclError aclmdlSetDump(const char *configPath){return 0;}
 aclError aclmdlInitDump(){return 0;}
@@ -29,20 +49,20 @@ aclError aclrtUnuseStreamResInCurrentThread(aclrtStream stream){return 0;}
 aclError aclrtGetResInCurrentThread(aclrtDevResLimitType type, uint32_t* value){return 0;}
 
 // Stream
-aclError aclrtCreateStream(aclrtStream *stream) { return 0; }
+aclError aclrtCreateStream(aclrtStream *stream) {if(stream) *stream=std::malloc(1); return 0;}
 aclError aclrtSetStreamFailureMode(aclrtStream stream, uint64_t mode) { return 0; }
 aclError aclrtSetOpWaitTimeout(uint32_t timeout) { return 0; }
-aclError aclrtCreateStreamWithConfig(aclrtStream *stream, uint32_t priority, uint32_t flag) { return 0; }
-aclError aclrtDestroyStream(aclrtStream stream){return 0;}
-aclError aclrtDestroyStreamForce(aclrtStream stream){return 0;}
+aclError aclrtCreateStreamWithConfig(aclrtStream *stream, uint32_t priority, uint32_t flag) {if(stream) *stream=std::malloc(1); return 0;}
+aclError aclrtDestroyStream(aclrtStream stream){std::free(stream); return 0;}
+aclError aclrtDestroyStreamForce(aclrtStream stream){std::free(stream); return 0;}
 aclError aclrtSynchronizeStream(aclrtStream stream){return 0;}
 aclError aclrtSynchronizeStreamWithTimeout(aclrtStream stream, int32_t timeout){return 0;}
 
 // Event
 aclError aclrtQueryEvent(aclrtEvent event, aclrtEventStatus *status){return 0;}
 aclError aclrtQueryEventStatus(aclrtEvent event, aclrtEventRecordedStatus *status){return 0;}
-aclError aclrtCreateEvent(aclrtEvent *event){return 0;}
-aclError aclrtDestroyEvent(aclrtEvent event){return 0;}
+aclError aclrtCreateEvent(aclrtEvent *event){if(event) *event=std::malloc(1); return 0;}
+aclError aclrtDestroyEvent(aclrtEvent event){std::free(event); return 0;}
 aclError aclrtRecordEvent(aclrtEvent event, aclrtStream stream){return 0;}
 aclError aclrtStreamWaitEvent(aclrtStream stream, aclrtEvent event){return 0;}
 aclError aclrtSynchronizeEvent(aclrtEvent event){return 0;}
@@ -51,16 +71,16 @@ aclError aclrtIpcGetEventHandle(aclrtEvent event, aclrtIpcEventHandle *handle){r
 aclError aclrtIpcOpenEventHandle(aclrtIpcEventHandle handle, aclrtEvent *event){return 0;}
 
 // memory相关操作
-aclError aclrtMalloc(void **devPtr, size_t size, aclrtMemMallocPolicy policy){return 0;}
-aclError aclrtMallocAlign32(void **devPtr, size_t size, aclrtMemMallocPolicy policy){return 0;}
-aclError aclrtMemcpy(void *dst, size_t destMax, const void *src, size_t count, aclrtMemcpyKind kind){return 0;}
+aclError aclrtMalloc(void **devPtr, size_t size, aclrtMemMallocPolicy policy){return qwen_alloc(devPtr,size);}
+aclError aclrtMallocAlign32(void **devPtr, size_t size, aclrtMemMallocPolicy policy){return qwen_alloc(devPtr,size);}
+aclError aclrtMemcpy(void *dst, size_t destMax, const void *src, size_t count, aclrtMemcpyKind kind){if(count>destMax || (!dst && count) || (!src && count)) return 100000; if(count) std::memcpy(dst,src,count); return 0;}
 aclError aclrtMemcpyAsync(void *dst, size_t destMax, const void *src,
-                          size_t count, aclrtMemcpyKind kind, aclrtStream stream){return 0;}
+                          size_t count, aclrtMemcpyKind kind, aclrtStream stream){return aclrtMemcpy(dst,destMax,src,count,kind);}
 aclError aclrtMemcpyAsyncWithCondition(void *dst, size_t destMax, const void *src,
-                                       size_t count, aclrtMemcpyKind kind, aclrtStream stream){return 0;}
-aclError aclrtMallocHost(void **hostPtr, size_t size){return 0;}
-aclError aclrtFreeHost(void *hostPtr){return 0;}
-aclError aclrtGetMemInfo(aclrtMemAttr attr, size_t *free, size_t *total){return 0;}
+                                       size_t count, aclrtMemcpyKind kind, aclrtStream stream){return aclrtMemcpy(dst,destMax,src,count,kind);}
+aclError aclrtMallocHost(void **hostPtr, size_t size){return qwen_alloc(hostPtr,size);}
+aclError aclrtFreeHost(void *hostPtr){std::free(hostPtr); return 0;}
+aclError aclrtGetMemInfo(aclrtMemAttr attr, size_t *free, size_t *total){if(free) *free=size_t(32)<<30; if(total) *total=size_t(32)<<30; return 0;}
 aclError aclrtGetMemUceInfo(int32_t deviceId, aclrtMemUceInfo* memUceInfoArray, size_t arraySize, size_t *retSize){return 0;}
 aclError aclrtMemUceRepair(int32_t deviceId, aclrtMemUceInfo* memUceInfoArray, size_t arraySize){return 0;}
 aclError aclrtCmoAsync(void *src, size_t size, aclrtCmoType cmoType, aclrtStream stream){return 0;}
@@ -102,11 +122,62 @@ aclError aclrtGetDeviceUtilizationRate(int32_t deviceId, aclrtUtilizationInfo *u
 
 void aclAppLog(aclLogLevel logLevel, const char *func, const char *file, uint32_t line, const char *fmt, ...) {}
 aclError aclrtSetExceptionInfoCallback(aclrtExceptionInfoCallback callback) {return 0;}
-aclError aclrtCreateEventWithFlag(aclrtEvent *event, uint32_t flag) {return 0;}
-aclError aclrtCreateEventExWithFlag(aclrtEvent *event, uint32_t flag) {return 0;}
+aclError aclrtCreateEventWithFlag(aclrtEvent *event, uint32_t flag) {if(event) *event=std::malloc(1); return 0;}
+aclError aclrtCreateEventExWithFlag(aclrtEvent *event, uint32_t flag) {if(event) *event=std::malloc(1); return 0;}
 aclError aclrtResetEvent(aclrtEvent event, aclrtStream stream){return 0;}
 aclError aclrtStreamQuery(aclrtStream stream, aclrtStreamStatus *status) {return 0;};
 aclError aclmdlRIDebugJsonPrint(aclmdlRI modelRI, const char* path, uint32_t flags) {return 0;};
 aclError aclrtGetErrorVerbose(int32_t deviceId, aclrtErrorInfo *errorInfo) {return 0;};
 aclError aclrtRepairError(int32_t deviceId, const aclrtErrorInfo *errorInfo) {return 0;}
+}
+
+extern "C" {
+aclError aclrtDeviceEnablePeerAccess(int32_t peerDeviceId, uint32_t flags) { return 100000; }
+aclError aclrtDeviceGetBareTgid(int32_t *pid) { if(pid) *pid=int32_t(getpid()); return 0; }
+aclError aclrtFreePhysical(aclrtDrvMemHandle handle) { return 100000; }
+aclError aclrtGetCurrentContext(aclrtContext *context) { if(context) *context=qwen_context; return 0; }
+const char *aclrtGetSocName() { return "Ascend910B1"; }
+aclError aclrtMallocPhysical(aclrtDrvMemHandle *handle, size_t size, const aclrtPhysicalMemProp *prop, uint64_t flags) { return 100000; }
+aclError aclrtMapMem(void *virPtr, size_t size, size_t offset, aclrtDrvMemHandle handle, uint64_t flags) { return 100000; }
+aclError aclrtMemExportToShareableHandle(aclrtDrvMemHandle handle, aclrtMemHandleType handleType, uint64_t flags, uint64_t *shareableHandle) { return 100000; }
+aclError aclrtMemImportFromShareableHandle(uint64_t shareableHandle, int32_t deviceId, aclrtDrvMemHandle *handle) { return 100000; }
+aclError aclrtMemset(void *devPtr, size_t maxCount, int32_t value, size_t count) { if(count>maxCount || (!devPtr && count)) return 100000; if(count) std::memset(devPtr,value,count); return 0; }
+aclError aclrtMemSetPidToShareableHandle(uint64_t shareableHandle, int32_t *pid, size_t pidNum) { return 100000; }
+aclError aclrtReleaseMemAddress(void *virPtr) { return 100000; }
+aclError aclrtReserveMemAddress(void **virPtr, size_t size, size_t alignment, void *expectPtr, uint64_t flags) { return 100000; }
+aclError aclrtSetCurrentContext(aclrtContext context) { qwen_context=context; return 0; }
+aclError aclrtUnmapMem(void *virPtr) { return 100000; }
+}
+
+#include "profiling/aprof_pub.h"
+extern "C" {
+uint64_t MsprofSysCycleTime(void) { return 0; }
+int32_t MsprofRegisterCallback(uint32_t moduleId, ProfCommandHandle handle) { return 0; }
+int32_t MsprofReportAdditionalInfo(uint32_t nonPersistantFlag, const VOID_PTR data, uint32_t length) { return 0; }
+int32_t MsprofReportCompactInfo(uint32_t nonPersistantFlag, const VOID_PTR data, uint32_t length) { return 0; }
+int32_t MsprofReportApi(uint32_t nonPersistantFlag, const struct MsprofApi *api) { return 0; }
+uint64_t MsprofGetHashId(const char *hashInfo, size_t length) { return 0; }
+}
+
+extern "C" {
+aclError aclrtProcessReport(int32_t) { return 0; }
+aclError aclrtCtxSetSysParamOpt(aclSysParamOpt, int64_t) { return 0; }
+aclError aclrtSetOpExecuteTimeOut(uint32_t) { return 0; }
+aclError aclrtSetOpExecuteTimeOutWithMs(uint32_t) { return 0; }
+aclError aclrtSetOpExecuteTimeOutV2(uint64_t, uint64_t *actual) { if (actual) *actual = 0; return 0; }
+aclError aclGetDeviceCapability(uint32_t, aclDeviceInfo info, int64_t *value) {
+    if (!value) return 100000;
+    if (info == ACL_DEVICE_INFO_AI_CORE_NUM) *value = 20;
+    else if (info == ACL_DEVICE_INFO_VECTOR_CORE_NUM) *value = 40;
+    else if (info == ACL_DEVICE_INFO_L2_SIZE) *value = 4 * 1024 * 1024;
+    else *value = 1;
+    return 0;
+}
+}
+
+#include "../../../torch_npu/csrc/inductor/mlir/hacl_rt.h"
+extern "C" {
+rtError_t rtDevBinaryRegister(const rtDevBinary_t *, void **handle) { if (handle) *handle = reinterpret_cast<void *>(uintptr_t(1)); return RT_ERROR_NONE; }
+rtError_t rtFunctionRegister(void *, const void *, const char *, const void *, uint32_t) { return RT_ERROR_NONE; }
+rtError_t rtKernelLaunch(const void *, uint32_t, void *, uint32_t, rtSmDesc_t *, rtStream_t) { return RT_ERROR_NONE; }
 }

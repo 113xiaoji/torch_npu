@@ -10,6 +10,7 @@
 
 #ifndef BUILD_LIBTORCH
 #include <Python.h>
+#include "torch_npu/csrc/utils/PythonThreadState.h"
 #endif
 #include <atomic>
 #if defined(_MSC_VER)
@@ -226,20 +227,12 @@ void SetPrecisionMode()
 void LazyInitAclopsCore()
 {
 #ifndef BUILD_LIBTORCH
-    PyThreadState *gilState = nullptr;
-    if (PyGILState_Check()) {
-        gilState = PyEval_SaveThread();
-    }
+    torch_npu::utils::PythonThreadStateDetachGuard detach_guard;
 #endif
     SetPrecisionMode();
     SetHF32DefaultValue();
     MakeCompileCacheDirAndSetOption();
     GetAndSetDefaultJitCompileByAcl();
-#ifndef BUILD_LIBTORCH
-    if (gilState) {
-        PyEval_RestoreThread(gilState);
-    }
-#endif
 }
 
 void LazyInitAclops()

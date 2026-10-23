@@ -17,6 +17,7 @@
 
 #ifndef BUILD_LIBTORCH
 #include <Python.h>
+#include "torch_npu/csrc/utils/PythonThreadState.h"
 #endif
 
 namespace at_npu {
@@ -140,17 +141,9 @@ void OpCommandImpl::Run(
     ASCEND_LOGD("Op %s Run.", opName.c_str());
     RECORD_FUNCTION(opName, std::vector<c10::IValue>({}));
 #ifndef BUILD_LIBTORCH
-    if (PyGILState_Check() != 0) {
-        // we need to release GIL for NPU to compile op.
-        Py_BEGIN_ALLOW_THREADS;
-        ACL_REQUIRE_OK_OP(InnerRun(opName, execParam, sync, sync_index, outputTensor), opName.c_str());
-        Py_END_ALLOW_THREADS;
-    } else {
-        ACL_REQUIRE_OK_OP(InnerRun(opName, execParam, sync, sync_index, outputTensor), opName.c_str());
-    }
-#else
-    ACL_REQUIRE_OK_OP(InnerRun(opName, execParam, sync, sync_index, outputTensor), opName.c_str());
+    torch_npu::utils::PythonThreadStateDetachGuard detach_guard;
 #endif
+    ACL_REQUIRE_OK_OP(InnerRun(opName, execParam, sync, sync_index, outputTensor), opName.c_str());
 }
 
 void OpCommandImpl::RunOpApi(const string &op_name, PROC_FUNC func)
@@ -158,17 +151,9 @@ void OpCommandImpl::RunOpApi(const string &op_name, PROC_FUNC func)
     ASCEND_LOGD("Op %s Run.", op_name.c_str());
     RECORD_FUNCTION(op_name, std::vector<c10::IValue>({}));
 #ifndef BUILD_LIBTORCH
-    if (PyGILState_Check() != 0) {
-        // we need to release GIL for NPU to compile op.
-        Py_BEGIN_ALLOW_THREADS;
-        ACL_REQUIRE_OK_OP(InnerRunOpApi(op_name, func), op_name.c_str());
-        Py_END_ALLOW_THREADS;
-    } else {
-        ACL_REQUIRE_OK_OP(InnerRunOpApi(op_name, func), op_name.c_str());
-    }
-#else
-    ACL_REQUIRE_OK_OP(InnerRunOpApi(op_name, func), op_name.c_str());
+    torch_npu::utils::PythonThreadStateDetachGuard detach_guard;
 #endif
+    ACL_REQUIRE_OK_OP(InnerRunOpApi(op_name, func), op_name.c_str());
 }
 
 aclError OpCommandImpl::InnerRun(

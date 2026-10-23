@@ -1,0 +1,126 @@
+{
+  "CMakeLists.txt": {
+    "sha256": "9ddd5463f94987da26ffbe4a59bccaa48835567279bcfa9a3480e557580ed755",
+    "bytes": 16044
+  },
+  "ci/build.sh": {
+    "sha256": "3f0cc1d85028b6f4153cb672712d1c06b8b00138995ae856ae86f41de94cc7cb",
+    "bytes": 4980
+  },
+  "setup.py": {
+    "sha256": "78657707c1a05010305979a0ac715c1e3ea862a4f6366236d699c78bc4d55a8a",
+    "bytes": 29815
+  },
+  "third_party/acl/libs/acl.cpp": {
+    "sha256": "bd3d6f1d27707b2b5e85ba750e8e6587c0013acf3c3b21382421b099d8019b00",
+    "bytes": 12311
+  },
+  "torch_npu/_inductor/ascend_npu_ir/ascend_npu_ir/npu/codegen/cpp_wrapper.py": {
+    "sha256": "b046603b48224b73f83a098c540800973bde919e3e41352894a281b2bb790b96",
+    "bytes": 18751
+  },
+  "torch_npu/_inductor/ascend_npu_ir/ascend_npu_ir/npu/mlir_compiler.py": {
+    "sha256": "b169f4fe963eee42925548c7bedcdf1f6fbc41d3b161b13165ae0b5daf5135e2",
+    "bytes": 28907
+  },
+  "torch_npu/csrc/InitNpuBindings.cpp": {
+    "sha256": "cf5d9bdbfa7d76a0bf13b516017a62690bf97b3b574d36fcf526254b4041713e",
+    "bytes": 8616
+  },
+  "torch_npu/csrc/core/npu/CachingHostAllocator.cpp": {
+    "sha256": "3d6610d814c7d8e2dba62cfe05d8f81e284b1fb02600910f4469b681f38fbd5b",
+    "bytes": 50992
+  },
+  "torch_npu/csrc/core/npu/NPUFunctions.cpp": {
+    "sha256": "06cc3de0d315ef9d82d0bb7458cc33d67b767b7d2e0e2fd81f5237d516a376fd",
+    "bytes": 18162
+  },
+  "torch_npu/csrc/core/npu/NPUQueue.cpp": {
+    "sha256": "823eb406a5eb9324a866151413b63466eda17b1c12e18991bedb4dc8c432972e",
+    "bytes": 51208
+  },
+  "torch_npu/csrc/core/npu/NPUQueue.h": {
+    "sha256": "8261a67c01e787df13b37b7d805095b6f2ed5c61d8cdebffc449f7685af15b05",
+    "bytes": 6452
+  },
+  "torch_npu/csrc/core/npu/NPUStream.cpp": {
+    "sha256": "cff480882b4c03a65068577424e85364033c6b6f34721179b1648130241a9741",
+    "bytes": 38958
+  },
+  "torch_npu/csrc/core/npu/NPUStream.h": {
+    "sha256": "d24aeabdabe3d21a519b8895d875e2c5e1e43de5fe8f06b433b651cab71677ff",
+    "bytes": 4797
+  },
+  "torch_npu/csrc/core/npu/register/OptionRegister.cpp": {
+    "sha256": "5a0da54a1ea43c2a8db92be9fcdd9b14bc8f86c7454b955ad4dc7a28f8b94a39",
+    "bytes": 4927
+  },
+  "torch_npu/csrc/core/npu/sys_ctrl/npu_sys_ctrl.cpp": {
+    "sha256": "3becc4f1732c92a4588cded1e6770f5363ecf7debf3a65052f9a17fe8ee372c4",
+    "bytes": 22025
+  },
+  "torch_npu/csrc/core/npu/sys_ctrl/npu_sys_ctrl.h": {
+    "sha256": "1dc00f02c97805344ab3620daf7db2d4c4b336730e3ad40db4e7f0b92803339a",
+    "bytes": 2859
+  },
+  "torch_npu/csrc/distributed/Init.cpp": {
+    "sha256": "65cbba438f53868d1e0b11d57bee700d93fc2bc4961257f417f37d5f9b5e8884",
+    "bytes": 28321
+  },
+  "torch_npu/csrc/framework/LazyInitAclops.cpp": {
+    "sha256": "01969935bc918d50dfde4b61c34afe1bddb7306e7c6def4d59b3da1506dcaadf",
+    "bytes": 9788
+  },
+  "torch_npu/csrc/framework/OpParamMaker.cpp": {
+    "sha256": "aab3b84e271d848f495d6b0a8a58f46b18c9808190db971f7697a07e58351cd5",
+    "bytes": 30852
+  },
+  "torch_npu/csrc/framework/contiguous/ContiguousOpt.cpp": {
+    "sha256": "438002c5983b6db6d6df9ee179c70eec051d3cab7d3b3fe23f0cd9d89172c10e",
+    "bytes": 9464
+  },
+  "torch_npu/csrc/framework/contiguous/ContiguousOpt.h": {
+    "sha256": "9862c886ee7f4d546117516f9f157caf40521702cfb4ed8765c96ca583450afb",
+    "bytes": 3082
+  },
+  "torch_npu/csrc/framework/contiguous/combined_opt.cpp": {
+    "sha256": "aee43390c670827323eb4006a3047f01021224cc8848a4458e2928a5dc427ab2",
+    "bytes": 20264
+  },
+  "torch_npu/csrc/framework/contiguous/permute_opt.cpp": {
+    "sha256": "4ba0b3298cc1fd0b540cbc528be4e2372f5804481eb21fa56addcaf191254495",
+    "bytes": 8461
+  },
+  "torch_npu/csrc/framework/contiguous/slice_opt.cpp": {
+    "sha256": "cdf194ca5bee2d2d960bebe15787d8e0bd764c323f8f2938cc66ad92047ce0db",
+    "bytes": 6187
+  },
+  "torch_npu/csrc/framework/interface/EnvVariables.cpp": {
+    "sha256": "697b5608c1c38fb5193d4364da361ca22fb97bbf3cf844ec197534c48f98c9ad",
+    "bytes": 8991
+  },
+  "torch_npu/csrc/utils/LazyInit.cpp": {
+    "sha256": "a38cb472fed39046cdbc328f2dcc24bd3eae21d3b04a59e41bf86395b24d000d",
+    "bytes": 1229
+  },
+  "torch_npu/npu/__init__.py": {
+    "sha256": "235f99b5730780864aa242849d31a68e343818645b1a7480084c8f0a2c7b418e",
+    "bytes": 27148
+  },
+  "torch_npu/csrc/core/npu/ExperimentalSequenceMpscQueueCore.h": {
+    "sha256": "c22cdfaddce3bf0ddf3c51704dd4a8ef7176298a12bd3859106e82eeb74dec20",
+    "bytes": 10355
+  },
+  "torch_npu/csrc/core/npu/OrderedMpscQueueCore.h": {
+    "sha256": "2a14d98b42ad0b63bd7369c6929815caa3eb80e1e6c3c33858d060437fc068c4",
+    "bytes": 12127
+  },
+  "torch_npu/csrc/framework/contiguous/ContiguousOptCache.h": {
+    "sha256": "e40b96b5af79b6d06d34d23961a6fd81eddcbe15e7310e22de2bacce8b30c1b2",
+    "bytes": 1405
+  },
+  "torch_npu/csrc/utils/PythonThreadState.h": {
+    "sha256": "2589376cd837ba6d7f4ffe23d127f2ba0712e399aa96085d00de3c8b1e4e9991",
+    "bytes": 1132
+  }
+}

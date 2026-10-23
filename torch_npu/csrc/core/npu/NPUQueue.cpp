@@ -13,17 +13,16 @@
 
 #ifndef BUILD_LIBTORCH
 #include <Python.h>
+#include "torch_npu/csrc/utils/PythonThreadState.h"
 #endif
 
 #include <ATen/record_function.h>
-#include <unistd.h>
+#include <atomic>
+#include <optional>
 #include <sstream>
-#include <sys/time.h>
-#include <sys/eventfd.h>
 #include <third_party/acl/inc/acl/acl_rt.h>
 
 namespace c10_npu {
-struct timeval delay = { 0, 1 };
 
 namespace {
 class CallBackManager {
@@ -67,27 +66,27 @@ public:
 
     void *getCurrentParams(void *head, int offset)
     {
-        return (uint8_t *)head + sizePerParams * offset;
+        return (uint8_t *)head + ParameterSize() * offset;
     }
 
     int Call(void *head, int offset)
     {
         TORCH_CHECK(this->execFunc, "Failed to find execution function.", PTA_ERROR(ErrCode::NOT_FOUND));
-        auto dstPtr = (uint8_t *)head + sizePerParams * offset;
+        auto dstPtr = (uint8_t *)head + ParameterSize() * offset;
         return this->execFunc(dstPtr);
     }
 
     void Copy(void *dstHead, int offset, void *src)
     {
         TORCH_CHECK(this->copyFunc, "Failed to find copy function.", PTA_ERROR(ErrCode::NOT_FOUND));
-        auto dstPtr = (uint8_t *)dstHead + sizePerParams * offset;
+        auto dstPtr = (uint8_t *)dstHead + ParameterSize() * offset;
         return this->copyFunc(dstPtr, src);
     }
 
     void Release(void *head, int offset, ReleaseQueue &releaseQueue)
     {
         TORCH_CHECK(this->releaseFunc, "Failed to find release function.", PTA_ERROR(ErrCode::NOT_FOUND));
-        auto ptr = (uint8_t *)head + sizePerParams * offset;
+        auto ptr = (uint8_t *)head + ParameterSize() * offset;
         return this->releaseFunc(ptr, releaseQueue);
     }
 
@@ -95,21 +94,46 @@ public:
     {
         TORCH_CHECK(this->copyReleaseParamFunc, "Failed to find copy release params function.",
             PTA_ERROR(ErrCode::NOT_FOUND));
-        auto dstPtr = (uint8_t *)dstHead + sizePerParams * offset;
+        auto dstPtr = (uint8_t *)dstHead + ParameterSize() * offset;
         return this->copyReleaseParamFunc(dstPtr, src);
     }
 
     void ReleaseParam(void *head, int offset)
     {
         TORCH_CHECK(this->releaseParamFunc, "Failed to find release params function.", PTA_ERROR(ErrCode::NOT_FOUND));
-        auto ptr = (uint8_t *)head + sizePerParams * offset;
+        auto ptr = (uint8_t *)head + ParameterSize() * offset;
         return this->releaseParamFunc(ptr);
     }
 
     void *Init(int capacity)
     {
         TORCH_CHECK(this->newFunc, "Failed to find new function.", PTA_ERROR(ErrCode::NOT_FOUND));
-        void *ptr = this->newFunc(capacity, sizePerParams); // not check as CUDA
+        int discovered_size = 0;
+        void *ptr = this->newFunc(capacity, discovered_size); // not check as CUDA
+        if (discovered_size <= 0) {
+            if (ptr != nullptr && this->deleteFunc != nullptr) {
+                this->deleteFunc(ptr);
+            }
+            TORCH_CHECK(
+                false,
+                "Queue callback returned an invalid parameter size.",
+                PTA_ERROR(ErrCode::INTERNAL));
+        }
+        int expected_size = 0;
+        if (!sizePerParams.compare_exchange_strong(
+                expected_size,
+                discovered_size,
+                std::memory_order_acq_rel,
+                std::memory_order_acquire) &&
+            expected_size != discovered_size) {
+            if (ptr != nullptr && this->deleteFunc != nullptr) {
+                this->deleteFunc(ptr);
+            }
+            TORCH_CHECK(
+                false,
+                "Queue callback parameter size changed across repository initialization.",
+                PTA_ERROR(ErrCode::INTERNAL));
+        }
         return ptr;
     }
 
@@ -123,7 +147,14 @@ public:
     }
 
 private:
-    int sizePerParams = 0;
+    int ParameterSize() const
+    {
+        const int size = sizePerParams.load(std::memory_order_acquire);
+        TORCH_CHECK(size > 0, "Queue callback parameter size is not initialized.", PTA_ERROR(ErrCode::INTERNAL));
+        return size;
+    }
+
+    std::atomic<int> sizePerParams{0};
     ACL_EXEC_FUNC execFunc = nullptr;
     ACL_COPY_FUNC copyFunc = nullptr;
     ACL_RELEASE_FUNC releaseFunc = nullptr;
@@ -144,6 +175,33 @@ CallBackManager &releaseManager()
     static CallBackManager releaseinstance;
     return releaseinstance;
 }
+
+class QueueWaitHooks {
+public:
+    explicit QueueWaitHooks(bool detach_python) : detach_python_(detach_python) {}
+
+    void BeforeWait()
+    {
+#ifndef BUILD_LIBTORCH
+        if (detach_python_) {
+            python_state_.emplace();
+        }
+#endif
+    }
+
+    void AfterWait()
+    {
+#ifndef BUILD_LIBTORCH
+        python_state_.reset();
+#endif
+    }
+
+private:
+    bool detach_python_ = false;
+#ifndef BUILD_LIBTORCH
+    std::optional<torch_npu::utils::PythonThreadStateDetachGuard> python_state_;
+#endif
+};
 } // namespace
 
 namespace register_queue_cb {
@@ -168,10 +226,6 @@ NPUCallBackRegisterBuilder::NPUCallBackRegisterBuilder(const ACL_EXEC_FUNC &exec
 // a large amount of device memory is occupied at the same time;
 // if the capacity is too small, and the main thread is fast enough,
 // it does not make full use of concurrent design capabilities.
-static constexpr size_t kQueueCapacity = 4096;
-static std::string repo_error;
-static std::string acl_error;
-
 std::unordered_map<RepoStatus, std::string> deviceErrorMap = {
     {RepoStatus::UCE_EXIT, "UCE ERROR"},
     {RepoStatus::HBM_ECC_EXIT, "HBM MULTI BIT ECC ERROR"},
@@ -211,9 +265,34 @@ std::string get_func_error_msg(void *error_paras)
     return result.str();
 }
 
+ErrorRecord Repository::SnapshotError() const
+{
+    std::lock_guard<std::mutex> lock(error_mu_);
+    return error_;
+}
+
+void Repository::RecordRepositoryError(std::string message)
+{
+    std::lock_guard<std::mutex> lock(error_mu_);
+    error_.repository = std::move(message);
+}
+
+void Repository::RecordAclError(std::string message)
+{
+    std::lock_guard<std::mutex> lock(error_mu_);
+    error_.acl = std::move(message);
+}
+
+void Repository::RecordCurrentParameter(std::string message)
+{
+    std::lock_guard<std::mutex> lock(error_mu_);
+    error_.current_parameter = std::move(message);
+}
+
 RepoStatus Repository::GetStatus() const
 {
-    if (initialized == false) {
+    const Lifecycle lifecycle = lifecycle_.load(std::memory_order_acquire);
+    if (lifecycle == Lifecycle::Uninitialized || lifecycle == Lifecycle::Stopped) {
         ASCEND_LOGE("Task queue is not initialized, shouldn't call GetStatus(). !!");
     }
 
@@ -222,31 +301,149 @@ RepoStatus Repository::GetStatus() const
 
 void Repository::SetStatus(RepoStatus desired)
 {
-    if (initialized == false) {
-        ASCEND_LOGE("Task queue is not initialized, shouldn't call SetStatus(). !!");
+    if (desired != RepoStatus::RUN && desired != RepoStatus::INIT) {
+        std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mu_);
+        const Lifecycle lifecycle = lifecycle_.load(std::memory_order_acquire);
+        if (lifecycle == Lifecycle::Uninitialized || lifecycle == Lifecycle::Stopped) {
+            ASCEND_LOGE("Task queue is not initialized, shouldn't call SetStatus(). !!");
+            return;
+        }
+        repo_status.store(desired, std::memory_order_release);
+        ++status_epoch_;
+        queue_core_.RequestStop();
         return;
     }
 
-    repo_status = desired;
+#ifndef BUILD_LIBTORCH
+    QueueWaitHooks wait_hooks(g_used_aclop);
+#else
+    QueueWaitHooks wait_hooks(false);
+#endif
+    RepoStatus previous_status = RepoStatus::INIT;
+    uint64_t previous_epoch = 0;
+    {
+        std::unique_lock<std::mutex> lifecycle_lock(lifecycle_mu_);
+        while (lifecycle_.load(std::memory_order_acquire) == Lifecycle::Initializing) {
+            wait_hooks.BeforeWait();
+            try {
+                lifecycle_cv_.wait(lifecycle_lock);
+            } catch (...) {
+                if (lifecycle_lock.owns_lock()) {
+                    lifecycle_lock.unlock();
+                }
+                wait_hooks.AfterWait();
+                throw;
+            }
+            lifecycle_lock.unlock();
+            wait_hooks.AfterWait();
+            lifecycle_lock.lock();
+        }
+        const Lifecycle lifecycle = lifecycle_.load(std::memory_order_acquire);
+        TORCH_CHECK(
+            lifecycle == Lifecycle::Running,
+            "Task queue cannot activate from its current lifecycle state.",
+            PTA_ERROR(ErrCode::INTERNAL));
+        previous_status = repo_status.load(std::memory_order_acquire);
+        previous_epoch = status_epoch_;
+        lifecycle_.store(Lifecycle::Initializing, std::memory_order_release);
+    }
+
+    try {
+        const queue::QueueMode mode = queue_core_.Snapshot().mode;
+        if (mode == queue::QueueMode::Failed) {
+            queue_core_.StopAndDiscardMetadata(wait_hooks);
+        } else if (mode == queue::QueueMode::Stopping) {
+            queue_core_.StopAndDiscard(
+                [this](uint32_t slot) { manager().Release(data, slot, releaseQueue); },
+                wait_hooks);
+        }
+        {
+            std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mu_);
+            // A STOP/error published while cleanup was in progress wins over
+            // this restart. The caller can retry after observing that status.
+            if (status_epoch_ == previous_epoch &&
+                repo_status.load(std::memory_order_acquire) == previous_status) {
+                if (queue_core_.Snapshot().mode == queue::QueueMode::Stopped) {
+                    queue_core_.Start();
+                }
+                TORCH_CHECK(
+                    queue_core_.Snapshot().mode == queue::QueueMode::Running,
+                    "Task queue recovery did not restart the ordered queue core.",
+                    PTA_ERROR(ErrCode::INTERNAL));
+                repo_status.store(desired, std::memory_order_release);
+                ++status_epoch_;
+            }
+            lifecycle_.store(Lifecycle::Running, std::memory_order_release);
+        }
+        lifecycle_cv_.notify_all();
+    } catch (const std::exception& error) {
+        RecordRepositoryError(std::string("Task queue recovery failed: ") + error.what());
+        try {
+            // A cleanup callback may have released only part of its payload.
+            // Drop metadata without retrying that callback.
+            queue_core_.StopAndDiscardMetadata(wait_hooks);
+        } catch (...) {
+            ASCEND_LOGE("Task queue recovery metadata cleanup failed.");
+        }
+        {
+            std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mu_);
+            repo_status.store(RepoStatus::ERROR_EXIT, std::memory_order_release);
+            ++status_epoch_;
+            lifecycle_.store(Lifecycle::Running, std::memory_order_release);
+        }
+        lifecycle_cv_.notify_all();
+        throw;
+    } catch (...) {
+        RecordRepositoryError("Task queue recovery failed with an unknown exception.");
+        try {
+            queue_core_.StopAndDiscardMetadata(wait_hooks);
+        } catch (...) {
+            ASCEND_LOGE("Task queue recovery metadata cleanup failed.");
+        }
+        {
+            std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mu_);
+            repo_status.store(RepoStatus::ERROR_EXIT, std::memory_order_release);
+            ++status_epoch_;
+            lifecycle_.store(Lifecycle::Running, std::memory_order_release);
+        }
+        lifecycle_cv_.notify_all();
+        throw;
+    }
 }
 
 void Repository::ChangeStatus(RepoStatus expected, RepoStatus desired)
 {
-    if (initialized == false) {
+    std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mu_);
+    const Lifecycle lifecycle = lifecycle_.load(std::memory_order_acquire);
+    if (lifecycle == Lifecycle::Uninitialized || lifecycle == Lifecycle::Stopped) {
         ASCEND_LOGE("Task queue is not initialized, shouldn't call ChangeStatus(). !!");
         return;
     }
-
-    repo_status.compare_exchange_strong(expected, desired);
+    if (repo_status.load(std::memory_order_acquire) != expected) {
+        return;
+    }
+    if (desired == RepoStatus::RUN || desired == RepoStatus::INIT) {
+        TORCH_CHECK(
+            lifecycle == Lifecycle::Running &&
+                queue_core_.Snapshot().mode == queue::QueueMode::Running,
+            "Task queue cannot publish an active status while its core is stopped.",
+            PTA_ERROR(ErrCode::INTERNAL));
+        repo_status.store(desired, std::memory_order_release);
+        ++status_epoch_;
+    } else {
+        repo_status.store(desired, std::memory_order_release);
+        ++status_epoch_;
+        queue_core_.RequestStop();
+    }
 }
 
 NPUStatus Repository::MakeSureQueueEmpty(bool check_error)
 {
-    TORCH_NPU_QUEUE_LOGD("MakeSureQueueEmpty: start, device = %d, write_idx = %u, read_idx = %u, status = %d",
-        device_idx, write_idx.idx, read_idx.idx, GetStatus());
+    TORCH_NPU_QUEUE_LOGD("MakeSureQueueEmpty: start, device = %d, queued = %zu, status = %d",
+        device_idx, queue_core_.Snapshot().size, GetStatus());
     std::string error_msg;
     std::string runtime_error;
-    if (initialized == false) {
+    if (!CheckInit()) {
         ASCEND_LOGE("Task queue is not initialized, shouldn't call MakeSureQueueEmpty(). !!");
         return NPU_STATUS_FAILED;
     }
@@ -260,58 +457,31 @@ NPUStatus Repository::MakeSureQueueEmpty(bool check_error)
     // the TE module attempts to obtain the GIL.
     // If the current thread does not release the GIL, a deadlock will
     // occur.
-#ifndef BUILD_LIBTORCH
-    PyThreadState *gilState = nullptr;
-    if (PyGILState_Check() != 0 && g_used_aclop) {
-        gilState = PyEval_SaveThread();
-    }
-#endif
-
     if (consumer.joinable()) {
-        ssize_t s;
-        uint64_t u = 1;
-        while (!IsEmptyQueue()) {
-            std::lock_guard<std::mutex> lock(mu_empty);
-            need_empty = true;
-            __sync_synchronize();
-            if (!IsEmptyQueue()) { // double-check, very important idea
-                TORCH_NPU_QUEUE_LOGI("MakeSureQueueEmpty: wait for efd_empty, device = %d, write_idx = %u, read_idx = %u, status = %d",
-                    device_idx, write_idx.idx, read_idx.idx, GetStatus());
-                s = eventfd_read(efd_empty, &u);
-                TORCH_NPU_QUEUE_LOGI("MakeSureQueueEmpty: wait for efd_empty end, device = %d, write_idx = %u, read_idx = %u, status = %d, s = %d",
-                    device_idx, write_idx.idx, read_idx.idx, GetStatus(), s);
-                if (s != 0) {
-                    if (errno == EINTR) {
-                        continue;
-                    }
-                    ASCEND_LOGE("eventfd_read failed. s=%zd, errno=%s.", s, strerror(errno));
 #ifndef BUILD_LIBTORCH
-                    // Get the GIL
-                    if (gilState) {
-                        PyEval_RestoreThread(gilState);
-                    }
+        QueueWaitHooks wait_hooks(g_used_aclop);
+#else
+        QueueWaitHooks wait_hooks(false);
 #endif
-                    return NPU_STATUS_INTERNAL_ERROR;
-                }
-            }
-            need_empty = false;
-        }
+        queue_core_.WaitDrained(wait_hooks);
     }
+
+    const ErrorRecord error = SnapshotError();
 
     const RepoStatus current_status = GetStatus();
     auto iter = deviceErrorMap.find(current_status);
     if (iter != deviceErrorMap.end()) {
         std::string throwError = iter->second;
-        std::string error_msg;
+        std::string device_detail;
         if (current_status != RepoStatus::STOP_EXIT && current_status != RepoStatus::UCE_EXIT) {
-            error_msg = c10_npu::c10_npu_get_error_message();
+            device_detail = c10_npu::c10_npu_get_error_message();
         }
-        runtime_error = throwError + ", " + error_msg + PTA_ERROR(ErrCode::ACL);
+        runtime_error = throwError + ", " + device_detail + PTA_ERROR(ErrCode::ACL);
         error_msg = throwError + " happened.";
     }
 
     if (current_status == RepoStatus::CAN_EXIT) {
-        error_msg = "Inner error happened with CAN_EXIT status, detail: " + repo_error;
+        error_msg = "Inner error happened with CAN_EXIT status, detail: " + error.repository;
     }
 
     auto errmsg = GetQueueErrMsg();
@@ -326,23 +496,16 @@ NPUStatus Repository::MakeSureQueueEmpty(bool check_error)
 
         runtime_error = "The Inner error is reported as above. "
             "The process exits for this inner error, and " +
-            repo_error + ".\n" +
+            error.repository + ".\n" +
             "Since the operator is called asynchronously, the stacktrace may be inaccurate. "
             "If you want to get the accurate stacktrace, "
             "please set the environment variable ASCEND_LAUNCH_BLOCKING=1.\n" +
             "Note: ASCEND_LAUNCH_BLOCKING=1 will force ops to run in synchronous mode, "
             "resulting in performance degradation. "
             "Please unset ASCEND_LAUNCH_BLOCKING in time after debugging." +
-            PTA_ERROR(ErrCode::ACL) + ".\n" + acl_error;
-        error_msg = "Inner error happened, detail: " + repo_error;
+            PTA_ERROR(ErrCode::ACL) + ".\n" + error.acl;
+        error_msg = "Inner error happened, detail: " + error.repository;
     }
-
-#ifndef BUILD_LIBTORCH
-    // Get the GIL
-    if (gilState) {
-        PyEval_RestoreThread(gilState);
-    }
-#endif
 
     if (!error_msg.empty()) {
         ASCEND_LOGE("%s", error_msg.c_str());
@@ -355,39 +518,18 @@ NPUStatus Repository::MakeSureQueueEmpty(bool check_error)
             throw std::runtime_error(runtime_error);
         }
     }
-    TORCH_NPU_QUEUE_LOGD("MakeSureQueueEmpty: clearing successful, device = %d, write_idx = %u, read_idx = %u, status = %d",
-        device_idx, write_idx.idx, read_idx.idx, GetStatus());
+    TORCH_NPU_QUEUE_LOGD("MakeSureQueueEmpty: clearing successful, device = %d, queued = %zu, status = %d",
+        device_idx, queue_core_.Snapshot().size, GetStatus());
 
     return NPU_STATUS_SUCCESS;
 }
 
-bool Repository::WriteQueue(void *cur_paras)
-{
-    std::lock_guard<std::mutex> lock(mu_enqueue);
-
-    const RepoStatus current_status = GetStatus();
-    ThrowDeviceError(current_status, cur_paras);
-
-    if (IsFullQueue()) {
-        TORCH_NPU_QUEUE_LOGI("WriteQueue: taskqueue is full, device = %d, write_idx = %u, read_idx = %u, status = %d",
-            device_idx, write_idx.idx, read_idx.idx, GetStatus());
-        return false;
-    }
-
-    __sync_synchronize();
-    manager().Copy(data, write_idx.idx, cur_paras);
-    __sync_synchronize();
-
-    TORCH_NPU_QUEUE_LOGD("WriteQueue: write success, %s, device = %d, write_idx = %u, read_idx = %u, status = %d",
-        get_func_error_msg(cur_paras).c_str(), device_idx, write_idx.idx, read_idx.idx, GetStatus());
-    write_idx.idx = (write_idx.idx + 1) & (kQueueCapacity - 1);
-    return true;
-}
-
 void Repository::CheckDeviceError(int ret, std::string& err_msg)
 {
+    std::string acl_error;
     if (ret != ACL_ERROR_RT_DEVICE_TASK_ABORT && ret != ACL_ERROR_RT_DEVICE_MEM_ERROR) {
         acl_error = c10_npu::c10_npu_get_error_message();
+        RecordAclError(acl_error);
     }
     if (ret == ACL_ERROR_RT_DEVICE_MEM_ERROR ||
         acl_error.find(DEVICE_MEM_ERROR) != std::string::npos ||
@@ -429,81 +571,58 @@ void Repository::CheckDeviceError(int ret, std::string& err_msg)
 
 bool Repository::ReadQueue()
 {
-    if (IsEmptyQueue()) {
-        static const auto task_queue_enable = c10_npu::option::OptionsManager::GetTaskQueueEnable();
-        if (task_queue_enable == 2) {
-            // read queue polls for at most 1 ms when queue is empty.
-            for (int i = 0; i < READ_QUEUE_POLL_MAX_LOOP; ++i) {
-                if (!IsEmptyQueue()) {
-                    break;
-                }
-            }
-            if (IsEmptyQueue()) {
-                return false;
-            }
-        } else {
-            return false;
-        }
-    }
-
-    __sync_synchronize();
+    bool execution_failed = false;
+    const bool consumed = queue_core_.ConsumeOne([this, &execution_failed](uint32_t slot) {
+        const std::string current_para = get_func_error_msg(manager().getCurrentParams(data, slot));
+        RecordCurrentParameter(current_para);
 #ifndef BUILD_LIBTORCH
-    at_npu::native::NpuUtils::ProfReportMarkDataToNpuProfiler(2, data, read_idx.idx);
-    auto ret = manager().Call(data, read_idx.idx);
-    at_npu::native::NpuUtils::ProfReportMarkDataToNpuProfiler(3, data, read_idx.idx);
+        at_npu::native::NpuUtils::ProfReportMarkDataToNpuProfiler(2, data, slot);
+        const auto ret = manager().Call(data, slot);
+        at_npu::native::NpuUtils::ProfReportMarkDataToNpuProfiler(3, data, slot);
 #else
-    auto ret = manager().Call(data, read_idx.idx);
+        const auto ret = manager().Call(data, slot);
 #endif
-    if (ret != 0) {
-        repo_error = get_func_error_msg(manager().getCurrentParams(data, read_idx.idx));
-        ASCEND_LOGE("---Thread---%llu: device = %d, write_idx = %u, read_idx = %u, status = %d, ret = %d",
-            std::this_thread::get_id(), device_idx, write_idx.idx, read_idx.idx, GetStatus(), ret);
-        TORCH_NPU_QUEUE_LOGI("ReadQueue: read failed, %s, device = %d, write_idx = %u, read_idx = %u, status = %d, ret = %d",
-            repo_error.c_str(), device_idx, write_idx.idx, read_idx.idx, GetStatus(), ret);
-        while (!IsEmptyQueue()) { // ignore other tasks
-            manager().Release(data, read_idx.idx, releaseQueue);
-            read_idx.idx = (read_idx.idx + 1) & (kQueueCapacity - 1);
+        if (ret != 0) {
+            execution_failed = true;
+            std::string repository_error = current_para;
+            RecordRepositoryError(repository_error);
+            ASCEND_LOGE("---Thread---%llu: device = %d, slot = %u, status = %d, ret = %d",
+                std::this_thread::get_id(), device_idx, slot, GetStatus(), ret);
+            TORCH_NPU_QUEUE_LOGI("ReadQueue: read failed, %s, device = %d, slot = %u, status = %d, ret = %d",
+                repository_error.c_str(), device_idx, slot, GetStatus(), ret);
+            manager().Release(data, slot, releaseQueue);
+            std::string err_msg;
+            CheckDeviceError(ret, err_msg);
+            if (!err_msg.empty()) {
+                repository_error += ". Other error information exists:" + err_msg;
+                RecordRepositoryError(repository_error);
+            }
+            if (GetStatus() == RepoStatus::STOP_EXIT) {
+                const auto acl_ret = c10_npu::acl::AclrtSynchronizeDeviceWithTimeout();
+                ASCEND_LOGI("ReadQueue: SynchronizeDevice with FORCE STOP, device = %d, slot = %u, "
+                            "status = %d, ret = %d, acl_ret = %d",
+                    device_idx, slot, GetStatus(), ret, acl_ret);
+            }
+            return;
         }
-        std::string err_msg;
-        CheckDeviceError(ret, err_msg);
-        if (!err_msg.empty()) {
-            repo_error = repo_error + ". Other error information exists:" + err_msg;
+
+        manager().Release(data, slot, releaseQueue);
+        RecordCurrentParameter({});
+        TORCH_NPU_QUEUE_LOGD("ReadQueue: read success, %s, device = %d, slot = %u, status = %d",
+            current_para.c_str(), device_idx, slot, GetStatus());
+        if (GetStatus() == RepoStatus::STOP_EXIT) {
+            const auto acl_ret = c10_npu::acl::AclrtSynchronizeDeviceWithTimeout();
+            ASCEND_LOGI("ReadQueue: SynchronizeDevice with FORCE STOP, device = %d, slot = %u, "
+                        "status = %d, ret = %d, acl_ret = %d",
+                device_idx, slot, GetStatus(), ret, acl_ret);
         }
+    });
+    if (execution_failed) {
         ClearQueue();
         c10_npu::NPUEventManager::GetInstance().ClearUnrecordedCount();
-        if (GetStatus() == RepoStatus::STOP_EXIT) {
-            // The "stop_device" function will first set the "FORCE STOP" state, and then call the "devicetaskabort" interface.
-            // In a theoretical scenario, it is possible that before setting the FORCE STOP state,
-            // the dequeue thread had already got a task and was preparing to dispatch it.
-            // After calling the "devicetaskabort" interface, the task was finally ready to be dispatched.
-            // At this point, if the execution of this task fails, there will be an error state in the device,
-            // and it needs to be handled through the synchronization interface.
-            auto acl_ret = c10_npu::acl::AclrtSynchronizeDeviceWithTimeout();
-            ASCEND_LOGI("ReadQueue: SynchronizeDevice with FORCE STOP, device = %d, write_idx = %u, read_idx = %u, status = %d, ret = %d, acl_ret = %d",
-                device_idx, write_idx.idx, read_idx.idx, GetStatus(), ret, acl_ret);
-        }
         return false;
     }
-
-    manager().Release(data, read_idx.idx, releaseQueue);
-    __sync_synchronize();
-
-    TORCH_NPU_QUEUE_LOGD("ReadQueue: read success, %s, device = %d, write_idx = %u, read_idx = %u, status = %d",
-        get_func_error_msg(manager().getCurrentParams(data, read_idx.idx)).c_str(), device_idx, write_idx.idx, read_idx.idx, GetStatus());
-    read_idx.idx = (read_idx.idx + 1) & (kQueueCapacity - 1);
-
-    if (GetStatus() == RepoStatus::STOP_EXIT) {
-        // The "stop_device" function will first set the "FORCE STOP" state, and then call the "devicetaskabort" interface.
-        // In a theoretical scenario, it is possible that before setting the FORCE STOP state,
-        // the dequeue thread had already got a task and was preparing to dispatch it.
-        // After calling the "devicetaskabort" interface, the task was finally ready to be dispatched.
-        // At this point, if the execution of this task fails, there will be an error state in the device,
-        // and it needs to be handled through the synchronization interface.
-        auto acl_ret = c10_npu::acl::AclrtSynchronizeDeviceWithTimeout();
-        ASCEND_LOGI("ReadQueue: SynchronizeDevice with FORCE STOP, device = %d, write_idx = %u, read_idx = %u, status = %d, ret = %d, acl_ret = %d",
-            device_idx, write_idx.idx, read_idx.idx, GetStatus(), ret, acl_ret);
-    }
-    return true;
+    return consumed;
 }
 
 void Repository::ThrowDeviceError(RepoStatus current_status, void* cur_paras)
@@ -529,19 +648,20 @@ void Repository::ThrowDeviceError(RepoStatus current_status, void* cur_paras)
 
 void Repository::Enqueue(void *cur_paras)
 {
-    if (initialized == false) {
-        ASCEND_LOGE("Task queue is not initialized, shouldn't call Enqueue(). !!");
-        return;
-    }
+    TORCH_CHECK(
+        lifecycle_.load(std::memory_order_acquire) == Lifecycle::Running,
+        "Task queue is not ready to accept a producer.",
+        PTA_ERROR(ErrCode::INTERNAL));
 
-    TORCH_NPU_QUEUE_LOGD("Enqueue: start, %s, device = %d, write_idx = %u, read_idx = %u, status = %d",
-        get_func_error_msg(cur_paras).c_str(), device_idx, write_idx.idx, read_idx.idx, GetStatus());
+    TORCH_NPU_QUEUE_LOGD("Enqueue: start, %s, device = %d, queued = %zu, status = %d",
+        get_func_error_msg(cur_paras).c_str(), device_idx, queue_core_.Snapshot().size, GetStatus());
 
     const RepoStatus current_status = GetStatus();
     ThrowDeviceError(current_status, cur_paras);
+    const ErrorRecord error = SnapshotError();
 
     if (current_status == RepoStatus::CAN_EXIT) {
-        ASCEND_LOGE("Inner error happened with CAN_EXIT status, detail: %s", repo_error.c_str());
+        ASCEND_LOGE("Inner error happened with CAN_EXIT status, detail: %s", error.repository.c_str());
     }
 
     if (current_status == RepoStatus::ERROR_EXIT) {
@@ -550,14 +670,14 @@ void Repository::Enqueue(void *cur_paras)
 
         auto retmsg = std::string("The Inner error is reported as above. "
             "The process exits for this inner error, and " +
-            repo_error + ".\n" +
+            error.repository + ".\n" +
             "Since the operator is called asynchronously, the stacktrace may be inaccurate. "
             "If you want to get the accurate stacktrace, "
             "please set the environment variable ASCEND_LAUNCH_BLOCKING=1.\n" +
             "Note: ASCEND_LAUNCH_BLOCKING=1 will force ops to run in synchronous mode, "
             "resulting in performance degradation. "
             "Please unset ASCEND_LAUNCH_BLOCKING in time after debugging." +
-            PTA_ERROR(ErrCode::ACL) + ".\n" + acl_error);
+            PTA_ERROR(ErrCode::ACL) + ".\n" + error.acl);
 
         auto errmsg = GetQueueErrMsg();
         if (isCannOOM(errmsg)) {
@@ -604,88 +724,64 @@ void Repository::Enqueue(void *cur_paras)
         }
     }
 
-    bool ret = false;
-    ssize_t s;
-    uint64_t u = 1;
-
-    SetWriteWorking(true);
-    while (!ret && (GetStatus() == RUN || GetStatus() == INIT)) {
-        ret = WriteQueue(cur_paras);
-        if (ret == false) {
-            SetWriteWorking(false);
-            __sync_synchronize();
-            if (IsFullQueue()) {
-                TORCH_NPU_QUEUE_LOGI("Enqueue: taskqueue is full, wait for efd_write, device = %d, write_idx = %u, read_idx = %u, status = %d",
-                    device_idx, write_idx.idx, read_idx.idx, GetStatus());
 #ifndef BUILD_LIBTORCH
-                // double check the current thread hold a Gil lock
-                // and release the GIL to TE op compiler in case the acl thread deadlock.
-                // However, this operator could produce another form of deadlock.
-                // When thread A deconstruct a tensor, it will hold the mutex of deviceCachingAllocator and insert an event into the taskqueue.
-                // If the taskqueue is full, thread A will run into here and release the GIL.
-                // Once another thread B get GIL and trigger GC, it may deconstruct another tensor
-                // and try to get deviceCachingAllocator's mutex, which would cause another form of deadlock.
-                // Since the aclop will be deprecated soon, we just add a using-aclop check here to avoid the second case of deadlock.
-                if (PyGILState_Check() != 0 && g_used_aclop) {
-                    Py_BEGIN_ALLOW_THREADS s = eventfd_read(efd_write, &u);
-                    Py_END_ALLOW_THREADS
-                } else {
-                    s = eventfd_read(efd_write, &u);
-                }
+    QueueWaitHooks wait_hooks(g_used_aclop);
 #else
-                s = eventfd_read(efd_write, &u);
+    QueueWaitHooks wait_hooks(false);
 #endif
-                TORCH_NPU_QUEUE_LOGI("Enqueue: taskqueue is full, wait for efd_write end, device = %d, write_idx = %u, read_idx = %u, status = %d, s = %d",
-                    device_idx, write_idx.idx, read_idx.idx, GetStatus(), s);
-                if (s != 0) {
-                    if (errno == EINTR) {
-                        continue;
-                    }
-                    ASCEND_LOGE("waiting dequeue failed. s=%zd, errno=%s.", s, strerror(errno));
-                    return;
-                }
-                SetWriteWorking(true);
-            }
-            continue;
-        }
-        __sync_synchronize();
-        while (!IsReadWorking()) {
-            s = eventfd_write(efd_read, u);
-            if (s != 0) {
-                if (errno == EINTR) {
-                    continue;
-                }
-                ASCEND_LOGE("notify consumer failed!! s=%zd, errno=%s", s, strerror(errno));
-                return;
-            }
-            break;
-        }
+    const bool accepted = queue_core_.Enqueue(
+        [this, cur_paras](uint32_t slot) {
+            ThrowDeviceError(GetStatus(), cur_paras);
+            // The deep copy is deliberately inside the core's short producer
+            // commit section. Publishing tail/size before this returns would
+            // expose a partially copied parameter record to the ACL thread.
+            manager().Copy(data, slot, cur_paras);
+        },
+        wait_hooks);
+    if (!accepted) {
+        const RepoStatus rejected_status = GetStatus();
+        ThrowDeviceError(rejected_status, cur_paras);
+        TORCH_CHECK(
+            rejected_status != RepoStatus::RUN && rejected_status != RepoStatus::INIT,
+            "active task queue rejected a producer",
+            PTA_ERROR(ErrCode::INTERNAL));
+        TORCH_NPU_QUEUE_LOGI("Enqueue: producer admission closed, device = %d, status = %d",
+            device_idx, rejected_status);
     }
-    SetWriteWorking(false);
 }
 
 void Repository::Dequeue()
 {
-    if (initialized == false) {
+    const Lifecycle lifecycle = lifecycle_.load(std::memory_order_acquire);
+    if (lifecycle == Lifecycle::Uninitialized || lifecycle == Lifecycle::Stopped) {
         ASCEND_LOGE("Task queue is not initialized, shouldn't call Dequeue(). !!");
         return;
     }
 
-    bool ret = false;
-    bool notify_empty = false;
-    ssize_t s;
-    uint64_t u = 1;
-
-    SetReadWorking(true);
-    while (ret == false && GetStatus() != RepoStatus::CAN_EXIT) {
+    while (GetStatus() != RepoStatus::CAN_EXIT) {
         if (deviceErrorMap.find(GetStatus()) != deviceErrorMap.end()) {
             ClearQueue();
             c10_npu::NPUEventManager::GetInstance().ClearUnrecordedCount();
             std::this_thread::sleep_for(std::chrono::microseconds(1000));
             continue;
         }
-        ret = ReadQueue();
-        if (ret == false) {
+        bool consumed = false;
+        try {
+            consumed = ReadQueue();
+        } catch (const std::exception& error) {
+            RecordRepositoryError(error.what());
+            SetStatus(RepoStatus::ERROR_EXIT);
+            ClearQueue();
+            c10_npu::NPUEventManager::GetInstance().ClearUnrecordedCount();
+            break;
+        } catch (...) {
+            RecordRepositoryError("unknown exception in task queue consumer");
+            SetStatus(RepoStatus::ERROR_EXIT);
+            ClearQueue();
+            c10_npu::NPUEventManager::GetInstance().ClearUnrecordedCount();
+            break;
+        }
+        if (!consumed) {
             if (GetStatus() == RepoStatus::NEED_EXIT) {
                 ChangeStatus(NEED_EXIT, CAN_EXIT);
                 break;
@@ -696,272 +792,477 @@ void Repository::Dequeue()
             }
 
             if (GetStatus() == RepoStatus::STOP_EXIT) {
+                std::this_thread::sleep_for(std::chrono::microseconds(1000));
                 continue;
             }
-
-            SetReadWorking(false);
-            __sync_synchronize();
-            if (IsEmptyQueue()) {
-                TORCH_NPU_QUEUE_LOGI("Dequeue: taskqueue is empty, wait for efd_read, device = %d, write_idx = %u, read_idx = %u, status = %d",
-                    device_idx, write_idx.idx, read_idx.idx, GetStatus());
-                s = eventfd_read(efd_read, &u);
-                TORCH_NPU_QUEUE_LOGI("Dequeue: taskqueue is empty, wait for efd_read end, device = %d, write_idx = %u, read_idx = %u, status = %d, s = %d",
-                    device_idx, write_idx.idx, read_idx.idx, GetStatus(), s);
-                if (s != 0) {
-                    if (errno == EINTR) {
-                        continue;
-                    }
-                    ASCEND_LOGE("waiting enqueue failed. s=%zd, errno=%s.", s, strerror(errno));
-                    return;
-                }
-                SetReadWorking(true);
-            }
-            continue;
-        }
-        __sync_synchronize();
-        notify_empty = need_empty && IsEmptyQueue(); // need_empty && (ret == false || IsEmptyQueue());
-        while (notify_empty) {
-            s = eventfd_write(efd_empty, u);
-            if (s != 0) {
-                if (errno == EINTR) {
-                    continue;
-                }
-                ASCEND_LOGE("notify make_sure failed. s=%zd, errno=%s.", s, strerror(errno));
-                return;
-            }
-            break;
-        }
-        __sync_synchronize();
-        while (!IsWriteWorking()) {
-            s = eventfd_write(efd_write, u);
-            if (s != 0) {
-                if (errno == EINTR) {
-                    continue;
-                }
-                ASCEND_LOGE("notify producer failed. s=%zd, errno=%s.", s, strerror(errno));
-                return;
-            }
-            break;
         }
     }
-    SetReadWorking(false);
 }
 
 void Repository::ReleaseResource()
 {
     manager().DeInit(data);
-    if (efd_read > 0) {
-        close(efd_read);
-        efd_read = -1;
-    }
-    if (efd_write > 0) {
-        close(efd_write);
-        efd_write = -1;
-    }
-    if (efd_empty > 0) {
-        close(efd_empty);
-        efd_empty = -1;
-    }
+    data = nullptr;
 }
 
 void Repository::ClearQueue()
 {
-    read_idx.idx = write_idx.idx;
-    __sync_synchronize();
-    eventfd_write(efd_empty, 1);
-    eventfd_write(efd_write, 1);
+    RepoStatus status = RepoStatus::INIT;
+    uint64_t epoch = 0;
+    queue::QueueSnapshot snapshot;
+    {
+        std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mu_);
+        if (lifecycle_.load(std::memory_order_acquire) != Lifecycle::Running) {
+            // Initialization, restart, another cleanup, or destruction owns
+            // the transition. It will leave the core in a coherent state.
+            return;
+        }
+        status = repo_status.load(std::memory_order_acquire);
+        epoch = status_epoch_;
+        snapshot = queue_core_.Snapshot();
+
+        // A consumer may have decided to clear under STOP just before another
+        // thread completed restart. Once the new generation is Running, stale
+        // cleanup must not touch it.
+        if ((status == RepoStatus::RUN || status == RepoStatus::INIT) &&
+            snapshot.mode == queue::QueueMode::Running) {
+            return;
+        }
+        lifecycle_.store(Lifecycle::Initializing, std::memory_order_release);
+    }
+
+#ifndef BUILD_LIBTORCH
+    QueueWaitHooks wait_hooks(g_used_aclop);
+#else
+    QueueWaitHooks wait_hooks(false);
+#endif
+    bool cleanup_failed = false;
+    try {
+        if (snapshot.failed) {
+            // The callback that owns the head may have partially released it.
+            // Metadata-only discard prevents a non-idempotent retry.
+            queue_core_.StopAndDiscardMetadata(wait_hooks);
+        } else {
+            queue_core_.StopAndDiscard(
+                [this](uint32_t slot) { manager().Release(data, slot, releaseQueue); },
+                wait_hooks);
+        }
+    } catch (const std::exception& error) {
+        cleanup_failed = true;
+        RecordRepositoryError(std::string("Task queue cleanup failed: ") + error.what());
+        ASCEND_LOGE("Task queue cleanup failed, discarding metadata: %s", error.what());
+        try {
+            queue_core_.StopAndDiscardMetadata(wait_hooks);
+        } catch (...) {
+            ASCEND_LOGE("Task queue metadata cleanup failed.");
+        }
+    } catch (...) {
+        cleanup_failed = true;
+        RecordRepositoryError("Task queue cleanup failed with an unknown exception.");
+        ASCEND_LOGE("Task queue cleanup failed, discarding metadata.");
+        try {
+            queue_core_.StopAndDiscardMetadata(wait_hooks);
+        } catch (...) {
+            ASCEND_LOGE("Task queue metadata cleanup failed.");
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mu_);
+        if (cleanup_failed) {
+            repo_status.store(RepoStatus::ERROR_EXIT, std::memory_order_release);
+            ++status_epoch_;
+        } else if (
+            status_epoch_ == epoch &&
+            repo_status.load(std::memory_order_acquire) == status &&
+            (status == RepoStatus::RUN || status == RepoStatus::INIT) &&
+            queue_core_.Snapshot().mode == queue::QueueMode::Stopped) {
+            queue_core_.Start();
+        }
+        lifecycle_.store(Lifecycle::Running, std::memory_order_release);
+    }
+    lifecycle_cv_.notify_all();
 }
 
 void Repository::SetQueueErrMsg(const char *errmsg)
 {
-    error_msg = std::string(errmsg);
+    std::lock_guard<std::mutex> lock(error_mu_);
+    error_.queue = errmsg == nullptr ? std::string{} : std::string(errmsg);
 }
 
 std::string Repository::GetQueueErrMsg()
 {
-    return error_msg;
+    std::lock_guard<std::mutex> lock(error_mu_);
+    return error_.queue;
 }
 
 Repository::~Repository()
 {
-    if (initialized) {
-        if (consumer.joinable()) {
-            SetStatus(NEED_EXIT);
-            (void)eventfd_write(efd_read, 1); // escape wait
-            consumer.join();
+    {
+        std::lock_guard<std::mutex> lock(lifecycle_mu_);
+        const Lifecycle lifecycle = lifecycle_.load(std::memory_order_relaxed);
+        if (lifecycle == Lifecycle::Uninitialized || lifecycle == Lifecycle::Stopped) {
+            return;
         }
-        eventfd_write(efd_empty, 1);
-        ReleaseResource();
+        lifecycle_.store(Lifecycle::Stopping, std::memory_order_release);
     }
-}
 
-bool Repository::IsFullQueue() const
-{
-    return ((write_idx.idx + 1) & (kQueueCapacity - 1)) == read_idx.idx;
+    repo_status.store(RepoStatus::NEED_EXIT, std::memory_order_release);
+    queue_core_.RequestStop();
+#ifndef BUILD_LIBTORCH
+    QueueWaitHooks wait_hooks(g_used_aclop);
+#else
+    QueueWaitHooks wait_hooks(false);
+#endif
+    try {
+        // Drain with runtime-aware wait hooks before joining. Once this
+        // returns, the consumer has no leased task and join only observes its
+        // loop exit; an attached Python thread never blocks the task callback.
+        queue_core_.StopAndDrain(wait_hooks);
+    } catch (const std::exception& error) {
+        ASCEND_LOGE("Task queue drain failed, discarding pending tasks: %s", error.what());
+        try {
+            // StopAndDrain waits for active producers before surfacing a
+            // shared callback error, so this fallback has no producer wait.
+            if (queue_core_.Snapshot().failed) {
+                queue_core_.StopAndDiscardMetadata(wait_hooks);
+            } else {
+                queue_core_.StopAndDiscard(
+                    [this](uint32_t slot) { manager().Release(data, slot, releaseQueue); },
+                    wait_hooks);
+            }
+        } catch (const std::exception& discard_error) {
+            ASCEND_LOGE("Task queue cleanup failed: %s", discard_error.what());
+            try {
+                queue_core_.StopAndDiscardMetadata(wait_hooks);
+            } catch (...) {
+                ASCEND_LOGE("Task queue metadata cleanup failed.");
+            }
+        } catch (...) {
+            ASCEND_LOGE("Task queue cleanup failed with an unknown exception.");
+            try {
+                queue_core_.StopAndDiscardMetadata(wait_hooks);
+            } catch (...) {
+                ASCEND_LOGE("Task queue metadata cleanup failed.");
+            }
+        }
+    } catch (...) {
+        ASCEND_LOGE("Task queue drain failed with an unknown exception.");
+        try {
+            if (queue_core_.Snapshot().failed) {
+                queue_core_.StopAndDiscardMetadata(wait_hooks);
+            } else {
+                queue_core_.StopAndDiscard(
+                    [this](uint32_t slot) { manager().Release(data, slot, releaseQueue); },
+                    wait_hooks);
+            }
+        } catch (...) {
+            ASCEND_LOGE("Task queue cleanup failed with an unknown exception.");
+            try {
+                queue_core_.StopAndDiscardMetadata(wait_hooks);
+            } catch (...) {
+                ASCEND_LOGE("Task queue metadata cleanup failed.");
+            }
+        }
+    }
+    if (consumer.joinable()) {
+        consumer.join();
+    }
+    try {
+        releaseQueue.Shutdown();
+    } catch (const std::exception& error) {
+        ASCEND_LOGE("Release queue shutdown failed: %s", error.what());
+    } catch (...) {
+        ASCEND_LOGE("Release queue shutdown failed with an unknown exception.");
+    }
+    try {
+        ReleaseResource();
+    } catch (const std::exception& error) {
+        ASCEND_LOGE("Task queue storage cleanup failed: %s", error.what());
+    } catch (...) {
+        ASCEND_LOGE("Task queue storage cleanup failed with an unknown exception.");
+    }
+    lifecycle_.store(Lifecycle::Stopped, std::memory_order_release);
+    lifecycle_cv_.notify_all();
 }
 
 bool Repository::CheckInit() const
 {
-    return initialized;
+    return lifecycle_.load(std::memory_order_acquire) == Lifecycle::Running;
 }
 
 void StartConsume(Repository *repo, c10::DeviceIndex device_id)
 {
-    SetThreadType(ThreadType::ACL_THREAD);
-    SetThreadAffinity(device_id);
+    try {
+        SetThreadType(ThreadType::ACL_THREAD);
+        SetThreadAffinity(device_id);
 
-    aclError ret = c10_npu::SetDevice(device_id);
-    if (ret != 0) {
-        C10_NPU_SHOW_ERR_MSG();
-        ASCEND_LOGE("***Thread*%d: set device (%d): ret = %d", std::this_thread::get_id(), device_id, ret);
-    }
+        aclError ret = c10_npu::SetDevice(device_id);
+        if (ret != 0) {
+            C10_NPU_SHOW_ERR_MSG();
+            ASCEND_LOGE("***Thread*%d: set device (%d): ret = %d", std::this_thread::get_id(), device_id, ret);
+        }
 
-    while (repo->GetStatus() != RepoStatus::CAN_EXIT and repo->GetStatus() != RepoStatus::ERROR_EXIT) {
-        repo->Dequeue();
+        while (repo->GetStatus() != RepoStatus::CAN_EXIT and repo->GetStatus() != RepoStatus::ERROR_EXIT) {
+            repo->Dequeue();
+        }
+    } catch (const std::exception& error) {
+        ASCEND_LOGE("Task queue consumer escaped its dequeue loop: %s", error.what());
+        try {
+            repo->SetStatus(RepoStatus::ERROR_EXIT);
+        } catch (...) {
+            ASCEND_LOGE("Task queue consumer could not publish ERROR_EXIT.");
+        }
+    } catch (...) {
+        ASCEND_LOGE("Task queue consumer escaped its dequeue loop with an unknown exception.");
+        try {
+            repo->SetStatus(RepoStatus::ERROR_EXIT);
+        } catch (...) {
+            ASCEND_LOGE("Task queue consumer could not publish ERROR_EXIT.");
+        }
     }
-    return;
 }
 
 void Repository::InitRepo(c10::DeviceIndex device_id)
 {
-    if (data == nullptr) {
-        data = manager().Init(kQueueCapacity);
-        ASCEND_LOGI("TaskQueue is enable");
+    std::lock_guard<std::mutex> lock(lifecycle_mu_);
+    const Lifecycle current = lifecycle_.load(std::memory_order_acquire);
+    if (current == Lifecycle::Running) {
+        return;
     }
+    TORCH_CHECK(current == Lifecycle::Uninitialized || current == Lifecycle::Stopped,
+        "Task queue cannot initialize from its current lifecycle state.", PTA_ERROR(ErrCode::INTERNAL));
+    lifecycle_.store(Lifecycle::Initializing, std::memory_order_release);
 
-    efd_read = eventfd(0, 0);
-    efd_write = eventfd(0, 0);
-    efd_empty = eventfd(0, 0);
+    try {
+        device_idx = device_id;
+        repo_status.store(RepoStatus::INIT, std::memory_order_release);
+        ++status_epoch_;
+        {
+            std::lock_guard<std::mutex> error_lock(error_mu_);
+            error_ = ErrorRecord{};
+        }
+        data = manager().Init(static_cast<int>(queue_core_.Capacity()));
+        ASCEND_LOGI("TaskQueue is enable");
+        queue_core_.Start();
 
-    initialized = true;
-    SetStatus(INIT);
-    device_idx = device_id;
-    std::thread cur_consumer(StartConsume, this, device_id);
-    consumer = std::move(cur_consumer);
-
-    releaseQueue.InitReleaseQueue(device_id);
+        // Release storage must be live before the main consumer can transfer
+        // ownership to it.
+        releaseQueue.InitReleaseQueue(device_id);
+        std::thread cur_consumer(StartConsume, this, device_id);
+        consumer = std::move(cur_consumer);
+        lifecycle_.store(Lifecycle::Running, std::memory_order_release);
+        lifecycle_cv_.notify_all();
+    } catch (...) {
+        const std::exception_ptr initialization_error = std::current_exception();
+        queue_core_.RequestStop();
+        if (consumer.joinable()) {
+            repo_status.store(RepoStatus::NEED_EXIT, std::memory_order_release);
+            try {
+                consumer.join();
+            } catch (...) {
+                ASCEND_LOGE("Task queue initialization consumer cleanup failed.");
+            }
+        }
+        try {
+            queue_core_.StopAndDiscard();
+        } catch (...) {
+            ASCEND_LOGE("Task queue initialization metadata cleanup failed.");
+        }
+        try {
+            releaseQueue.Shutdown();
+        } catch (...) {
+            ASCEND_LOGE("Task queue initialization release cleanup failed.");
+        }
+        try {
+            ReleaseResource();
+        } catch (...) {
+            ASCEND_LOGE("Task queue initialization storage cleanup failed.");
+        }
+        data = nullptr;
+        lifecycle_.store(Lifecycle::Stopped, std::memory_order_release);
+        lifecycle_cv_.notify_all();
+        std::rethrow_exception(initialization_error);
+    }
 }
 
 std::string Repository::GetPara()
 {
-    if (IsEmptyQueue()) {
-        return "EmptyQueue";
+    const ErrorRecord error = SnapshotError();
+    if (!error.current_parameter.empty()) {
+        return error.current_parameter;
     }
-    __sync_synchronize();
-    std::string repo_para = get_func_error_msg(manager().getCurrentParams(data, read_idx.idx));
-    __sync_synchronize();
+    std::string repo_para = "EmptyQueue";
+    queue_core_.InspectHead([this, &repo_para](uint32_t slot) {
+        repo_para = get_func_error_msg(manager().getCurrentParams(data, slot));
+    });
     return repo_para;
 }
-
-static constexpr size_t kReleaseQueueCapacity = 8192;
-bool ReleaseQueue::WriteToReleaseQueue(void *cur_paras)
-{
-    if (IsFullQueue()) {
-        return false;
-    }
-    __sync_synchronize();
-    releaseManager().CopyRealseParam(data, write_idx.idx, cur_paras);
-
-    __sync_synchronize();
-    write_idx.idx = (write_idx.idx + 1) & (kReleaseQueueCapacity - 1);
-    return true;
-}
-
 void ReleaseQueue::PushToReleaseQueue(void *cur_paras)
 {
-    if (initialized == false) {
-        ASCEND_LOGE("Release queue is not initialized, shouldn't call PushToReleaseQueue(). !!");
-        return;
-    }
+    TORCH_CHECK(
+        lifecycle_.load(std::memory_order_acquire) == Lifecycle::Running,
+        "Release queue is not ready to accept a parameter.",
+        PTA_ERROR(ErrCode::INTERNAL));
 
-    bool ret = false;
-    while (ret == false) {
-        ret = WriteToReleaseQueue(cur_paras);
-        if (ret == true) {
-            break;
-        }
-    }
-}
-
-bool ReleaseQueue::ReadFromReleaseQueue()
-{
-    if (IsEmptyQueue()) {
-        return false;
-    }
-
-    __sync_synchronize();
-    releaseManager().ReleaseParam(data, read_idx.idx);
-
-    __sync_synchronize();
-    read_idx.idx = (read_idx.idx + 1) & (kReleaseQueueCapacity - 1);
-
-    return true;
+    const bool accepted = queue_core_.Enqueue(
+        [this, cur_paras](uint32_t slot) { releaseManager().CopyRealseParam(data, slot, cur_paras); },
+        queue::NoopWaitHooks{});
+    TORCH_CHECK(accepted, "Release queue stopped before accepting a parameter.", PTA_ERROR(ErrCode::INTERNAL));
 }
 
 void ReleaseQueue::PopFromReleaseQueue()
 {
-    if (initialized == false) {
+    const Lifecycle lifecycle = lifecycle_.load(std::memory_order_acquire);
+    if (lifecycle == Lifecycle::Uninitialized || lifecycle == Lifecycle::Stopped) {
         ASCEND_LOGE("Release queue is not initialized, shouldn't call PopFromReleaseQueue(). !!");
         return;
     }
 
-    bool ret = false;
-    while ((ret == false) && (GetStatus() != RepoStatus::CAN_EXIT)) {
-        ret = ReadFromReleaseQueue();
-        if (ret == false) {
-            if (GetStatus() == RepoStatus::NEED_EXIT) {
-                ChangeStatus(NEED_EXIT, CAN_EXIT);
-                break;
-            }
-            delay.tv_usec = 1;
-            select(0, nullptr, nullptr, nullptr, &delay);
-        }
+    const bool consumed = queue_core_.ConsumeOne(
+        [this](uint32_t slot) { releaseManager().ReleaseParam(data, slot); });
+    if (!consumed && GetStatus() == RepoStatus::NEED_EXIT) {
+        ChangeStatus(NEED_EXIT, CAN_EXIT);
     }
 }
 
 void StartRelease(ReleaseQueue *releaseQue)
 {
-    SetThreadType(ThreadType::RELEASE_THREAD);
-    SetThreadAffinity(releaseQue->GetDeviceID());
+    try {
+        SetThreadType(ThreadType::RELEASE_THREAD);
+        SetThreadAffinity(releaseQue->GetDeviceID());
 
-    while (releaseQue->GetStatus() != RepoStatus::CAN_EXIT) {
-        releaseQue->PopFromReleaseQueue();
+        while (releaseQue->GetStatus() != RepoStatus::CAN_EXIT) {
+            releaseQue->PopFromReleaseQueue();
+        }
+    } catch (const std::exception& error) {
+        ASCEND_LOGE("Release queue consumer failed: %s", error.what());
+        try {
+            releaseQue->SetStatus(RepoStatus::ERROR_EXIT);
+        } catch (...) {
+            ASCEND_LOGE("Release queue consumer could not publish ERROR_EXIT.");
+        }
+    } catch (...) {
+        ASCEND_LOGE("Release queue consumer failed with an unknown exception.");
+        try {
+            releaseQue->SetStatus(RepoStatus::ERROR_EXIT);
+        } catch (...) {
+            ASCEND_LOGE("Release queue consumer could not publish ERROR_EXIT.");
+        }
     }
-    return;
 }
 
 void ReleaseQueue::InitReleaseQueue(c10::DeviceIndex device_id)
 {
-    if (data == nullptr) {
-        data = releaseManager().Init(kReleaseQueueCapacity);
+    std::lock_guard<std::mutex> lock(lifecycle_mu_);
+    const Lifecycle current = lifecycle_.load(std::memory_order_acquire);
+    if (current == Lifecycle::Running) {
+        return;
     }
-
-    initialized = true;
-    SetStatus(INIT);
-    std::thread cur_releaser(StartRelease, this);
-    releaser = std::move(cur_releaser);
-    device_idx = device_id;
+    TORCH_CHECK(current == Lifecycle::Uninitialized || current == Lifecycle::Stopped,
+        "Release queue cannot initialize from its current lifecycle state.", PTA_ERROR(ErrCode::INTERNAL));
+    lifecycle_.store(Lifecycle::Initializing, std::memory_order_release);
+    try {
+        device_idx = device_id;
+        repo_status.store(RepoStatus::INIT, std::memory_order_release);
+        data = releaseManager().Init(static_cast<int>(queue_core_.Capacity()));
+        queue_core_.Start();
+        std::thread cur_releaser(StartRelease, this);
+        releaser = std::move(cur_releaser);
+        lifecycle_.store(Lifecycle::Running, std::memory_order_release);
+    } catch (...) {
+        const std::exception_ptr initialization_error = std::current_exception();
+        try {
+            queue_core_.StopAndDiscard();
+        } catch (...) {
+            ASCEND_LOGE("Release queue initialization metadata cleanup failed.");
+        }
+        try {
+            releaseManager().DeInit(data);
+        } catch (...) {
+            ASCEND_LOGE("Release queue initialization storage cleanup failed.");
+        }
+        data = nullptr;
+        lifecycle_.store(Lifecycle::Stopped, std::memory_order_release);
+        std::rethrow_exception(initialization_error);
+    }
 }
 
 ReleaseQueue::~ReleaseQueue()
 {
-    if (initialized) {
-        if (releaser.joinable()) {
-            SetStatus(NEED_EXIT);
-            releaser.join();
-        }
+    try {
+        Shutdown();
+    } catch (const std::exception& error) {
+        ASCEND_LOGE("Release queue cleanup failed: %s", error.what());
+    } catch (...) {
+        ASCEND_LOGE("Release queue cleanup failed with an unknown exception.");
     }
-    releaseManager().DeInit(data);
 }
 
-bool ReleaseQueue::IsFullQueue() const
+void ReleaseQueue::Shutdown()
 {
-    return ((write_idx.idx + 1) % kReleaseQueueCapacity) == read_idx.idx;
+    {
+        std::lock_guard<std::mutex> lock(lifecycle_mu_);
+        const Lifecycle current = lifecycle_.load(std::memory_order_relaxed);
+        if (current == Lifecycle::Uninitialized || current == Lifecycle::Stopped ||
+            current == Lifecycle::Stopping) {
+            return;
+        }
+        lifecycle_.store(Lifecycle::Stopping, std::memory_order_release);
+    }
+
+    if (repo_status.load(std::memory_order_acquire) != RepoStatus::ERROR_EXIT) {
+        repo_status.store(RepoStatus::NEED_EXIT, std::memory_order_release);
+    }
+    queue_core_.RequestStop();
+    if (releaser.joinable()) {
+        releaser.join();
+    }
+
+    const bool release_failed = queue_core_.Snapshot().failed;
+    if (release_failed) {
+        // ConsumeOne retains the failing head. ReleaseParam is not idempotent,
+        // so a callback that partially destroyed it must never be retried.
+        try {
+            queue_core_.StopAndDiscard();
+        } catch (...) {
+            ASCEND_LOGE("Release queue metadata cleanup failed.");
+        }
+    } else {
+        try {
+            queue_core_.StopAndDiscard(
+                [this](uint32_t slot) { releaseManager().ReleaseParam(data, slot); });
+        } catch (const std::exception& error) {
+            ASCEND_LOGE("Release queue cleanup failed, discarding metadata: %s", error.what());
+            try {
+                queue_core_.StopAndDiscard();
+            } catch (...) {
+                ASCEND_LOGE("Release queue metadata cleanup failed.");
+            }
+        } catch (...) {
+            ASCEND_LOGE("Release queue cleanup failed, discarding metadata.");
+            try {
+                queue_core_.StopAndDiscard();
+            } catch (...) {
+                ASCEND_LOGE("Release queue metadata cleanup failed.");
+            }
+        }
+    }
+    try {
+        releaseManager().DeInit(data);
+    } catch (const std::exception& error) {
+        ASCEND_LOGE("Release queue storage cleanup failed: %s", error.what());
+    } catch (...) {
+        ASCEND_LOGE("Release queue storage cleanup failed with an unknown exception.");
+    }
+    data = nullptr;
+    lifecycle_.store(Lifecycle::Stopped, std::memory_order_release);
 }
 
 RepoStatus ReleaseQueue::GetStatus() const
 {
-    if (initialized == false) {
+    const Lifecycle lifecycle = lifecycle_.load(std::memory_order_acquire);
+    if (lifecycle == Lifecycle::Uninitialized || lifecycle == Lifecycle::Stopped) {
         ASCEND_LOGE("Release queue is not initialized, shouldn't call GetStatus(). !!");
     }
 
@@ -976,21 +1277,36 @@ c10::DeviceIndex ReleaseQueue::GetDeviceID() const
 
 void ReleaseQueue::SetStatus(RepoStatus desired)
 {
-    if (initialized == false) {
+    const Lifecycle lifecycle = lifecycle_.load(std::memory_order_acquire);
+    if (lifecycle == Lifecycle::Uninitialized || lifecycle == Lifecycle::Stopped) {
         ASCEND_LOGE("Release queue is not initialized, shouldn't call SetStatus(). !!");
         return;
     }
 
+    std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mu_);
     repo_status = desired;
+    if (desired != RepoStatus::RUN && desired != RepoStatus::INIT) {
+        queue_core_.RequestStop();
+    } else if (queue_core_.Snapshot().mode == queue::QueueMode::Stopped) {
+        queue_core_.Start();
+    }
 }
 
 void ReleaseQueue::ChangeStatus(RepoStatus expected, RepoStatus desired)
 {
-    if (initialized == false) {
+    const Lifecycle lifecycle = lifecycle_.load(std::memory_order_acquire);
+    if (lifecycle == Lifecycle::Uninitialized || lifecycle == Lifecycle::Stopped) {
         ASCEND_LOGE("Release queue is not initialized, shouldn't call ChangeStatus(). !!");
         return;
     }
 
-    repo_status.compare_exchange_strong(expected, desired);
+    std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mu_);
+    if (repo_status.compare_exchange_strong(expected, desired)) {
+        if (desired != RepoStatus::RUN && desired != RepoStatus::INIT) {
+            queue_core_.RequestStop();
+        } else if (queue_core_.Snapshot().mode == queue::QueueMode::Stopped) {
+            queue_core_.Start();
+        }
+    }
 }
 } // namespace c10_npu

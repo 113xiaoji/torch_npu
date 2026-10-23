@@ -3,6 +3,7 @@
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/Generator.h>
 #include <torch/csrc/profiler/python/combined_traceback.h>
+#include <mutex>
 
 #include "torch_npu/csrc/npu/Event.h"
 #include "torch_npu/csrc/npu/DataParallelComm.h"
@@ -31,6 +32,9 @@
 
 PyObject* module;
 
+namespace {
+std::mutex npu_shutdown_mutex;
+}
 
 void AddPyMethodDefs(std::vector<PyMethodDef>& vector, PyMethodDef* methods)
 {
@@ -49,6 +53,7 @@ void AddPyMethodDefs(std::vector<PyMethodDef>& vector, PyMethodDef* methods)
 
 PyObject* THPModule_npu_shutdown(PyObject* self, PyObject* arg)
 {
+    std::lock_guard<std::mutex> shutdown_lock(npu_shutdown_mutex);
     int check_error;
     if (!PyBool_Check(arg)) {
         PyErr_SetString(PyExc_TypeError, "Expected a boolean value");
@@ -102,6 +107,7 @@ PyObject* THPModule_npu_shutdown(PyObject* self, PyObject* arg)
 
 PyObject* THPModule_npu_shutdown_synchronize(PyObject* /* unused */)
 {
+    std::lock_guard<std::mutex> shutdown_lock(npu_shutdown_mutex);
     ASCEND_LOGI("NPU shutdown synchronize begin.");
     if (!c10_npu::NpuSysCtrl::GetInstance().GetInitFlag()) {
         Py_RETURN_FALSE;
@@ -221,5 +227,28 @@ PyObject* initModule()
 
 PyMODINIT_FUNC PyInit__C(void)
 {
-    return initModule();
+    PyObject* result = initModule();
+    if (result == nullptr) {
+        return nullptr;
+    }
+
+#if defined(TORCH_NPU_EXPERIMENTAL_FREE_THREADED) && TORCH_NPU_EXPERIMENTAL_FREE_THREADED
+    constexpr int capability = 1;
+#else
+    constexpr int capability = 0;
+#endif
+    if (PyModule_AddIntConstant(result, "_experimental_free_threaded_build", capability) < 0) {
+        Py_DECREF(result);
+        module = nullptr;
+        return nullptr;
+    }
+
+#if defined(Py_GIL_DISABLED) && defined(TORCH_NPU_EXPERIMENTAL_FREE_THREADED) && TORCH_NPU_EXPERIMENTAL_FREE_THREADED
+    if (PyUnstable_Module_SetGIL(result, Py_MOD_GIL_NOT_USED) < 0) {
+        Py_DECREF(result);
+        module = nullptr;
+        return nullptr;
+    }
+#endif
+    return result;
 }

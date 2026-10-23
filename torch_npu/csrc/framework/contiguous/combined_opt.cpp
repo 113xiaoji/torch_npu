@@ -35,7 +35,10 @@ public:
         if (src_desc.cached_contiguous) {
             RECORD_FUNCTION("cached_contiguous_h_combined", std::vector<c10::IValue>({src}));
 
-            CachedContiguousOpt cachedContiguousOpt = TransContiguous::cached_contiguous_opt[src_desc.hash_src_desc];
+            CachedContiguousOpt cachedContiguousOpt;
+            if (!TransContiguous::TryGetCachedOpt(src_desc, "combined", cachedContiguousOpt)) {
+                return Optimizer(self, src, src_desc);
+            }
             shape_stride_stacks = cachedContiguousOpt.shape_stride_stack;
             offset_stack = cachedContiguousOpt.offset_stack;
             return pre_combined_to_contiguous(self, src, shape_stride_stacks, offset_stack);
@@ -56,7 +59,7 @@ public:
                 cached_opt.shape_stride_stack = cached_shape_stride_stacks;
                 cached_opt.offset_stack = cached_offset_stack;
                 cached_opt.contiguous_tensor_desc = src_desc;
-                TransContiguous::cached_contiguous_opt[src_desc.hash_src_desc] = cached_opt;
+                TransContiguous::cached_contiguous_opt.Insert(src_desc.hash_src_desc, cached_opt);
             }
             return contiguousOrNot;
         }

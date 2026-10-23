@@ -1,4 +1,51 @@
+import os
+
+
+def _experimental_free_threaded_cache_tag() -> str:
+    value = os.environ.get("TORCH_NPU_EXPERIMENTAL_FREE_THREADED", "0")
+    if value not in {"0", "1"}:
+        raise RuntimeError(
+            "TORCH_NPU_EXPERIMENTAL_FREE_THREADED must be exactly 0 or 1"
+        )
+
+    from torch_npu import _C
+
+    requested = value == "1"
+    try:
+        build_marker = _C._experimental_free_threaded_build
+    except AttributeError:
+        raise RuntimeError(
+            "torch_npu._C is missing build marker "
+            "_experimental_free_threaded_build"
+        ) from None
+    if type(build_marker) is not int or build_marker not in (0, 1):
+        raise RuntimeError(
+            "torch_npu._C build marker _experimental_free_threaded_build "
+            "must be an exact integer 0 or 1"
+        )
+    built = build_marker == 1
+    if requested != built:
+        raise RuntimeError(
+            "TORCH_NPU_EXPERIMENTAL_FREE_THREADED mismatch: "
+            f"requested={requested}, built={built}"
+        )
+    return "ft1" if requested else "ft0"
+
+
+def _experimental_free_threaded_module_declaration() -> str:
+    if _experimental_free_threaded_cache_tag() == "ft0":
+        return ""
+    return """#ifdef Py_GIL_DISABLED
+  if (PyUnstable_Module_SetGIL(m, Py_MOD_GIL_NOT_USED) < 0) {
+    Py_DECREF(m);
+    return NULL;
+  }
+#endif"""
+
+
 def cpp_launcher(signature, kernel_name, ranks, dynamic=False) -> str:
+    module_declaration = _experimental_free_threaded_module_declaration()
+
     def _ty_to_cpp(ty):
         if ty[0] == '*':
             return "void*"
@@ -272,6 +319,7 @@ PyMODINIT_FUNC PyInit___launcher(void) {{
     return NULL;
   }}
   PyModule_AddFunctions(m, ModuleMethods);
+{module_declaration}
   return m;
 }}
 """
@@ -395,6 +443,7 @@ PyMODINIT_FUNC PyInit___launcher(void) {{
     return NULL;
   }}
   PyModule_AddFunctions(m, ModuleMethods);
+{module_declaration}
   return m;
 }}
 """

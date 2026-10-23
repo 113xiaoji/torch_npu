@@ -26,6 +26,7 @@
 #include "torch_npu/csrc/aten/CustomFunctions.h"
 #include "torch_npu/csrc/core/NPUBridge.h"
 #include "torch_npu/csrc/distributed/Init.h"
+#include "torch_npu/csrc/utils/PythonThreadState.h"
 
 
 namespace {
@@ -49,12 +50,10 @@ public:
         : impl_(c10::intrusive_ptr<T>::unsafe_steal_from_new(impl)) {}
     ~IntrusivePtrNoGilDestructor() {
         if (impl_) {
-            if (PyGILState_Check() != 0) {
-                pybind11::gil_scoped_release release;
-                impl_.reset();
-            } else {
-                impl_.reset();
-            }
+#ifndef BUILD_LIBTORCH
+            torch_npu::utils::PythonThreadStateDetachGuard detach_guard;
+#endif
+            impl_.reset();
         }
     }
     T& operator*() const noexcept {

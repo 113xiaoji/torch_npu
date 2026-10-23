@@ -34,7 +34,10 @@ public:
     {
         if (src_desc.cached_contiguous) {
             RECORD_FUNCTION("cached_contiguous_d_Transpose", std::vector<c10::IValue>({src}));
-            CachedContiguousOpt cachedContiguousOpt = TransContiguous::cached_contiguous_opt[src_desc.hash_src_desc];
+            CachedContiguousOpt cachedContiguousOpt;
+            if (!TransContiguous::TryGetCachedOpt(src_desc, "permute", cachedContiguousOpt)) {
+                return Optimizer(self, src, src_desc);
+            }
             c10::SmallVector<int64_t, MAX_DIM> sizes = cachedContiguousOpt.cached_opt_parameters.pop_back_val();
             c10::SmallVector<int64_t, MAX_DIM> perm = cachedContiguousOpt.cached_opt_parameters.pop_back_val();
             permute_to_contiguous(self, src, perm, sizes);
@@ -52,7 +55,7 @@ public:
             cached_opt.cached_opt_parameters.emplace_back(perm);
             cached_opt.cached_opt_parameters.emplace_back(sizes);
             cached_opt.contiguous_tensor_desc = src_desc;
-            TransContiguous::cached_contiguous_opt[src_desc.hash_src_desc] = cached_opt;
+            TransContiguous::cached_contiguous_opt.Insert(src_desc.hash_src_desc, cached_opt);
             permute_to_contiguous(self, src, perm, sizes);
             return true;
         }

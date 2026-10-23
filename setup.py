@@ -37,6 +37,18 @@ with open(os.path.join(BASE_DIR, "version.txt")) as version_f:
     VERSION = version_f.read().strip()
 UNKNOWN = "Unknown"
 BUILD_PERMISSION = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP
+EXPERIMENTAL_FREE_THREADED = os.environ.get(
+    "TORCH_NPU_EXPERIMENTAL_FREE_THREADED", "0"
+)
+if EXPERIMENTAL_FREE_THREADED not in {"0", "1"}:
+    raise RuntimeError(
+        "TORCH_NPU_EXPERIMENTAL_FREE_THREADED must be exactly 0 or 1"
+    )
+EXPERIMENTAL_FREE_THREADED_DEFINE_MACROS = (
+    [("TORCH_NPU_EXPERIMENTAL_FREE_THREADED", "1")]
+    if EXPERIMENTAL_FREE_THREADED == "1"
+    else []
+)
 
 DISABLE_TORCHAIR = "FALSE"
 if os.environ.get("DISABLE_INSTALL_TORCHAIR") is not None:
@@ -355,6 +367,10 @@ class CPPLibBuild(build_clib, object):
             '-DPYTHON_INCLUDE_DIR=' + get_paths().get('include'),
             '-DTORCH_VERSION=' + VERSION,
             '-DPYTORCH_INSTALL_DIR=' + get_pytorch_dir()]
+        cmake_args.append(
+            "-DTORCH_NPU_EXPERIMENTAL_FREE_THREADED="
+            + ("ON" if EXPERIMENTAL_FREE_THREADED == "1" else "OFF")
+        )
 
         if DISABLE_TORCHAIR == 'FALSE':
             if check_torchair_valid(BASE_DIR):
@@ -750,7 +766,10 @@ setup(
                 extra_compile_args=extra_compile_args + ['-fstack-protector-all'] + ['-D__FILENAME__=\"InitNpuBindings.cpp\"'],
                 library_dirs=["lib"],
                 extra_link_args=extra_link_args + ['-Wl,-rpath,$ORIGIN/lib', '-Wl,-Bsymbolic-functions'],
-                define_macros=[('_GLIBCXX_USE_CXX11_ABI', '1' if USE_CXX11_ABI else '0'), ('GLIBCXX_USE_CXX11_ABI', '1' if USE_CXX11_ABI else '0')]
+                define_macros=[
+                    ('_GLIBCXX_USE_CXX11_ABI', '1' if USE_CXX11_ABI else '0'),
+                    ('GLIBCXX_USE_CXX11_ABI', '1' if USE_CXX11_ABI else '0'),
+                ] + EXPERIMENTAL_FREE_THREADED_DEFINE_MACROS
             ),
     ],
     install_requires=[

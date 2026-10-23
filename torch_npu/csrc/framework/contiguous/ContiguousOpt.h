@@ -3,6 +3,7 @@
 
 #include "torch_npu/csrc/core/npu/register/OptionsManager.h"
 #include "torch_npu/csrc/framework/contiguous/contiguous_register.h"
+#include "torch_npu/csrc/framework/contiguous/ContiguousOptCache.h"
 #include "torch_npu/csrc/framework/utils/OpPreparation.h"
 #include <ATen/record_function.h>
 
@@ -53,7 +54,9 @@ public:
         bool OpenCombined = true);
     static bool cached_contiguous_optimize_with_anyformat_(
         at::Tensor &self, const at::Tensor &src, ContiguousTensorDesc &src_desc);
-    static ska::flat_hash_map<size_t, CachedContiguousOpt> cached_contiguous_opt;
+    static ContiguousOptCache<CachedContiguousOpt> cached_contiguous_opt;
+    static bool TryGetCachedOpt(const ContiguousTensorDesc &src_desc,
+                                const char *expected_case, CachedContiguousOpt &snapshot);
     static at::Tensor view_tensor(const at::Tensor& self, int64_t offset, const c10::IntArrayRef& sizes, const c10::IntArrayRef& strides);
 
 private:

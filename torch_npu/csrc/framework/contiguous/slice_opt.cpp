@@ -33,7 +33,10 @@ public:
     {
         if (src_desc.cached_contiguous) {
             RECORD_FUNCTION("cached_contiguous_d_Slice", std::vector<c10::IValue>({src}));
-            CachedContiguousOpt cachedContiguousOpt = TransContiguous::cached_contiguous_opt[src_desc.hash_src_desc];
+            CachedContiguousOpt cachedContiguousOpt;
+            if (!TransContiguous::TryGetCachedOpt(src_desc, "slice", cachedContiguousOpt)) {
+                return Optimizer(self, src, src_desc);
+            }
             c10::SmallVector<int64_t, MAX_DIM> size = cachedContiguousOpt.cached_opt_parameters.pop_back_val();
             c10::SmallVector<int64_t, MAX_DIM> offsets = cachedContiguousOpt.cached_opt_parameters.pop_back_val();
             slice_to_contiguous(self, src, offsets, size, src_desc);
@@ -49,7 +52,7 @@ public:
             cached_opt.cached_opt_parameters.emplace_back(offsets);
             cached_opt.cached_opt_parameters.emplace_back(size);
             cached_opt.contiguous_tensor_desc = src_desc;
-            TransContiguous::cached_contiguous_opt[src_desc.hash_src_desc] = cached_opt;
+            TransContiguous::cached_contiguous_opt.Insert(src_desc.hash_src_desc, cached_opt);
             slice_to_contiguous(self, src, offsets, size, src_desc);
             return true;
         }

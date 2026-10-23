@@ -7,7 +7,7 @@ namespace native {
 
 OptimizationCases TransContiguous::optCasesDefault = {};
 OptimizationCases TransContiguous::optCasesAnyFormat = {"reshape", "slice"};
-ska::flat_hash_map<size_t, CachedContiguousOpt> TransContiguous::cached_contiguous_opt;
+ContiguousOptCache<CachedContiguousOpt> TransContiguous::cached_contiguous_opt{CachedMaxSize};
 
 
 ContiguousTensorDesc TransContiguous::GetTensorDescInfo(
@@ -128,6 +128,16 @@ bool equalDesc(const ContiguousTensorDesc &src_desc, const ContiguousTensorDesc 
     return false;
 }
 
+bool TransContiguous::TryGetCachedOpt(const ContiguousTensorDesc &src_desc,
+                                     const char *expected_case, CachedContiguousOpt &snapshot)
+{
+    // Find copies the complete value while locked. No cache reference survives
+    // this call, and optimizer/device callbacks execute after unlocking.
+    return cached_contiguous_opt.Find(src_desc.hash_src_desc, snapshot) &&
+           equalDesc(src_desc, snapshot.contiguous_tensor_desc) &&
+           snapshot.cached_opt_case == expected_case;
+}
+
 bool TransContiguous::cached_contiguous_optimize_with_anyformat_(
     at::Tensor &self, const at::Tensor &src, ContiguousTensorDesc &src_desc)
 {
@@ -136,12 +146,12 @@ bool TransContiguous::cached_contiguous_optimize_with_anyformat_(
         return false;
     }
     src_desc.hash_src_desc = GetHash_(src_desc);
-    auto it = TransContiguous::cached_contiguous_opt.find(src_desc.hash_src_desc);
-    if (it != TransContiguous::cached_contiguous_opt.end()) {
+    CachedContiguousOpt snapshot;
+    if (cached_contiguous_opt.Find(src_desc.hash_src_desc, snapshot)) {
         // Cached
-        if (equalDesc(src_desc, it->second.contiguous_tensor_desc)) {
+        if (equalDesc(src_desc, snapshot.contiguous_tensor_desc)) {
             src_desc.cached_contiguous = true;
-            auto &opt_case = it->second.cached_opt_case;
+            const auto &opt_case = snapshot.cached_opt_case;
             return register_opt::CopyOptRegister::GetInstance()->CachedRun(opt_case, self,
                                                                            src, src_desc);
         }
@@ -150,7 +160,7 @@ bool TransContiguous::cached_contiguous_optimize_with_anyformat_(
 
     for (auto &opt_case : src_desc.opt_cases_) {
         bool res = false;
-        if (TransContiguous::cached_contiguous_opt.size() >= CachedMaxSize) {
+        if (cached_contiguous_opt.AtCapacity()) {
             res = register_opt::CopyOptRegister::GetInstance()->Run(opt_case, self, src, src_desc);
         } else {
             src_desc.cached_contiguous = false;

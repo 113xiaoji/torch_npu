@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <atomic>
+#include <cstring>
 
 #include "torch_npu/csrc/core/npu/NPUException.h"
 #include "torch_npu/csrc/core/npu/register/OptionRegister.h"
@@ -8,6 +10,10 @@
 
 namespace c10_npu {
 namespace option {
+namespace {
+std::atomic<c10_npu::option::OptionInterface*> fast_allow_internal_format{nullptr};
+std::atomic<c10_npu::option::OptionInterface*> fast_compatible_impl{nullptr};
+}
 OptionInterface::OptionInterface(OptionCallBack callback)
 {
     this->callback = callback;
@@ -43,7 +49,13 @@ OptionRegister *OptionRegister::GetInstance()
 void OptionRegister::Register(const std::string &name, ::std::unique_ptr<OptionInterface> &ptr)
 {
     std::lock_guard<std::mutex> lock(mu_);
-    registry.emplace(name, std::move(ptr));
+    auto result = registry.emplace(name, std::move(ptr));
+    auto* value = result.first->second.get();
+    if (name == "ALLOW_INTERNAL_FORMAT") {
+        fast_allow_internal_format.store(value, std::memory_order_release);
+    } else if (name == "TORCH_NPU_USE_COMPATIBLE_IMPL") {
+        fast_compatible_impl.store(value, std::memory_order_release);
+    }
 }
 
 void OptionRegister::Set(const std::string &name, const std::string &val)
@@ -82,6 +94,29 @@ OptionInterfaceBuilder::OptionInterfaceBuilder(const std::string &name, ::std::u
     }
 }
 } // namespace register_options
+
+
+namespace {
+struct FastCacheLifetime {
+    ~FastCacheLifetime() {
+        fast_allow_internal_format.store(nullptr, std::memory_order_release);
+        fast_compatible_impl.store(nullptr, std::memory_order_release);
+    }
+};
+}
+c10::optional<std::string> GetOptionFast(const char* key)
+{
+    auto* registry = register_options::OptionRegister::GetInstance();
+    static FastCacheLifetime lifetime;
+    OptionInterface* value = nullptr;
+    if (key != nullptr && std::strcmp(key, "ALLOW_INTERNAL_FORMAT") == 0) {
+        value = fast_allow_internal_format.load(std::memory_order_acquire);
+    } else if (key != nullptr && std::strcmp(key, "TORCH_NPU_USE_COMPATIBLE_IMPL") == 0) {
+        value = fast_compatible_impl.load(std::memory_order_acquire);
+    }
+    if (value != nullptr) return value->Get();
+    return registry->Get(key == nullptr ? std::string{} : std::string(key));
+}
 
 void SetOption(const std::string &key, const std::string &val)
 {

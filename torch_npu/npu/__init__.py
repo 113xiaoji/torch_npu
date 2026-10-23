@@ -203,26 +203,31 @@ default_generators: Tuple[torch._C.Generator] = ()  # type: ignore[assignment]
 _is_internal_in_bad_fork = False
 _initialized = False
 _tls = threading.local()
-_initialization_lock = threading.Lock()
+_initialization_lock = threading.RLock()
 _queued_calls = []  # don't invoke these until initialization occurs
 _original_pid = False
 
 
 def _is_in_bad_fork():
-    return _is_internal_in_bad_fork
+    with _initialization_lock:
+        return _is_internal_in_bad_fork
 
 
 def is_initialized():
     r"""Returns whether PyTorch's NPU state has been initialized."""
-    return _initialized and not _is_internal_in_bad_fork
+    with _initialization_lock:
+        return _initialized and not _is_internal_in_bad_fork
 
 
 def _lazy_call(cb):
-    if _initialized:
-        cb()
-    else:
-        # Don't store the actual traceback to avoid memory cycle
-        _queued_calls.append((cb, traceback.format_stack()))
+    with _initialization_lock:
+        if not _initialized:
+            # Don't store the actual traceback to avoid memory cycle
+            _queued_calls.append((cb, traceback.format_stack()))
+            return
+    # An initialized callback may call back into NPU code.  Do not execute it
+    # while holding the coordinator lock.
+    cb()
 
 
 class _DeferredNpuCallError(Exception):
@@ -277,54 +282,64 @@ def npurt():
 
 
 def _lazy_init():
-    def _queue_call(queued_calls):
-        for queued_call, orig_traceback in queued_calls:
-            try:
-                queued_call()
-            except Exception as e:
-                msg = (f"NPU call failed lazily at initialization with error: {str(e)}\n\n"
-                       f"NPU call was originally invoked at:\n\n{orig_traceback}")
-                raise DeferredNpuCallError(msg + pta_error(ErrCode.INTERNAL)) from e
-
     global _initialized, _original_pid, _queued_calls
-    if _initialized or hasattr(_tls, 'is_initializing'):
+    if hasattr(_tls, 'is_initializing'):
         return
     with _initialization_lock:
-        # We be double-checked locking, boys!  This is OK because
-        # the above test was GIL protected anyway.  The inner test
-        # is for when a thread blocked on some other thread which was
-        # doing the initialization; when they get the lock, they will
-        # find there is nothing left to do.
         if _initialized:
             return
-        # It is important to prevent other threads from entering _lazy_init
-        # immediately, while we are still guaranteed to have the GIL, because some
-        # of the C calls we make below will release the GIL
         if _is_internal_in_bad_fork:
             raise RuntimeError(
                 "Cannot re-initialize NPU in forked subprocess. To use NPU with "
                 "multiprocessing, you must use the 'spawn' start method")
 
-        torch_npu._C._npu_init()
-
-        _original_pid = os.getpid()
-        # Some of the queued calls may reentrantly call _lazy_init();
-        # we need to just return without initializing in that case.
-        # However, we must not let any *other* threads in!
         _tls.is_initializing = True
         try:
-            _queue_call(_queued_calls)
+            # Record an initialization attempt before entering native code so
+            # a fork during a partially completed attempt is rejected in the
+            # child as conservatively as a completed initialization.
+            _original_pid = os.getpid()
+            torch_npu._C._npu_init()
+
+            # A callback may queue more work reentrantly.  Swap out one stable
+            # batch at a time so newly queued calls run in the next batch.
+            while _queued_calls:
+                queued_calls = _queued_calls
+                _queued_calls = []
+                for index, (queued_call, orig_traceback) in enumerate(queued_calls):
+                    try:
+                        queued_call()
+                    except BaseException as error:
+                        # Successful callbacks from this batch are not repeated.
+                        # Preserve the failing and remaining callbacks ahead of
+                        # work queued reentrantly by the failing callback.
+                        _queued_calls[0:0] = queued_calls[index:]
+                        if isinstance(error, Exception):
+                            msg = (f"NPU call failed lazily at initialization with error: {str(error)}\n\n"
+                                   f"NPU call was originally invoked at:\n\n{orig_traceback}")
+                            raise _DeferredNpuCallError(
+                                msg + pta_error(ErrCode.INTERNAL)) from error
+                        raise
+            _initialized = True
         finally:
             delattr(_tls, 'is_initializing')
-        _initialized = True
 
 
 def _after_fork(arg):
-    global _initialized, _is_internal_in_bad_fork
-    if _initialized and _original_pid != os.getpid():
-        _initialized = False
-        _is_internal_in_bad_fork = True
-        torch_npu._C._npu_set_run_yet_variable_to_false()
+    global _initialized, _is_internal_in_bad_fork, _initialization_lock, _tls
+    was_initialized = _initialized
+    original_pid = _original_pid
+
+    # A lock may have been held by a thread which no longer exists in the
+    # child.  Never acquire that inherited lock; publish a fresh coordinator
+    # and thread-local state before changing the child state.
+    _initialization_lock = threading.RLock()
+    _tls = threading.local()
+    with _initialization_lock:
+        if (was_initialized or original_pid) and original_pid != os.getpid():
+            torch_npu._C._npu_set_run_yet_variable_to_false()
+            _initialized = False
+            _is_internal_in_bad_fork = True
 
 
 _register_after_fork(_after_fork, _after_fork)

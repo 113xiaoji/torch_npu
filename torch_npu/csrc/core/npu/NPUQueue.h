@@ -4,9 +4,17 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <condition_variable>
+#include <cstdint>
+#include <functional>
 
 #include <c10/core/Device.h>
 #include "torch_npu/csrc/logging/LogContext.h"
+#ifdef TORCH_NPU_EXPERIMENTAL_LOCKFREE_QUEUE
+#include "torch_npu/csrc/core/npu/ExperimentalSequenceMpscQueueCore.h"
+#else
+#include "torch_npu/csrc/core/npu/OrderedMpscQueueCore.h"
+#endif
 #include <third_party/acl/inc/acl/acl_op.h>
 
 namespace c10_npu {
@@ -29,11 +37,6 @@ inline std::shared_ptr<npu_logging::Logger>& GetQueueLogger()
         ASCEND_LOGI(format, ##__VA_ARGS__);                                    \
     } while (0);
 
-struct sring_idx {
-  bool working = false;
-  volatile unsigned int idx = 0;
-};
-
 enum RepoStatus {
   INIT = 0,
   RUN = 1,
@@ -49,11 +52,23 @@ enum RepoStatus {
   SUSPECT_REMOTE_EXIT = 11,
 };
 
+enum class Lifecycle {
+  Uninitialized,
+  Initializing,
+  Running,
+  Stopping,
+  Stopped,
+};
+
+struct ErrorRecord {
+  std::string repository;
+  std::string acl;
+  std::string queue;
+  std::string current_parameter;
+};
+
 // c10::SmallVector max size
 const int N = 32;
-// When task queue is empty, poll the read queue for at most 1ms till more tasks sent in.
-// In terms of time granularity, executing query function--IsEmptyQueue() for 200000 times is equal to 1ms.
-const int READ_QUEUE_POLL_MAX_LOOP = 200000;
 
 class ReleaseQueue {
 public:
@@ -62,14 +77,12 @@ public:
   void PushToReleaseQueue(void* cur_paras);
   void PopFromReleaseQueue();
   void InitReleaseQueue(c10::DeviceIndex device_id);
+  void Shutdown();
   RepoStatus GetStatus() const;
   c10::DeviceIndex GetDeviceID() const;
 
 private:
-  inline bool IsEmptyQueue() {return read_idx.idx == write_idx.idx;};
-  bool IsFullQueue() const;
-  bool WriteToReleaseQueue(void* cur_paras);
-  bool ReadFromReleaseQueue();
+  friend void StartRelease(ReleaseQueue* releaseQue);
   void SetStatus(RepoStatus desired);
   void ChangeStatus(RepoStatus expected, RepoStatus desired);
 
@@ -79,10 +92,15 @@ private:
   c10::DeviceIndex device_idx;
 
 private:
-  sring_idx read_idx;
-  sring_idx write_idx;
-  std::atomic<RepoStatus> repo_status;
-  bool initialized = false;
+  #ifdef TORCH_NPU_EXPERIMENTAL_LOCKFREE_QUEUE
+  using QueueCore = queue::ExperimentalSequenceMpscQueueCore;
+#else
+  using QueueCore = queue::OrderedMpscQueueCore;
+#endif
+  QueueCore queue_core_{8192};
+  std::atomic<RepoStatus> repo_status{RepoStatus::INIT};
+  std::atomic<Lifecycle> lifecycle_{Lifecycle::Uninitialized};
+  std::mutex lifecycle_mu_;
 };
 
 class NPUQueueBase {
@@ -125,41 +143,37 @@ public:
   void ClearQueue() override;
   void SetQueueErrMsg(const char *errmsg) override;
   std::string GetQueueErrMsg() override;
-  bool IsEmptyRepo() override { return IsEmptyQueue(); }
+  bool IsEmptyRepo() override { return queue_core_.Snapshot().size == 0; }
 
 private:
   void ReleaseResource();
-  inline bool IsEmptyQueue() {return read_idx.idx == write_idx.idx;};
-  bool IsFullQueue() const;
-  void SetWriteWorking(bool isWorking) {write_idx.working = isWorking;};
-  void SetReadWorking(bool isWorking) {read_idx.working = isWorking;};
-  bool IsWriteWorking() const {return write_idx.working;};
-  bool IsReadWorking() const {return read_idx.working;};
-  bool WriteQueue(void* cur_paras);
   bool ReadQueue();
   void CheckDeviceError(int ret, std::string& err_msg);
   void ThrowDeviceError(RepoStatus current_status, void* cur_paras);
+  ErrorRecord SnapshotError() const;
+  void RecordRepositoryError(std::string message);
+  void RecordAclError(std::string message);
+  void RecordCurrentParameter(std::string message);
 
 private:
   void* data = nullptr;
   std::thread consumer;
-  int efd_read;
-  int efd_write;
-  int efd_empty;
   c10::DeviceIndex device_idx;
-  std::string error_msg;
 
 private:
-  sring_idx read_idx;
-  sring_idx write_idx;
-  std::atomic<RepoStatus> repo_status;
-  bool need_empty = false;
-  bool initialized = false;
-  std::mutex mu_empty;
-  // In theory, this is not necessary.
-  // The logic is ensured by original pytorch, but this is added here just in
-  // case.
-  std::mutex mu_enqueue;
+  #ifdef TORCH_NPU_EXPERIMENTAL_LOCKFREE_QUEUE
+  using QueueCore = queue::ExperimentalSequenceMpscQueueCore;
+#else
+  using QueueCore = queue::OrderedMpscQueueCore;
+#endif
+  QueueCore queue_core_{4096};
+  std::atomic<RepoStatus> repo_status{RepoStatus::INIT};
+  std::atomic<Lifecycle> lifecycle_{Lifecycle::Uninitialized};
+  std::mutex lifecycle_mu_;
+  std::condition_variable lifecycle_cv_;
+  uint64_t status_epoch_ = 0;
+  mutable std::mutex error_mu_;
+  ErrorRecord error_;
   ReleaseQueue releaseQueue;
 };
 

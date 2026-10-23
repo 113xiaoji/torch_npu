@@ -22,7 +22,10 @@ from .utils import (
 )
 from .. import config as anir_config
 from ..cache import get_cache_manager
-from .codegen.cpp_wrapper import cpp_launcher
+from .codegen.cpp_wrapper import (
+    _experimental_free_threaded_cache_tag,
+    cpp_launcher,
+)
 from .meta_compiler import MetaCompiler
 
 akg_spec = importlib.util.find_spec("akg")
@@ -135,7 +138,8 @@ class NpuMlirCompiler(MetaCompiler):
             spec.loader.exec_module(mod)
             return mod
 
-        so_name = f"{self.kernel_name}.so"
+        launcher_cache_tag = _experimental_free_threaded_cache_tag()
+        so_name = f"{self.kernel_name}_{launcher_cache_tag}.so"
         cache_so_path = self.cache.get_file(so_name)
         if cache_so_path is None or (anir_config.always_compile and cache_so_path not in global_cache):
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -341,6 +345,8 @@ class NpuMlirCompiler(MetaCompiler):
             spec.loader.exec_module(mod)
             return mod
 
+        launcher_cache_tag = _experimental_free_threaded_cache_tag()
+        so_name = f"{self.kernel_name}_{launcher_cache_tag}.so"
         best_kernel = self.cache.get_file('best_kernel')
         if best_kernel is None:
             raise RuntimeError("can not find best kernel")
@@ -349,7 +355,7 @@ class NpuMlirCompiler(MetaCompiler):
         if not kernel_path.endswith(('.so', '.o')):
             self.register_fx_fallback(self.kernel_meta)
             return
-        so_path = self.cache.get_file(f'{self.kernel_name}.so')
+        so_path = self.cache.get_file(so_name)
         if kernel_path is None:
             return RuntimeError()
         mod = get_launch_mod(so_path)

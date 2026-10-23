@@ -85,23 +85,26 @@ void SetDeterministicFromLevel()
 #ifndef BUILD_LIBTORCH
 std::string GetTorchNpuFile()
 {
-    PyObject *file_attr = nullptr;
-    {
-        pybind11::gil_scoped_acquire get_gil;
-        auto torch = THPObjectPtr(PyImport_ImportModule("torch"));
-        if (!torch) {
-            throw python_error();
-        }
-        file_attr = PyObject_GetAttrString(torch, "__file__");
+    pybind11::gil_scoped_acquire get_gil;
+    auto torch = THPObjectPtr(PyImport_ImportModule("torch"));
+    if (!torch) {
+        throw python_error();
     }
-    if (file_attr) {
-        const char *file_path = PyUnicode_AsUTF8(file_attr);
-        std::string file_path_str = std::string(file_path);
-        std::string key_word = "torch";
-        size_t pos = file_path_str.rfind(key_word);
-        if (pos != std::string::npos) {
-            return file_path_str.substr(0, pos);
-        }
+    auto file_attr = THPObjectPtr(PyObject_GetAttrString(torch.get(), "__file__"));
+    if (!file_attr) {
+        PyErr_Clear();
+        ASCEND_LOGW("Failed to get __file__ attribute.");
+        return "";
+    }
+    const char *file_path = PyUnicode_AsUTF8(file_attr.get());
+    if (file_path == nullptr) {
+        throw python_error();
+    }
+    std::string file_path_str(file_path);
+    const std::string key_word = "torch";
+    const size_t pos = file_path_str.rfind(key_word);
+    if (pos != std::string::npos) {
+        return file_path_str.substr(0, pos);
     }
     ASCEND_LOGW("Failed to get __file__ attribute.");
     return "";
@@ -189,7 +192,7 @@ std::string GetAclConfigJsonPath()
 
 namespace c10_npu {
 
-NpuSysCtrl::NpuSysCtrl() : repeat_init_acl_flag_(true), init_flag_(false), lazy_init_flag_(false), host_finalize_flag_(false), device_id_(0) {}
+NpuSysCtrl::NpuSysCtrl() : repeat_init_acl_flag_(true) {}
 
 // Get NpuSysCtrl singleton instance
 NpuSysCtrl &NpuSysCtrl::GetInstance()
@@ -201,13 +204,31 @@ NpuSysCtrl &NpuSysCtrl::GetInstance()
 // Environment Initialize, return Status: SUCCESS, FAILED
 NpuSysCtrl::SysStatus NpuSysCtrl::Initialize(int device_id)
 {
-    if (init_flag_) {
-        return INIT_SUCC;
+    {
+        std::unique_lock<std::mutex> lifecycle_lock(init_mutex_);
+        lifecycle_cv_.wait(lifecycle_lock, [this]() {
+            return lifecycle_ != RuntimeLifecycle::Initializing &&
+                lifecycle_ != RuntimeLifecycle::Finalizing;
+        });
+        if (lifecycle_ == RuntimeLifecycle::Running) {
+            return INIT_SUCC;
+        }
+        if (lifecycle_ == RuntimeLifecycle::Failed) {
+            const std::exception_ptr error = initialization_error_;
+            lifecycle_lock.unlock();
+            if (error) {
+                std::rethrow_exception(error);
+            }
+            TORCH_CHECK(false, "NPU runtime initialization previously failed.", PTA_ERROR(ErrCode::INTERNAL));
+        }
+        lifecycle_ = RuntimeLifecycle::Initializing;
+        initialization_error_ = nullptr;
+        repeat_init_acl_flag_ = true;
+        host_finalize_flag_.store(false, std::memory_order_release);
     }
-    std::lock_guard<std::mutex> lock(init_mutex_);
-    if (init_flag_) {
-        return INIT_SUCC;
-    }
+
+    bool owns_acl_runtime = false;
+    try {
     std::string json_path = GetAclConfigJsonPath();
     const char *json_path_ptr = json_path == "" ? nullptr : json_path.c_str();
     ASCEND_LOGD("get acl json path:%s.", json_path_ptr);
@@ -220,6 +241,8 @@ NpuSysCtrl::SysStatus NpuSysCtrl::Initialize(int device_id)
         ASCEND_LOGI("acl has already init by other component.");
     } else if (init_ret != ACL_ERROR_NONE) {
         NPU_CHECK_ERROR(init_ret, "aclInit");
+    } else {
+        owns_acl_runtime = true;
     }
 
     if (c10_npu::option::OptionsManager::CheckAclDumpDateEnable()) {
@@ -235,16 +258,19 @@ NpuSysCtrl::SysStatus NpuSysCtrl::Initialize(int device_id)
 
     if (!c10_npu::is_lazy_set_device()) {
         // There's no need to call c10_npu::GetDevice at the start of the process, because device 0 may not be needed
-        auto ret = aclrtGetDevice(&device_id_);
+        int initialized_device = device_id_.load(std::memory_order_acquire);
+        auto ret = aclrtGetDevice(&initialized_device);
         if (ret != ACL_ERROR_NONE) {
-            device_id_ = (device_id == -1) ? 0 : device_id;
-            NPU_CHECK_ERROR(c10_npu::SetDevice(device_id_));
+            initialized_device = (device_id == -1) ? 0 : device_id;
+            NPU_CHECK_ERROR(c10_npu::SetDevice(initialized_device));
         } else {
-            ASCEND_LOGW("Npu device %d has been set before global init.", device_id_);
+            ASCEND_LOGW("Npu device %d has been set before global init.", initialized_device);
         }
+        device_id_.store(initialized_device, std::memory_order_release);
     } else {
         if (device_id >= 0) {
             NPU_CHECK_ERROR(c10_npu::SetDevice(device_id));
+            device_id_.store(device_id, std::memory_order_release);
         }
     }
 
@@ -285,24 +311,50 @@ NpuSysCtrl::SysStatus NpuSysCtrl::Initialize(int device_id)
         NPU_CHECK_ERROR(c10_npu::acl::AclrtSetOpExecuteTimeOut(kMaxOpExecuteTimeOut));
     }
 
-    // lazy call for the setoption
-    for (const auto &iter: lazy_fn_) {
-        ASCEND_LOGD("start setoption for the lazy call.");
-        const auto &call_ = iter.first;
-        const auto &in = iter.second;
-        call_(in);
-    }
-
-    lazy_fn_.clear();
-
     if (SetThreadAffinityInInitialize()) {
-        SetThreadAffinity(device_id_);
+        SetThreadAffinity(device_id_.load(std::memory_order_acquire));
     }
 
-    init_flag_ = true;
+    for (;;) {
+        std::vector<std::pair<option::OptionCallBack, std::string>> pending_callbacks;
+        {
+            std::lock_guard<std::mutex> lifecycle_lock(init_mutex_);
+            pending_callbacks.swap(lazy_fn_);
+            if (pending_callbacks.empty()) {
+                init_flag_.store(true, std::memory_order_release);
+                lifecycle_ = RuntimeLifecycle::Running;
+            }
+        }
+        if (pending_callbacks.empty()) {
+            break;
+        }
+        for (const auto& callback : pending_callbacks) {
+            ASCEND_LOGD("start setoption for the lazy call.");
+            callback.first(callback.second);
+        }
+    }
+    lifecycle_cv_.notify_all();
     ASCEND_LOGD("Npu sys ctrl initialize successfully.");
 
     return INIT_SUCC;
+    } catch (...) {
+        const std::exception_ptr initialization_error = std::current_exception();
+        if (owns_acl_runtime) {
+            try {
+                NPU_CHECK_WARN(aclFinalize());
+            } catch (...) {
+                ASCEND_LOGE("ACL rollback after NPU initialization failure also failed.");
+            }
+        }
+        {
+            std::lock_guard<std::mutex> lifecycle_lock(init_mutex_);
+            init_flag_.store(false, std::memory_order_release);
+            lifecycle_ = RuntimeLifecycle::Failed;
+            initialization_error_ = initialization_error;
+        }
+        lifecycle_cv_.notify_all();
+        std::rethrow_exception(initialization_error);
+    }
 }
 
 NpuSysCtrl::SysStatus NpuSysCtrl::LazyInitialize(int device_id)
@@ -311,16 +363,25 @@ NpuSysCtrl::SysStatus NpuSysCtrl::LazyInitialize(int device_id)
         return INIT_SUCC;
     }
 
-    if (lazy_init_flag_) {
-        return INIT_SUCC;
-    }
-    std::lock_guard<std::mutex> lock(lazy_init_mutex_);
-    if (lazy_init_flag_) {
+    std::unique_lock<std::mutex> lifecycle_lock(init_mutex_);
+    lifecycle_cv_.wait(lifecycle_lock, [this]() {
+        return lifecycle_ != RuntimeLifecycle::Initializing &&
+            lifecycle_ != RuntimeLifecycle::Finalizing;
+    });
+    TORCH_CHECK(
+        lifecycle_ == RuntimeLifecycle::Running,
+        "NPU runtime must be initialized before lazy device initialization.",
+        PTA_ERROR(ErrCode::INTERNAL));
+    if (lazy_init_flag_.load(std::memory_order_acquire)) {
         return INIT_SUCC;
     }
 
     // There's no need to call c10_npu::GetDevice at the start of the process, because device 0 may not be needed
-    auto ret = aclrtGetDevice(&device_id_);
+    int initialized_device = device_id_.load(std::memory_order_acquire);
+    auto ret = aclrtGetDevice(&initialized_device);
+    if (ret == ACL_ERROR_NONE) {
+        device_id_.store(initialized_device, std::memory_order_release);
+    }
 
     if (c10_npu::IsSupportInfNan()) {
         c10_npu::acl::AclrtSetDeviceSatMode(aclrtFloatOverflowMode::ACL_RT_OVERFLOW_MODE_INFNAN);
@@ -331,7 +392,7 @@ NpuSysCtrl::SysStatus NpuSysCtrl::LazyInitialize(int device_id)
     SetDeterministicFromLevel();
     NPU_CHECK_ERROR(c10_npu::acl::AclrtSetOpExecuteTimeOut(kMaxOpExecuteTimeOut));
 
-    lazy_init_flag_ = true;
+    lazy_init_flag_.store(true, std::memory_order_release);
     ASCEND_LOGD("Npu sys ctrl Lazyinitialize successfully.");
 
     return INIT_SUCC;
@@ -340,13 +401,13 @@ NpuSysCtrl::SysStatus NpuSysCtrl::LazyInitialize(int device_id)
 NpuSysCtrl::SysStatus NpuSysCtrl::ExchangeDevice(int device)
 {
     NPU_CHECK_ERROR_WITHOUT_UCE(c10_npu::SetDevice(device));
-    device_id_ = device;
+    device_id_.store(device, std::memory_order_release);
     return INIT_SUCC;
 }
 
 NpuSysCtrl::SysStatus NpuSysCtrl::BackwardsInit()
 {
-    NPU_CHECK_ERROR(c10_npu::SetDevice(device_id_));
+    NPU_CHECK_ERROR(c10_npu::SetDevice(device_id_.load(std::memory_order_acquire)));
     return INIT_SUCC;
 }
 
@@ -362,72 +423,117 @@ NpuSysCtrl::SysStatus NpuSysCtrl::OverflowSwitchEnable()
 // Environment Finalize, return SysStatus
 NpuSysCtrl::SysStatus NpuSysCtrl::Finalize()
 {
-    if (!init_flag_) {
-        return FINALIZE_SUCC;
-    }
+    std::map<ReleasePriority, std::vector<ReleaseFn>> release_callbacks;
+    {
+        std::unique_lock<std::mutex> lifecycle_lock(init_mutex_);
+        lifecycle_cv_.wait(lifecycle_lock, [this]() {
+            return lifecycle_ != RuntimeLifecycle::Initializing &&
+                lifecycle_ != RuntimeLifecycle::Finalizing;
+        });
+        if (lifecycle_ == RuntimeLifecycle::Uninitialized) {
+            return FINALIZE_SUCC;
+        }
+        if (lifecycle_ == RuntimeLifecycle::Failed) {
+            return FINALIZE_FAILED;
+        }
 
-    this->RegisterReleaseFn(
-        [=]() -> void {
-            c10_npu::NPUEventManager::GetInstance().ClearEvent();
-            NPU_CHECK_WARN(c10_npu::DestroyUsedStreams());
-            NPU_CHECK_WARN(c10_npu::ResetUsedDevices());
+        const bool finalize_acl_runtime = repeat_init_acl_flag_;
+        release_fn_[ReleasePriority::PriorityLast].emplace_back(
+            []() -> void {
+                c10_npu::NPUEventManager::GetInstance().ClearEvent();
+            });
+        release_fn_[ReleasePriority::PriorityLast].emplace_back(
+            []() -> void {
+                NPU_CHECK_WARN(c10_npu::DestroyUsedStreams());
+            });
+        release_fn_[ReleasePriority::PriorityLast].emplace_back(
+            []() -> void {
+                NPU_CHECK_WARN(c10_npu::ResetUsedDevices());
+            });
 #ifndef BUILD_LIBTORCH
-            if (c10d::symmetric_memory::Aclshmem_finalize_exist()) {
-                auto ret = c10d::symmetric_memory::Aclshmem_finalize();
-                ASCEND_LOGI("shmem_finalize emd, ret is %d", ret);
-            }
+        release_fn_[ReleasePriority::PriorityLast].emplace_back(
+            []() -> void {
+                if (c10d::symmetric_memory::Aclshmem_finalize_exist()) {
+                    auto ret = c10d::symmetric_memory::Aclshmem_finalize();
+                    ASCEND_LOGI("shmem_finalize emd, ret is %d", ret);
+                }
+            });
 #endif
-            // Maintain a basic point of view, who applies for the resource, the resource is released by whom.
-            // If aclInit is not a PTA call, then aclFinalize should not be a PTA call either.
-            if (repeat_init_acl_flag_) {
-                NPU_CHECK_WARN(aclFinalize());
-            }
-        },
-        ReleasePriority::PriorityLast);
-
-    init_flag_ = false;
-
-    if (c10_npu::option::OptionsManager::CheckAclDumpDateEnable()) {
-        NPU_CHECK_WARN(aclmdlFinalizeDump());
+        // Only the component that acquired the ACL runtime releases it.
+        if (finalize_acl_runtime) {
+            release_fn_[ReleasePriority::PriorityLast].emplace_back(
+                []() -> void {
+                    NPU_CHECK_WARN(aclFinalize());
+                });
+        }
+        lifecycle_ = RuntimeLifecycle::Finalizing;
+        init_flag_.store(false, std::memory_order_release);
+        release_callbacks.swap(release_fn_);
     }
 
-    // call release fn by priority
-    for (const auto &iter: release_fn_) {
-        const auto &fn_vec = iter.second;
-        for (const auto &fn: fn_vec) {
-            fn();
+    bool finalize_failed = false;
+    try {
+        if (c10_npu::option::OptionsManager::CheckAclDumpDateEnable()) {
+            NPU_CHECK_WARN(aclmdlFinalizeDump());
+        }
+    } catch (const std::exception& error) {
+        finalize_failed = true;
+        ASCEND_LOGE("NPU dump finalization failed: %s", error.what());
+    } catch (...) {
+        finalize_failed = true;
+        ASCEND_LOGE("NPU dump finalization failed with an unknown exception.");
+    }
+
+    for (const auto& iter : release_callbacks) {
+        const auto& fn_vec = iter.second;
+        for (const auto& fn : fn_vec) {
+            try {
+                fn();
+            } catch (const std::exception& error) {
+                finalize_failed = true;
+                ASCEND_LOGE("NPU release callback failed: %s", error.what());
+            } catch (...) {
+                finalize_failed = true;
+                ASCEND_LOGE("NPU release callback failed with an unknown exception.");
+            }
         }
     }
-    release_fn_.clear();
+
+    {
+        std::lock_guard<std::mutex> lifecycle_lock(init_mutex_);
+        lazy_init_flag_.store(false, std::memory_order_release);
+        lifecycle_ = RuntimeLifecycle::Uninitialized;
+    }
+    lifecycle_cv_.notify_all();
 
     ASCEND_LOGD("Npu sys ctrl finalize successfully.");
-    return FINALIZE_SUCC;
+    return finalize_failed ? FINALIZE_FAILED : FINALIZE_SUCC;
 }
 
 bool NpuSysCtrl::GetInitFlag()
 {
-    return init_flag_;
+    return init_flag_.load(std::memory_order_acquire);
 }
 
 bool NpuSysCtrl::GetLazyInitFlag()
 {
-    return lazy_init_flag_;
+    return lazy_init_flag_.load(std::memory_order_acquire);
 }
 
 void NpuSysCtrl::HostFinalize()
 {
-    host_finalize_flag_ = true;
+    host_finalize_flag_.store(true, std::memory_order_release);
 }
 
 bool NpuSysCtrl::GetHostFinalize()
 {
-    return host_finalize_flag_;
+    return host_finalize_flag_.load(std::memory_order_acquire);
 }
 
 int NpuSysCtrl::InitializedDeviceID()
 {
     if (GetInitFlag()) {
-        return device_id_;
+        return device_id_.load(std::memory_order_acquire);
     }
     TORCH_CHECK(false, "no npu device has been initialized!", PTA_ERROR(ErrCode::INTERNAL));
     return -1;
@@ -435,11 +541,32 @@ int NpuSysCtrl::InitializedDeviceID()
 
 void NpuSysCtrl::RegisterLazyFn(const option::OptionCallBack& call_, const std::string& in)
 {
-    lazy_fn_.emplace_back(std::make_pair(call_, in));
+    bool call_immediately = false;
+    {
+        std::lock_guard<std::mutex> lifecycle_lock(init_mutex_);
+        TORCH_CHECK(
+            lifecycle_ != RuntimeLifecycle::Failed,
+            "Cannot register an NPU option after runtime initialization failed.",
+            PTA_ERROR(ErrCode::INTERNAL));
+        if (lifecycle_ == RuntimeLifecycle::Running) {
+            call_immediately = true;
+        } else {
+            lazy_fn_.emplace_back(std::make_pair(call_, in));
+        }
+    }
+    if (call_immediately) {
+        call_(in);
+    }
 }
 
 void NpuSysCtrl::RegisterReleaseFn(ReleaseFn release_fn, ReleasePriority priority)
 {
+    std::lock_guard<std::mutex> lifecycle_lock(init_mutex_);
+    TORCH_CHECK(
+        lifecycle_ != RuntimeLifecycle::Finalizing &&
+            lifecycle_ != RuntimeLifecycle::Failed,
+        "Cannot register an NPU release callback while the runtime is stopping.",
+        PTA_ERROR(ErrCode::INTERNAL));
     const auto& iter = this->release_fn_.find(priority);
     if (iter != release_fn_.end()) {
         release_fn_[priority].emplace_back(release_fn);
