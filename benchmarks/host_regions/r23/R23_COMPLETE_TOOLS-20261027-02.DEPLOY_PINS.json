@@ -1,0 +1,116 @@
+{
+  "archive": {
+    "bytes": 61578,
+    "filename": "R23_COMPLETE_TOOLS-20261027-02.zip",
+    "members": 16,
+    "sha256": "c8e1121176cb39b1f20a1cf1ec7511ad804d77b6b0415a75f49528069a3d30b7"
+  },
+  "external_source_pins": {
+    "R23_FROZEN_RUNNER": "a70a29413c63fc2fcd820950d105dd78eb2742d8277cdd855ce5f2d515c7061f",
+    "R23_PROVIDER_SOURCE": "d4b9f2aa7b1181f39a0d50fa2778dd1b349cd6e39e06eebe3e8338911cade568"
+  },
+  "files": {
+    "analyze_profile_r23.py": {
+      "bytes": 16842,
+      "sha256": "ac25791b995880ef114c530db6e099ec6eda00a9d29a558f0a587a4c6a51e0f8"
+    },
+    "instrument_caller_only_r23.py": {
+      "bytes": 9855,
+      "sha256": "f0a78ebc2296e71faab20cfd1cf5e03d4be14e624024163954bdd01caf7b32d7"
+    },
+    "instrument_frozen_runner_r23.py": {
+      "bytes": 15875,
+      "sha256": "d7461dbe7f1d6f0481e865381d9a07aa9bb64bf9ceb02a335a6776e2b0b39865"
+    },
+    "native_run_window_r23.py": {
+      "bytes": 9499,
+      "sha256": "61d1593b203d46695e492590402ecc508de5350884a1d68e113773c6a16099c7"
+    },
+    "owned_process_r23.py": {
+      "bytes": 5926,
+      "sha256": "b9cd1c9de700e90991471ab05c30ee3e15cc437614d08a91febdd1516a71578c"
+    },
+    "run_caller_campaign_r23.py": {
+      "bytes": 16019,
+      "sha256": "b81f40da289c850052a56751d1180ad9d6753b80c3dd9971cfaa1b6243de8067"
+    },
+    "run_msprof_r23.py": {
+      "bytes": 19597,
+      "sha256": "0a3c0aeab6cb8544b5494ee860ccfcb9ec81bb6e74aaace80352295e694b1fd9"
+    },
+    "run_profile_campaign_r23.py": {
+      "bytes": 14957,
+      "sha256": "da4c32bb49c92d0c275db75777934bfd0b11a8576c2b48fcca5d949d1db8d84d"
+    },
+    "test_analyze_profile_r23.py": {
+      "bytes": 10516,
+      "sha256": "426380ff26851115a102cf6885e7af89de1fafe00c3a480d425f02588b5f1568"
+    },
+    "test_instrument_caller_only_r23.py": {
+      "bytes": 6796,
+      "sha256": "7920fc3c61090145b77051e98ca9bf983491ab74d5a8ec9075b05cf1b9b715b1"
+    },
+    "test_instrument_frozen_runner_r23.py": {
+      "bytes": 9189,
+      "sha256": "e6dfa125d917ee54f0e703f593ac096455c8f8bfd0392cadabb2bbb7cdc37010"
+    },
+    "test_native_run_window_r23.py": {
+      "bytes": 10691,
+      "sha256": "fe5879f9e06cc563235846d4170041ed20873a5c6c8b6c8eafd632f6b4071771"
+    },
+    "test_owned_process_r23.py": {
+      "bytes": 10166,
+      "sha256": "6460e31d72200620c0b3e992a43e6fd3e216b63d23f43aae4e51ba52a1ce81bb"
+    },
+    "test_run_caller_campaign_r23.py": {
+      "bytes": 8427,
+      "sha256": "8240981406f6eb75ec59f5713ef5100c65c709917ae9559c5f5dfbbbe43bd358"
+    },
+    "test_run_msprof_r23.py": {
+      "bytes": 7060,
+      "sha256": "333b1bc8da9274280c0821b105b2ebe974a0cc87f2c98b42b21fbf9a4e486c71"
+    },
+    "test_run_profile_campaign_r23.py": {
+      "bytes": 10722,
+      "sha256": "b2cb04243d4fd700fc9a0fec6988724d7d5f028da5333516a6dd30a0c44b1411"
+    }
+  },
+  "local_host_validation": {
+    "device_execution": false,
+    "errors": 0,
+    "failures": 0,
+    "passed": 61,
+    "platform": "win32",
+    "python_version": "3.13.12",
+    "receipt": "R23_COMPLETE_HOST_TESTS-20261027-02.json",
+    "sdk_execution": false,
+    "sha256": "314ec97f0207b56006e5c50f7a4eb97d7beb1844dbbfc3b9b4db2bceca71c9d6",
+    "skipped": [
+      {
+        "reason": "Linux parent-exit/TERM-ignore fixture unavailable",
+        "test": "test_owned_process_r23.OwnedGroupCleanupTests.test_real_exited_leader_keeps_term_ignoring_child_owned_until_group_kill"
+      },
+      {
+        "reason": "Linux nonreaping process fixture unavailable",
+        "test": "test_owned_process_r23.OwnedGroupCleanupTests.test_real_short_lived_process_is_group_terminated_then_reaped"
+      }
+    ],
+    "tests_run": 63
+  },
+  "notes": [
+    "Windows skips are explicit Linux process tests; local success is not Linux qualification.",
+    "Set R23_FROZEN_RUNNER to exact a70 and R23_PROVIDER_SOURCE to exact d4b9 before host discovery.",
+    "Archive contains only the sixteen flat .py files. Deployment pins are this separate JSON.",
+    "Native content and device compatibility remain separate gates; prior failed/unproven results are unchanged."
+  ],
+  "required_target_host_validation": {
+    "device_execution": false,
+    "errors": 0,
+    "failures": 0,
+    "sdk_execution": false,
+    "skipped": 0,
+    "tests_run": 63
+  },
+  "schema": 1,
+  "scope": "Exactly sixteen reviewed R23 source/test files; no raw, wheels or vendor SDK; no source mutation."
+}

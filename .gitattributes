@@ -59,3 +59,24 @@ torch_npu/csrc/framework/OpParamMaker.cpp -text whitespace=trailing-space,space-
 torch_npu/csrc/framework/OpParamMaker.h -text whitespace=trailing-space,space-before-tab,cr-at-eol
 torch_npu/csrc/npu/Module.cpp -text whitespace=trailing-space,space-before-tab,cr-at-eol
 torch_npu/csrc/utils/PythonThreadState.h -text whitespace=trailing-space,space-before-tab,cr-at-eol
+
+# Preserve reviewed R23 tool and deployment payload bytes.
+benchmarks/host_regions/r23/R23_COMPLETE_TOOLS-20261027-02.DEPLOY_PINS.json -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/R23_COMPLETE_TOOLS-20261027-02.zip -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/analyze_profile_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/instrument_caller_only_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/instrument_frozen_runner_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/native_run_window_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/owned_process_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/run_caller_campaign_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/run_msprof_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/run_profile_campaign_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/test_analyze_profile_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/test_instrument_caller_only_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/test_instrument_frozen_runner_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/test_native_run_window_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/test_owned_process_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/test_run_caller_campaign_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/test_run_msprof_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/test_run_profile_campaign_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/README.md text eol=lf
