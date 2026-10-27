@@ -1,8 +1,9 @@
 # R23 stage profiling tools
 
-These are the sixteen reviewed R23 Python tools and host tests, preserved as
-exact source bytes. They observe the pinned R22 runner; they do not modify the
-production implementation, EmbeddingBag source, SDK, or frozen model inputs.
+This directory preserves sixteen reviewed R23 tools/tests as exact source
+bytes, with two supplemental offline-summary files distributed separately.
+They observe the pinned R22 runner without modifying the production
+implementation, EmbeddingBag source, SDK, or frozen model inputs.
 
 At publication, the main 42-case diagnostic cohort has been measured. The new
 eight-process caller-only supplement and four native-profiler cases have not
@@ -12,10 +13,11 @@ claimed here. R22 four-worker throughput regressed to 0.479x (std) and 0.570x
 
 ## Host tests
 
-Local verification used Python 3.13.12 on Windows: 63 tests, 61 passed, zero
-failures/errors, and two explicit Linux-only process-test skips. The target
-Linux host must pass all 63 with zero skips before device execution. These
-tests do not execute an SDK or NPU workload.
+The sixteen-file bundle was verified with Python 3.13.12 on Windows: 63 tests,
+61 passed, zero failures/errors, and two explicit Linux process-test skips.
+The target Linux host must pass all 63 with zero skips before device execution.
+The two additional offline-summary checks bring full repository discovery to
+65 tests (63 passed, two Linux skips). Tests do not execute an SDK or NPU.
 
 From the repository root:
 
@@ -48,3 +50,12 @@ No private raw receipts, wheels, SDK sources/binaries, or credentials are
 distributed. Diagnostic on/off observer cost and native process/window
 correlation remain separate evidence requirements; stage values are not
 corrected by subtracting an average observer overhead.
+
+## Optional offline summary
+
+`summarize_r23.py` replays the recorded 42 raw results and 18 stage sidecars
+through pinned validators, plus optional caller-only results. It pools the
+actual samples before computing quantiles and writes new JSON/Markdown outside
+producer output trees. Its source and two math checks are separate from the
+unchanged sixteen-file ZIP and deployment pins. A remote summary does not
+establish that the full private raw archive has been downloaded locally.

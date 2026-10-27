@@ -80,3 +80,5 @@ benchmarks/host_regions/r23/test_run_caller_campaign_r23.py -text whitespace=tra
 benchmarks/host_regions/r23/test_run_msprof_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
 benchmarks/host_regions/r23/test_run_profile_campaign_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
 benchmarks/host_regions/r23/README.md text eol=lf
+benchmarks/host_regions/r23/summarize_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/host_regions/r23/test_summarize_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
