@@ -1,6 +1,9 @@
 #include <algorithm>
+#include <array>
 #include <bitset>
 #include <deque>
+#include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <map>
 #include <memory>
@@ -62,6 +65,10 @@ std::string format_size(uint64_t size)
 namespace c10_npu {
 namespace NPUCachingAllocator {
 C10_DEFINE_REGISTRY(FreeNPUMemoryCallbacksRegistry, FreeMemoryCallback);
+// Experimental retirement admits immutable, uninstrumented allocator state only.
+// Once history/context/tracker instrumentation was configured in this process,
+// old cached Blocks may still retain Python GatheredContext, even after disable.
+static std::atomic<bool> captured_retirement_instrumentation_seen{false};
 
 //
 // Yet another caching allocator for NPU device allocations.
@@ -1074,6 +1081,7 @@ public:
     void recordHistory(bool enabled, CreateContextFn context_recorder, size_t alloc_trace_max_entries,
         RecordContext when)
     {
+        captured_retirement_instrumentation_seen.store(true, std::memory_order_release);
         std::unique_lock<std::recursive_mutex> lock(mutex);
         TORCH_CHECK(when == RecordContext::NEVER || context_recorder, PTA_ERROR(ErrCode::INTERNAL));
         record_history = enabled;
@@ -1087,6 +1095,22 @@ public:
     bool isHistoryEnabled()
     {
         return record_history;
+    }
+
+    bool capturedRetirementEligible(const Block* block)
+    {
+        std::lock_guard<std::recursive_mutex> lock(mutex);
+        if (record_history || context_recorder_.load(std::memory_order_acquire) ||
+            record_context_ != RecordContext::NEVER || !trace_trackers_.empty() ||
+            !captures_underway.empty() || !block || !block->pool || block->pool->owner_PrivatePool ||
+            !block->stream_uses.empty()) return false;
+        // free_block can merge a cached neighbor and destroy its saved context.
+        const std::array<const Block*, 3> candidates{block, block->prev, block->next};
+        for (const Block* candidate : candidates) {
+            if (candidate && (candidate->context_when_allocated || candidate->context_when_segment_allocated))
+                return false;
+        }
+        return true;
     }
 
   bool checkPoolLiveAllocations(
@@ -1129,6 +1153,7 @@ public:
 
     void attachAllocatorTraceTracker(AllocatorTraceTracker tracker)
     {
+        captured_retirement_instrumentation_seen.store(true, std::memory_order_release);
         std::unique_lock<std::recursive_mutex> lock(mutex);
         trace_trackers_.emplace_back(std::move(tracker));
     }
@@ -4241,6 +4266,45 @@ public:
 };
 
 NpuCachingAllocator caching_allocator;
+
+bool IsNativeCapturedRetirementDataOnStream(const c10::DataPtr& pointer, const c10::Allocator* source,
+    int device, aclrtStream stream) noexcept
+{
+    if (device < 0 || static_cast<size_t>(device) >= caching_allocator.device_allocator.size() ||
+        source != &caching_allocator || pointer.get_deleter() != &local_raw_delete ||
+        pointer.device().index() != device) return false;
+    try {
+        if (!pointer.get_context()) return true;
+        auto* block = caching_allocator.get_allocated_block(pointer.get_context());
+        return block && block->device == device && block->stream == stream &&
+            caching_allocator.device_allocator[device]->capturedRetirementEligible(block);
+    } catch (...) { return false; }
+}
+
+bool IsNativeCapturedRetirementData(const c10::DataPtr& pointer, const c10::Allocator* source) noexcept
+{
+    static const bool enabled = [] {
+        const char* value = std::getenv("FTLAB_HOST_OWNER_RETIREMENT");
+        return value && std::strcmp(value, "1") == 0;
+    }();
+    if (!enabled || source != &caching_allocator || pointer.get_deleter() != &local_raw_delete ||
+        captured_retirement_instrumentation_seen.load(std::memory_order_acquire)) return false;
+#ifndef BUILD_LIBTORCH
+    if (c10_npu::impl::NPUTrace::getTrace()) return false;
+#endif
+    try {
+        // DataPtr's deleter receives its context, which may precede an aligned
+        // data address. The owning Tensor keeps this allocated Block live here.
+        void* context = pointer.get_context();
+        if (!context) return true; // native free(nullptr) is an immediate no-op.
+        Block* block = caching_allocator.get_allocated_block(context);
+        if (!block || block->device < 0 ||
+            static_cast<size_t>(block->device) >= caching_allocator.device_allocator.size()) return false;
+        return caching_allocator.device_allocator[block->device]->capturedRetirementEligible(block);
+    } catch (...) {
+        return false;
+    }
+}
 
 REGISTER_ALLOCATOR(c10::DeviceType::PrivateUse1, &caching_allocator);
 

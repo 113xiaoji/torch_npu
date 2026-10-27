@@ -1,6 +1,11 @@
+#include "torch_npu/csrc/core/npu/HostRegionCapture.h"
+#include "torch_npu/csrc/core/npu/HostRegionTensorOwner.h"
+#include "torch_npu/csrc/core/npu/HostRegionParameterRelease.h"
+#include "torch_npu/csrc/core/npu/HostRegionNativeBindings.h"
 #include <ATen/record_function.h>
 #include <string>
 #include <chrono>
+#include <mutex>
 
 #include "torch_npu/csrc/framework/OpCommand.h"
 #include "torch_npu/csrc/core/npu/register/OptionsManager.h"
@@ -17,6 +22,7 @@
 #include "torch_npu/csrc/logging/LogContext.h"
 #ifndef BUILD_LIBTORCH
 #include "torch_npu/csrc/sanitizer/NPUTrace.h"
+#include "torch_npu/csrc/profiler/npu_profiler.h"
 #endif
 
 namespace {
@@ -42,6 +48,85 @@ std::atomic<bool> g_used_aclop{false};
 namespace at_npu {
 namespace native {
 
+// HDB_NATIVE_BINDING_HELPERS_BEGIN
+namespace {
+namespace binding = c10_npu::host_regions::native_binding_detail;
+using NativeBindingSnapshot = binding::TensorMetadata<aclDataType, aclFormat, c10::IntArrayRef>;
+
+bool UseNativeBindings() noexcept
+{
+    if (!c10_npu::host_regions::UseCapturedNativeBindings()) return false;
+#ifndef BUILD_LIBTORCH
+    if (c10_npu::impl::NPUTrace::getTrace() ||
+        torch_npu::profiler::profDataReportEnable().load(std::memory_order_relaxed)) return false;
+#endif
+    return true;
+}
+
+void CheckNativeBindingSource(const at::Tensor& tensor)
+{
+    binding::Increment(binding::counters.source_checks);
+    if (!c10_npu::host_regions::CapturedStorageSourceKey(tensor, true))
+        c10_npu::host_regions::RejectEffect("native builder requires a qualified native Tensor binding");
+}
+
+NativeBindingSnapshot SnapshotNativeInput(const at::Tensor& tensor, const string& force_type)
+{
+    const auto& storage_desc = torch_npu::NPUBridge::GetNpuStorageImplDesc(tensor);
+    const bool zero_dim = storage_desc.storage_sizes_.empty();
+    // The original native zero-dimensional helper ignores force_type and uses
+    // one tensor element, ND placement, and no SetFormat/SetShape calls.
+    const aclDataType type = zero_dim ? CalcuOpUtil::ConvertToAclDataType(tensor.scalar_type()) :
+        CalcuOpUtil::ConvertToAclDataType(tensor.scalar_type(), force_type);
+    const bool string_type = type == ACL_STRING;
+    const auto elements = zero_dim ? int64_t{1} : c10::multiply_integers(storage_desc.storage_sizes_);
+    NativeBindingSnapshot result{type, zero_dim ? ACL_FORMAT_ND : storage_desc.origin_format_,
+        storage_desc.npu_format_, zero_dim || string_type ? c10::IntArrayRef{} : c10::IntArrayRef(storage_desc.base_sizes_),
+        zero_dim || string_type ? c10::IntArrayRef{} : c10::IntArrayRef(storage_desc.storage_sizes_),
+        tensor.data_ptr(), static_cast<size_t>(tensor.itemsize()) * static_cast<size_t>(elements), !zero_dim};
+    binding::Increment(binding::counters.metadata_snapshots);
+    return result;
+}
+
+NativeBindingSnapshot SnapshotNativeOutput(const at::Tensor& tensor, const string& force_type)
+{
+    const auto& storage_desc = torch_npu::NPUBridge::GetNpuStorageImplDesc(tensor);
+    NativeBindingSnapshot result{CalcuOpUtil::ConvertToAclDataType(tensor.scalar_type(), force_type),
+        storage_desc.origin_format_, storage_desc.npu_format_, tensor.sizes(), storage_desc.storage_sizes_,
+        tensor.data_ptr(), static_cast<size_t>(tensor.itemsize()) *
+            static_cast<size_t>(c10::multiply_integers(storage_desc.storage_sizes_)), true};
+    binding::Increment(binding::counters.metadata_snapshots);
+    return result;
+}
+
+struct NativeBindingAclApi {
+    aclTensorDesc* CreateDescriptor(const NativeBindingSnapshot& metadata) const
+    {
+        return aclCreateTensorDesc(metadata.data_type, metadata.logical_dims.size(),
+            metadata.logical_dims.data(), metadata.origin_format);
+    }
+    void SetFormat(aclTensorDesc* descriptor, const NativeBindingSnapshot& metadata) const
+    {
+        aclSetTensorFormat(descriptor, metadata.device_format);
+    }
+    void SetShape(aclTensorDesc* descriptor, const NativeBindingSnapshot& metadata) const
+    {
+        aclSetTensorShape(descriptor, metadata.storage_dims.size(), metadata.storage_dims.data());
+    }
+    void SetName(aclTensorDesc* descriptor, const string& name) const
+    {
+        aclSetTensorDescName(descriptor, name.c_str());
+    }
+    aclDataBuffer* CreateBuffer(const NativeBindingSnapshot& metadata) const
+    {
+        return aclCreateDataBuffer(metadata.data, metadata.buffer_bytes);
+    }
+    void DestroyDescriptor(aclTensorDesc* descriptor) const noexcept { aclDestroyTensorDesc(descriptor); }
+    void DestroyBuffer(aclDataBuffer* buffer) const noexcept { aclDestroyDataBuffer(buffer); }
+};
+} // namespace
+// HDB_NATIVE_BINDING_HELPERS_END
+
 OpCommand::OpCommand()
 {
     aclCmds = OpCommandImpls::GetInstance();
@@ -51,12 +136,16 @@ OpCommand::OpCommand()
 
 OpCommand& OpCommand::Name(const string &name)
 {
+    auto failure = binding::GuardCommand(UseNativeBindings(), aclCmd, aclCmds, inputTensor, outputTensor, storage);
     aclCmd->SetName(name);
     return *this;
 }
 
 OpCommand& OpCommand::SetCustomHandler(PROC_FUNC func)
 {
+    auto failure = binding::GuardCommand(UseNativeBindings(), aclCmd, aclCmds, inputTensor, outputTensor, storage);
+    if (UseNativeBindings() && func)
+        c10_npu::host_regions::RejectEffect("custom handler violates the certified native builder contract");
     aclCmd->SetCustomHandler(func);
     return *this;
 }
@@ -122,12 +211,25 @@ OpCommand& OpCommand::InputScalarToNPUTensor(const c10::Scalar &input, const at:
 OpCommand& OpCommand::Output(at::Tensor &output, const string &descName,
                              const c10::optional<aclFormat> &sensitive_format, const string &realType)
 {
+    auto failure = binding::GuardCommand(UseNativeBindings(), aclCmd, aclCmds, inputTensor, outputTensor, storage);
     outputTensor.emplace_back(output);
     return AddOutput(output, realType);
 }
 
 void OpCommand::Run()
 {
+    TORCH_CHECK(aclCmd != nullptr && aclCmds != nullptr, "native builder command already terminated", PTA_ERROR(ErrCode::VALUE));
+    const bool native_builder = UseNativeBindings();
+    auto failure = binding::GuardCommand(native_builder, aclCmd, aclCmds, inputTensor, outputTensor, storage);
+    const bool region_capture = c10_npu::host_regions::IsCapturing();
+    bool region_source_released = false;
+    bool region_stack_popped = false;
+    bool region_acl_transferred = false;
+    try {
+    if (region_capture && (sync || !c10_npu::option::OptionsManager::GetTaskQueueEnable() ||
+        c10_npu::option::OptionsManager::CheckBlockingEnable())) {
+        c10_npu::host_regions::RejectEffect("synchronous legacy operator");
+    }
     // Check for npu graph
     if (aclCmd->CheckCustomHandlerNull()) {
         g_used_aclop = true;
@@ -150,14 +252,98 @@ void OpCommand::Run()
 #ifndef BUILD_LIBTORCH
         at_npu::native::NpuUtils::ProfReportMarkDataToNpuProfiler(0, op_name);
 #endif
-        ExecuteParas execParams;
-        aclCmd->ExportParams(execParams);
+        ExecuteParas execParams{};
         c10_npu::queue::QueueParas params(c10_npu::queue::COMPILE_AND_EXECUTE, sizeof(ExecuteParas), &execParams);
-        c10_npu::enCurrentNPUStream(&params);
+        if (region_capture) {
+            bool exported = false;
+            bool packet_prepared = false;
+            try {
+                packet_prepared = aclCmd->CanExportCapturedParams() &&
+#ifndef BUILD_LIBTORCH
+                    trigger == nullptr &&
+                    !torch_npu::profiler::profDataReportEnable().load(std::memory_order_relaxed) &&
+#endif
+                    c10_npu::host_regions::PrepareCapturedPacketCommand(
+                        inputTensor.data(), inputTensor.size(), outputTensor.data(), outputTensor.size(),
+                        storage.data(), storage.size());
+                if (native_builder && !packet_prepared)
+                    c10_npu::host_regions::RejectEffect("native builder command failed complete packet qualification");
+                if (packet_prepared) {
+                    aclCmd->ExportCapturedParams(execParams,
+                        [](void*, size_t bytes, size_t alignment) -> void* {
+                            return c10_npu::host_regions::AllocateCapturedPacketParams(bytes, alignment);
+                        }, nullptr);
+                } else {
+                    aclCmd->ExportParams(execParams);
+                }
+                exported = true;
+                // Frozen ACL buffers contain addresses, not Tensor ownership.
+                // Retain inputs, outputs and cast/contiguous temporaries until
+                // the original queue owns this command and consumes it.
+                if (!packet_prepared) {
+                    execParams.hostMemory.reserve(execParams.hostMemory.size() +
+                        inputTensor.size() + outputTensor.size() + storage.size());
+                    for (const auto& value : inputTensor)
+                        execParams.hostMemory.push_back(c10_npu::host_regions::RetainBufferOwner(value, !execParams.customHandler));
+                    for (const auto& value : outputTensor)
+                        execParams.hostMemory.push_back(c10_npu::host_regions::RetainBufferOwner(value, !execParams.customHandler));
+                    for (const auto& value : storage)
+                        execParams.hostMemory.push_back(c10_npu::host_regions::RetainBufferOwner(value, !execParams.customHandler));
+                }
+                c10_npu::enCurrentNPUStream(&params);
+                region_acl_transferred = true;
+            } catch (...) {
+                struct PreparedReset {
+                    ~PreparedReset() noexcept { c10_npu::host_regions::CancelCapturedPacketCommand(); }
+                } reset;
+                if (native_builder) {
+                    if (exported) {
+                        // The exported arena payload (or Capture) owns ACL.
+                        // Detach implementation metadata before its one release
+                        // attempt; the outer failure guard must not retry it.
+                        aclCmd->releaseSource(false);
+                        region_source_released = true;
+                        ReleaseLegacyParameters(execParams,
+                            c10_npu::host_regions::ParameterArrayOwnership::PacketArena);
+                    }
+                    // If export failed, the outer command guard cleans its
+                    // source once and detaches even a partial cleanup failure.
+                    throw;
+                }
+                // Capture clears execParams' ACL ownership after taking it.
+                // A failed capture therefore releases exactly the surviving owner.
+                if (exported) {
+                    if (packet_prepared) {
+                        // ACL cleanup may be partially complete when it throws.
+                        // Detach the implementation first so the outer unwind
+                        // cannot retry that non-idempotent destruction.
+                        region_source_released = true;
+                        aclCmd->releaseSource(false);
+                        ReleaseLegacyParameters(execParams,
+                            c10_npu::host_regions::ParameterArrayOwnership::PacketArena);
+                    } else {
+                        execParams.Release();
+                        aclCmd->releaseSource(false);
+                    }
+                } else {
+                    // Export may fail allocating/copying the owning vector after
+                    // allocating its pointer array. Impl still owns ACL objects.
+                    if (!packet_prepared) free(execParams.paras.input_desc);
+                    if (packet_prepared) region_source_released = true;
+                    aclCmd->releaseSource();
+                }
+                region_source_released = true;
+                throw;
+            }
+        } else {
+            aclCmd->ExportParams(execParams);
+            c10_npu::enCurrentNPUStream(&params);
+        }
 #ifndef BUILD_LIBTORCH
         at_npu::native::NpuUtils::ProfReportMarkDataToNpuProfiler(1, op_name, params.correlation_id);
 #endif
         aclCmd->releaseSource(false);
+        region_source_released = true;
     } else {
 #ifndef BUILD_LIBTORCH
         if (C10_UNLIKELY(trigger)) {
@@ -178,10 +364,34 @@ void OpCommand::Run()
         aclCmd->releaseSource();
     }
     aclCmds->Pop();
+    region_stack_popped = true;
+    } catch (...) {
+        if (native_builder && region_acl_transferred && !region_source_released)
+            aclCmd->releaseSource(false);
+        if (region_capture && !native_builder) {
+            if (!region_source_released) aclCmd->releaseSource(!region_acl_transferred);
+            if (!region_stack_popped) aclCmds->Pop();
+        }
+        throw;
+    }
+}
+
+void OpCommand::RunOwnedOpApi(const string &op_name,
+    std::unique_ptr<c10_npu::host_regions::OwnedOpApiPayload> payload)
+{
+    TORCH_CHECK(c10_npu::host_regions::UseCapturedOwnedOpApi(),
+        "Owned OpAPI command requires an admitted real native region");
+    TORCH_CHECK(c10_npu::host_regions::CaptureOwnedOpApi(op_name.c_str(), payload, c10_npu::current_device()),
+        "Owned OpAPI capture did not adopt the command");
 }
 
 void OpCommand::RunOpApi(const string &op_name, PROC_FUNC func, bool sync)
 {
+    if (c10_npu::host_regions::IsCapturing() &&
+        (sync || !c10_npu::option::OptionsManager::GetTaskQueueEnable() ||
+         c10_npu::option::OptionsManager::CheckBlockingEnable())) {
+        c10_npu::host_regions::RejectEffect("synchronous OPAPI operator");
+    }
 #ifndef BUILD_LIBTORCH
     const c10_npu::impl::PyCallbackTrigger* trigger = c10_npu::impl::NPUTrace::getTrace();
 #endif
@@ -229,6 +439,11 @@ void OpCommand::RunOpApi(const string &op_name, PROC_FUNC func, bool sync)
 
 void OpCommand::RunOpApiV2(const string &op_name, const PROC_FUNC &func, bool sync)
 {
+    if (c10_npu::host_regions::IsCapturing() &&
+        (sync || !c10_npu::option::OptionsManager::GetTaskQueueEnable() ||
+         c10_npu::option::OptionsManager::CheckBlockingEnable())) {
+        c10_npu::host_regions::RejectEffect("synchronous OPAPI operator");
+    }
 #ifndef BUILD_LIBTORCH
     const c10_npu::impl::PyCallbackTrigger* trigger = c10_npu::impl::NPUTrace::getTrace();
 #endif
@@ -280,6 +495,11 @@ void OpCommand::RunOpApiV2(const string &op_name, const PROC_FUNC &func, bool sy
 
 void OpCommand::RunOpApiV3(const string &op_name, const PROC_FUNC &func, bool sync, c10_npu::NPUStream *task_stream)
 {
+    if (c10_npu::host_regions::IsCapturing() &&
+        (sync || !c10_npu::option::OptionsManager::GetTaskQueueEnable() ||
+         c10_npu::option::OptionsManager::CheckBlockingEnable())) {
+        c10_npu::host_regions::RejectEffect("synchronous OPAPI operator");
+    }
 #ifndef BUILD_LIBTORCH
     const c10_npu::impl::PyCallbackTrigger* trigger = c10_npu::impl::NPUTrace::getTrace();
 #endif
@@ -323,6 +543,9 @@ void OpCommand::RunOpApiV3(const string &op_name, const PROC_FUNC &func, bool sy
 
 OpCommand& OpCommand::Sync(c10::SmallVector<int64_t, N> &index)
 {
+    auto failure = binding::GuardCommand(UseNativeBindings(), aclCmd, aclCmds, inputTensor, outputTensor, storage);
+    if (UseNativeBindings() && !index.empty())
+        c10_npu::host_regions::RejectEffect("synchronous operator violates the certified native builder contract");
     sync_index = index;
     if (!index.empty()) {
         sync = true;
@@ -332,6 +555,15 @@ OpCommand& OpCommand::Sync(c10::SmallVector<int64_t, N> &index)
 
 OpCommand& OpCommand::Sync()
 {
+    if (UseNativeBindings()) {
+        auto failure = binding::GuardCommand(true, aclCmd, aclCmds, inputTensor, outputTensor, storage);
+        c10_npu::host_regions::RejectEffect("synchronize violates the certified native builder contract");
+    }
+    if (c10_npu::host_regions::IsCapturing()) {
+        aclCmd->releaseSource();
+        aclCmds->Pop();
+        c10_npu::host_regions::RejectEffect("OpCommand sync");
+    }
     c10_npu::NPUStream stream = c10_npu::getCurrentNPUStream();
     NPU_CHECK_ERROR(c10_npu::acl::AclrtSynchronizeStreamWithTimeout(stream));
     return *this;
@@ -340,9 +572,27 @@ OpCommand& OpCommand::Sync()
 OpCommand& OpCommand::AddTensorInput(at::Tensor &tensor, at::ScalarType forceScaleType, const string &descName,
                                      const string &realData)
 {
+    const bool native_builder = UseNativeBindings();
+    auto failure = binding::GuardCommand(native_builder, aclCmd, aclCmds, inputTensor, outputTensor, storage);
+    const bool already_owned = native_builder && binding::OwnsBindingReference(inputTensor, tensor);
+    if (native_builder && !already_owned) CheckNativeBindingSource(tensor);
+    auto* previous_impl = native_builder ? tensor.unsafeGetTensorImpl() : nullptr;
     std::tuple<aclTensorDesc*, aclDataBuffer*> res;
     if (commonType.has_value() && commonType.value() != tensor.scalar_type()) {
         tensor = custom_ops::_npu_dtype_cast(tensor, commonType.value());
+    }
+    if (native_builder) {
+        if (tensor.unsafeGetTensorImpl() != previous_impl) CheckNativeBindingSource(tensor);
+        if (!already_owned) {
+            inputTensor.emplace_back(tensor);
+            binding::Increment(binding::counters.input_ledger_copies);
+        } else {
+            binding::Increment(binding::counters.input_duplicates_elided);
+        }
+        const auto metadata = SnapshotNativeInput(tensor, realData);
+        auto pair = binding::PreparePair(metadata, descName, NativeBindingAclApi{});
+        aclCmd->AddCapturedInput(pair);
+        return *this;
     }
     // as for dim=0, the dtype of tensor can not be `uint16` because of the backend
     if (torch_npu::NPUBridge::GetNpuStorageImplDesc(tensor).storage_sizes_.empty()) {
@@ -355,6 +605,7 @@ OpCommand& OpCommand::AddTensorInput(at::Tensor &tensor, at::ScalarType forceSca
         res = OpCmdHelper::CovertTensorToAclInput(tensor, descName, realData);
     }
     aclCmd->AddInput(std::get<0>(res), std::get<1>(res));
+    if (c10_npu::host_regions::IsCapturing()) inputTensor.emplace_back(tensor);
     return *this;
 }
 
@@ -364,6 +615,9 @@ OpCommand& OpCommand::AddHostTensorInput(
     const string& realDtype,
     const string& descName)
 {
+    auto failure = binding::GuardCommand(UseNativeBindings(), aclCmd, aclCmds, inputTensor, outputTensor, storage);
+    if (UseNativeBindings())
+        c10_npu::host_regions::RejectEffect("host memory violates the certified native builder contract");
     std::tuple<aclTensorDesc*, aclDataBuffer*> res =
         OpCmdHelper::CovertHostTensorToAclInput(
             tensor,
@@ -377,6 +631,9 @@ OpCommand& OpCommand::AddHostTensorInput(
 
 OpCommand& OpCommand::AddNoneTensor()
 {
+    auto failure = binding::GuardCommand(UseNativeBindings(), aclCmd, aclCmds, inputTensor, outputTensor, storage);
+    if (UseNativeBindings())
+        c10_npu::host_regions::RejectEffect("undefined input violates the certified native builder contract");
     AclTensorDescMaker desc;
     auto aclDesc = desc.Create(ACL_DT_UNDEFINED, ACL_FORMAT_UNDEFINED).Get();
     AclTensorBufferMaker buffer(nullptr, 0);
@@ -386,6 +643,9 @@ OpCommand& OpCommand::AddNoneTensor()
 
 OpCommand& OpCommand::AddScalarInput(const c10::Scalar& input, at::ScalarType type)
 {
+    auto failure = binding::GuardCommand(UseNativeBindings(), aclCmd, aclCmds, inputTensor, outputTensor, storage);
+    if (UseNativeBindings())
+        c10_npu::host_regions::RejectEffect("scalar conversion violates the certified native builder contract");
     at::ScalarType type_bk = type;
     if (commonType.has_value()) {
         type_bk = commonType.value();
@@ -398,11 +658,29 @@ OpCommand& OpCommand::AddScalarInput(const c10::Scalar& input, at::ScalarType ty
 
 OpCommand& OpCommand::AddOutput(at::Tensor &output, const string &realType)
 {
+    const bool native_builder = UseNativeBindings();
+    auto failure = binding::GuardCommand(native_builder, aclCmd, aclCmds, inputTensor, outputTensor, storage);
+    if (native_builder) CheckNativeBindingSource(output);
+    auto* previous_impl = native_builder ? output.unsafeGetTensorImpl() : nullptr;
     if (resultTypeDefined == false && commonType.has_value() && commonType.value() != output.scalar_type()) {
         output = custom_ops::_npu_dtype_cast(output, commonType.value());
     }
+    if (native_builder) {
+        if (output.unsafeGetTensorImpl() != previous_impl) CheckNativeBindingSource(output);
+        // Ordered pre-cast outputs remain untouched for the original Sync
+        // contract. Only a different actual TensorImpl needs another binding.
+        if (outputTensor.empty() || outputTensor.back().unsafeGetTensorImpl() != output.unsafeGetTensorImpl())
+            inputTensor.emplace_back(output);
+        else
+            binding::Increment(binding::counters.output_duplicates_elided);
+        const auto metadata = SnapshotNativeOutput(output, realType);
+        auto pair = binding::PreparePair(metadata, string{}, NativeBindingAclApi{});
+        aclCmd->AddCapturedOutput(pair);
+        return *this;
+    }
     auto res = OpCmdHelper::CovertToAclOutput(output, realType);
     aclCmd->AddOutput(std::get<0>(res), std::get<1>(res));
+    if (c10_npu::host_regions::IsCapturing()) inputTensor.emplace_back(output);
     return *this;
 }
 
@@ -410,6 +688,15 @@ OpCommand& OpCommand::AddOutput(at::Tensor &output, const string &realType)
 // 同下，CopyScalarToDevice也有同样问题
 at::Tensor& OpCommand::Contiguous(const at::Tensor &input)
 {
+    auto failure = binding::GuardCommand(UseNativeBindings(), aclCmd, aclCmds, inputTensor, outputTensor, storage);
+    if (UseNativeBindings()) {
+        CheckNativeBindingSource(input);
+        auto contiguous = NpuUtils::format_contiguous_add_copy_optimize(input);
+        if (contiguous.unsafeGetTensorImpl() != input.unsafeGetTensorImpl()) CheckNativeBindingSource(contiguous);
+        inputTensor.emplace_back(std::move(contiguous));
+        binding::Increment(binding::counters.contiguous_ledger_moves);
+        return inputTensor.back();
+    }
     storage.emplace_back(std::move(NpuUtils::format_contiguous_add_copy_optimize(input)));
     return storage.back();
 }
@@ -422,6 +709,9 @@ at::Tensor OpCommand::CopyHostToDevice(const c10::Scalar& scalar, at::ScalarType
 
 at::Tensor OpCommand::CopyHostToDevice(const at::Tensor& cpuTensor)
 {
+    auto failure = binding::GuardCommand(UseNativeBindings(), aclCmd, aclCmds, inputTensor, outputTensor, storage);
+    if (UseNativeBindings())
+        c10_npu::host_regions::RejectEffect("host-to-device conversion violates the certified native builder contract");
     at::Tensor cpuPinMemTensor = cpuTensor.pin_memory();
     int deviceIndex = 0;
     NPU_CHECK_ERROR(c10_npu::GetDevice(&deviceIndex));
@@ -440,6 +730,9 @@ at::Tensor& OpCommand::CreateHostTensor(
     const c10::TensorOptions &options,
     at::ScalarType toType)
 {
+    auto failure = binding::GuardCommand(UseNativeBindings(), aclCmd, aclCmds, inputTensor, outputTensor, storage);
+    if (UseNativeBindings())
+        c10_npu::host_regions::RejectEffect("host tensor creation violates the certified native builder contract");
     at::ScalarType dtype = options.dtype().toScalarType();
     auto cpuTensor = at::empty(size, options);
     std::memcpy(cpuTensor.data_ptr(), data, elementSize(dtype) * cpuTensor.numel());
@@ -466,6 +759,9 @@ bool OpCommand::ScalarIsInLimits(const c10::Scalar &scalar, at::ScalarType type)
 
 at::Tensor& OpCommand::CreateScalarTensor(const c10::Scalar &scalar, at::ScalarType type)
 {
+    auto failure = binding::GuardCommand(UseNativeBindings(), aclCmd, aclCmds, inputTensor, outputTensor, storage);
+    if (UseNativeBindings())
+        c10_npu::host_regions::RejectEffect("scalar tensor creation violates the certified native builder contract");
     if (commonType.has_value()) {
         type = commonType.value();
     }
@@ -480,3 +776,26 @@ at::Tensor& OpCommand::CreateScalarTensor(const c10::Scalar &scalar, at::ScalarT
 
 } // namespace native
 } // namespace at_npu
+
+namespace c10_npu::host_regions {
+void PrepareOwnedOpApiCallerState()
+{
+#ifndef BUILD_LIBTORCH
+    TORCH_CHECK(c10_npu::impl::NPUTrace::getTrace() == nullptr &&
+        !torch_npu::profiler::profDataReportEnable().load(std::memory_order_relaxed),
+        "owned OpAPI does not admit Python trace callbacks or active profiler instrumentation");
+#endif
+    static std::once_flag initialized;
+    static bool deterministic = false;
+    std::call_once(initialized, [] {
+        // A bottom-MLP prefix may still be executing on the original consumer.
+        // Drain that host FIFO once before touching its existing cached setter;
+        // this is not a device-wide synchronize and is outside every run lock.
+        (void)c10_npu::getCurrentNPUStream(0).stream();
+        at_npu::native::SetDeterministic();
+        deterministic = at::globalContext().deterministicAlgorithms();
+    });
+    TORCH_CHECK(deterministic == at::globalContext().deterministicAlgorithms(),
+        "owned OpAPI requires its caller configuration to remain frozen");
+}
+} // namespace c10_npu::host_regions

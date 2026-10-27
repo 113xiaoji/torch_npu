@@ -14,6 +14,8 @@
 #include "torch_npu/csrc/core/npu/register/OptionsManager.h"
 #include "torch_npu/csrc/framework/NPUDefine.h"
 #include "torch_npu/csrc/core/npu/interface/AsyncTaskQueueInterface.h"
+#include "torch_npu/csrc/core/npu/HostRegionParameterArrays.h"
+#include "torch_npu/csrc/core/npu/HostRegionNativeBindings.h"
 
 namespace at_npu {
 namespace native {
@@ -342,6 +344,46 @@ public:
         if (!ForceJitCompileList::GetInstance().Inlist(opName) && env::CheckJitDisable()) {
             params.isJitDisable = true;
         }
+    }
+
+    template<class NativePair>
+    void AddCapturedInput(NativePair& pair)
+    {
+        c10_npu::host_regions::native_binding_detail::AdoptPair(execParam.inDesc, execParam.inBuffer, pair);
+    }
+
+    template<class NativePair>
+    void AddCapturedOutput(NativePair& pair)
+    {
+        c10_npu::host_regions::native_binding_detail::AdoptPair(execParam.outDesc, execParam.outBuffer, pair);
+    }
+
+    // Added nonvirtual methods only: preserve the original ExportParams body,
+    // class fields, size, alignment and every preexisting public declaration.
+    bool CanExportCapturedParams() const noexcept
+    {
+        return execParam.hostMem.empty() && !execParam.customHandler;
+    }
+
+    void ExportCapturedParams(ExecuteParas& params,
+        void* (*allocate)(void*, size_t, size_t), void* context)
+    {
+        TORCH_CHECK(CanExportCapturedParams() && allocate,
+            "Packet export requires plain ACL parameters without host memory", OPS_ERROR(ErrCode::VALUE));
+        const bool disable_jit = !ForceJitCompileList::GetInstance().Inlist(opName) && env::CheckJitDisable();
+        static const auto max_len = sizeof(ExecuteParas::opType);
+        if (opName.length() + 1 < sizeof(ExecuteParas::opType)) {
+            opName.copy(params.opType, opName.length() + 1);
+        } else {
+            opName.copy(params.opType, max_len - 1);
+        }
+        c10_npu::host_regions::parameter_detail::ExportArrays(params.paras,
+            execParam.inDesc, execParam.inBuffer, execParam.outDesc, execParam.outBuffer,
+            [allocate, context](size_t bytes, size_t alignment) { return allocate(context, bytes, alignment); });
+        params.attr = execParam.attr;
+        params.customHandler = nullptr;
+        params.pta_correlation_id = ExecuteParas::g_pta_correlation_id++;
+        if (disable_jit) params.isJitDisable = true;
     }
 
     // Set engine priority for op on data preprocessing stream

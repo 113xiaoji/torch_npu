@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <future>
+#include <functional>
 #include <linux/limits.h>
 #include <sstream>
 #include <sys/stat.h>
@@ -63,6 +64,11 @@
 #include <torch_npu/csrc/profiler/combined_traceback.h>
 #include <torch_npu/csrc/profiler/python/combined_traceback.h>
 #include <torch_npu/csrc/utils/LazyInit.h>
+
+namespace c10_npu::prefix {
+C10_NPU_API std::function<void()> MakeDefaultStreamPrefixWaiter();
+C10_NPU_API std::function<void()> MakeDefaultStreamPrefixH2DWaiter();
+}
 
 constexpr int32_t kDeviceUtilizationNotSupport = -1;
 
@@ -784,6 +790,34 @@ static PyObject* THNPModule_initExtension(PyObject* self, PyObject* noargs) {
   set_module_attr("default_generators", default_npu_generators);
 
   Py_RETURN_NONE;
+  END_HANDLE_TH_ERRORS
+}
+
+PyObject* THNPModule_prefixCompletionFactory(PyObject* _unused, PyObject* noargs) {
+  HANDLE_TH_ERRORS
+  std::function<void()> completion;
+  {
+    pybind11::gil_scoped_release no_gil;
+    completion = c10_npu::prefix::MakeDefaultStreamPrefixWaiter();
+  }
+  return pybind11::cpp_function([completion = std::move(completion)] {
+    pybind11::gil_scoped_release no_gil;
+    completion();
+  }).release().ptr();
+  END_HANDLE_TH_ERRORS
+}
+
+PyObject* THNPModule_prefixH2DCompletionFactory(PyObject* _unused, PyObject* noargs) {
+  HANDLE_TH_ERRORS
+  std::function<void()> completion;
+  {
+    pybind11::gil_scoped_release no_gil;
+    completion = c10_npu::prefix::MakeDefaultStreamPrefixH2DWaiter();
+  }
+  return pybind11::cpp_function([completion = std::move(completion)] {
+    pybind11::gil_scoped_release no_gil;
+    completion();
+  }).release().ptr();
   END_HANDLE_TH_ERRORS
 }
 
@@ -2549,6 +2583,14 @@ static struct PyMethodDef THNPModule_methods[] = {
     {"_npu_init", (PyCFunction)THNPModule_initExtension, METH_NOARGS, nullptr},
     {"_npu_set_run_yet_variable_to_false",
      (PyCFunction)THNPModule_set_run_yet_variable_to_false_wrap,
+     METH_NOARGS,
+     nullptr},
+    {"_npu_prefix_h2d_completion_factory",
+     (PyCFunction)THNPModule_prefixH2DCompletionFactory,
+     METH_NOARGS,
+     nullptr},
+    {"_npu_prefix_completion_factory",
+     (PyCFunction)THNPModule_prefixCompletionFactory,
      METH_NOARGS,
      nullptr},
     {"_npu_synchronize",

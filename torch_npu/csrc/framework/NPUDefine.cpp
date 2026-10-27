@@ -1,22 +1,28 @@
 #include "torch_npu/csrc/core/npu/NPUException.h"
 #include "torch_npu/csrc/framework/NPUDefine.h"
+#include "torch_npu/csrc/core/npu/HostRegionParameterRelease.h"
 
 namespace at_npu {
 namespace native {
 std::atomic<uint64_t> ExecuteParas::g_pta_correlation_id{0};
 void ExecuteParas::Release()
 {
+    ReleaseLegacyParameters(*this, c10_npu::host_regions::ParameterArrayOwnership::Heap);
+}
+
+void ReleaseLegacyParameters(ExecuteParas& value, c10_npu::host_regions::ParameterArrayOwnership ownership)
+{
     // if useDynamicCompile, this attr will be freed in dynamic compile.
-    if (attr != nullptr) {
-        aclopDestroyAttr(attr);
+    if (value.attr != nullptr) {
+        aclopDestroyAttr(value.attr);
     }
-    DestroyConstParams(constParams);
-    NPUStatus ret = DestroyAclParams(paras);
-    if (ret != NPU_STATUS_SUCCESS) {
-        ASCEND_LOGE("DestroyAclParams fail, ret: %s", ret.c_str());
-    }
-    hostMemory.clear();
-    customHandler = nullptr;
+    DestroyConstParams(value.constParams);
+    c10_npu::host_regions::parameter_detail::DestroyArrays(value.paras, ownership,
+        [](const aclTensorDesc* desc) { aclDestroyTensorDesc(desc); },
+        [](const aclDataBuffer* buffer) { NPU_CHECK_ERROR_WITHOUT_UCE(aclDestroyDataBuffer(buffer)); },
+        [](const void* arrays) { std::free(const_cast<void*>(arrays)); });
+    value.hostMemory.clear();
+    value.customHandler = nullptr;
     return;
 }
 
@@ -61,37 +67,11 @@ void ExecuteParasOpApi::Copy(ExecuteParasOpApiV2 &other)
 
 NPUStatus DestroyAclParams(ACL_PARAMS& params)
 {
-    if (params.input_num != 0) {
-        if (params.input_desc != nullptr) {
-            for (int i = 0; i < params.input_num; ++i) {
-                aclDestroyTensorDesc(params.input_desc[i]);
-            }
-        }
-        if (params.input_data_buf != nullptr) {
-            for (int i = 0; i < params.input_num; ++i) {
-                NPU_CHECK_ERROR_WITHOUT_UCE(aclDestroyDataBuffer(params.input_data_buf[i]));
-            }
-        }
-        params.input_num = 0;
-    }
-    if (params.output_num != 0) {
-        if (params.output_desc != nullptr) {
-            for (int i = 0; i < params.output_num; ++i) {
-                aclDestroyTensorDesc(params.output_desc[i]);
-            }
-        }
-        if (params.output_data_buf != nullptr) {
-            for (int i = 0; i < params.output_num; ++i) {
-                NPU_CHECK_ERROR_WITHOUT_UCE(aclDestroyDataBuffer(params.output_data_buf[i]));
-            }
-        }
-        params.output_num = 0;
-    }
-    free(params.input_desc);
-    params.input_desc = nullptr;
-    params.input_data_buf = nullptr;
-    params.output_desc = nullptr;
-    params.output_data_buf = nullptr;
+    c10_npu::host_regions::parameter_detail::DestroyArrays(params,
+        c10_npu::host_regions::ParameterArrayOwnership::Heap,
+        [](const aclTensorDesc* desc) { aclDestroyTensorDesc(desc); },
+        [](const aclDataBuffer* buffer) { NPU_CHECK_ERROR_WITHOUT_UCE(aclDestroyDataBuffer(buffer)); },
+        [](const void* arrays) { std::free(const_cast<void*>(arrays)); });
     return NPU_STATUS_SUCCESS;
 }
 

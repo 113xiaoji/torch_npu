@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <cstddef>
 #include <thread>
 #include <mutex>
 #include <atomic>
@@ -67,6 +68,15 @@ struct ErrorRecord {
   std::string current_parameter;
 };
 
+struct NativeQueueBatchSnapshot {
+  uint64_t fast_calls = 0;
+  uint64_t committed_bursts = 0;
+  uint64_t committed_items = 0;
+  uint64_t fallback_calls = 0;
+};
+
+NativeQueueBatchSnapshot GetNativeQueueBatchSnapshot() noexcept;
+
 // c10::SmallVector max size
 const int N = 32;
 
@@ -78,6 +88,7 @@ public:
   void PopFromReleaseQueue();
   void InitReleaseQueue(c10::DeviceIndex device_id);
   void Shutdown();
+  void WaitForEligibleOwners();
   RepoStatus GetStatus() const;
   c10::DeviceIndex GetDeviceID() const;
 
@@ -135,6 +146,8 @@ public:
   void SetStatus(RepoStatus desired) override;
   void ChangeStatus(RepoStatus expected, RepoStatus desired) override;
   void Enqueue(void* cur_paras) override;
+  void EnqueueBatch(void* const* items, size_t count,
+    void (*prepare)(size_t, void*), void* context);
   void Dequeue() override;
   NPUStatus MakeSureQueueEmpty(bool check_error = true) override;
   void InitRepo(c10::DeviceIndex device_id) override;

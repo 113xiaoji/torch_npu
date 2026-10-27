@@ -1,0 +1,315 @@
+{
+  "base_commit": "7d45a86cd1fdf70d8177445f0c79268cc75c7516",
+  "experimental_default_off": true,
+  "historical_r21_source_files_sha256": "5e96f0c1c7b9d299b83cf4cf590e54b5d635e17be806a5c908f954c08092d9c0",
+  "op_plugin_delivery": "Complete source overlay; explicit validated application to the exact gitlink revision.",
+  "overall_device_acceptance": false,
+  "product_files": {
+    "third_party/op-plugin/op_plugin/utils/op_api_common.cpp": {
+      "bytes": 80379,
+      "layer": "r22-source13",
+      "published_path": "patches/host_regions/op-plugin/op_plugin/utils/op_api_common.cpp",
+      "sha256": "fd79118ee7f97f8cd6297e8ad8e6a2a8cb70fccffd09826fe525c3df7a8f16eb"
+    },
+    "third_party/op-plugin/op_plugin/utils/op_api_common.h": {
+      "bytes": 65166,
+      "layer": "r22-source13",
+      "published_path": "patches/host_regions/op-plugin/op_plugin/utils/op_api_common.h",
+      "sha256": "d2b77155457632e1547e461d5bb1043fc165c0ce6819c2a8577e3adf4bffa169"
+    },
+    "third_party/op-plugin/op_plugin/utils/op_api_common_base.h": {
+      "bytes": 31546,
+      "layer": "r22-source13",
+      "published_path": "patches/host_regions/op-plugin/op_plugin/utils/op_api_common_base.h",
+      "sha256": "4f7512633d3bdf287d83759b1cc826f4be8031f6804dedadf1cd6204c0606f89"
+    },
+    "third_party/op-plugin/op_plugin/utils/op_api_owned_pack_r22.h": {
+      "bytes": 6582,
+      "layer": "r22-source13",
+      "published_path": "patches/host_regions/op-plugin/op_plugin/utils/op_api_owned_pack_r22.h",
+      "sha256": "dfaea9ea90a7bbf8caebdf8754712b62b5e474d5c3dbaa6d6493a4ac260d033b"
+    },
+    "third_party/op-plugin/op_plugin/utils/op_api_owned_payload_r22.h": {
+      "bytes": 8585,
+      "layer": "r22-source13",
+      "published_path": "patches/host_regions/op-plugin/op_plugin/utils/op_api_owned_payload_r22.h",
+      "sha256": "5eff67885603249f92914c1b0745d8b14e50322ff6ad51d8dd4d2d259b1ac507"
+    },
+    "third_party/op-plugin/op_plugin/utils/op_api_owned_r22.h": {
+      "bytes": 7473,
+      "layer": "r22-source13",
+      "published_path": "patches/host_regions/op-plugin/op_plugin/utils/op_api_owned_r22.h",
+      "sha256": "5a1c7d166f3087aff1f56542e7a9b0d53155c14811584df0e806012ac6d58444"
+    },
+    "third_party/op-plugin/op_plugin/utils/op_api_sdk_profile_r22.h": {
+      "bytes": 4030,
+      "layer": "r22-source13",
+      "published_path": "patches/host_regions/op-plugin/op_plugin/utils/op_api_sdk_profile_r22.h",
+      "sha256": "77e00c02e2ba0e7048a1b0674bccd989c534122b21c181dc58c8b470d9e98f55"
+    },
+    "torch_npu/__init__.py": {
+      "bytes": 2771,
+      "layer": "r21-opt-in-entry",
+      "published_path": "torch_npu/__init__.py",
+      "sha256": "8e21e74e75a21fcb026778277b1abad18cd85a827d9b25c3ae5bc079ce96ea8c"
+    },
+    "torch_npu/_host_regions/__init__.py": {
+      "bytes": 645,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/_host_regions/__init__.py",
+      "sha256": "792e5bfc2d59b3e2daece7fbcb618010e40e7e2ec53344bd34832d4d3930567b"
+    },
+    "torch_npu/_host_regions/backends.py": {
+      "bytes": 9122,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/_host_regions/backends.py",
+      "sha256": "b946311d136c09622107771995819eed07c3272af61f2c13184b9d6b937eec34"
+    },
+    "torch_npu/_host_regions/contracts.py": {
+      "bytes": 5384,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/_host_regions/contracts.py",
+      "sha256": "87913d2bfb1ef09a6d6e6ce8ebb54f840702caf924f555e332aa530b854f6f1d"
+    },
+    "torch_npu/_host_regions/frontend.py": {
+      "bytes": 21991,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/_host_regions/frontend.py",
+      "sha256": "0b8ebffdfe03eebd4d574a70585c65d6eb767048544cebac93b8fb9c60e1c861"
+    },
+    "torch_npu/_host_regions/integration.py": {
+      "bytes": 11666,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/_host_regions/integration.py",
+      "sha256": "d82a018e99ac2efcd764c7ef1b8f89f1330db834963ed674a4b84d453ee867c4"
+    },
+    "torch_npu/_host_regions/runtime.py": {
+      "bytes": 35326,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/_host_regions/runtime.py",
+      "sha256": "ef7bbc6b683ba22aaa48152e38ebf6cd25c04f564ebd77905ba9f112bda26cf8"
+    },
+    "torch_npu/_host_regions/torch_npu_policy.py": {
+      "bytes": 23163,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/_host_regions/torch_npu_policy.py",
+      "sha256": "9153cbfdc2ad85e7dc81ea29f321e522973e1adc9f73831b495589daf49a41ec"
+    },
+    "torch_npu/_host_regions/torch_npu_provider.py": {
+      "bytes": 27676,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/_host_regions/torch_npu_provider.py",
+      "sha256": "d4b9f2aa7b1181f39a0d50fa2778dd1b349cd6e39e06eebe3e8338911cade568"
+    },
+    "torch_npu/csrc/aten/common/CopyKernel.cpp": {
+      "bytes": 18175,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/aten/common/CopyKernel.cpp",
+      "sha256": "59bc5c59fa89fb68542065ac60d99318050d76e195f8f971addb5746bbcba333"
+    },
+    "torch_npu/csrc/aten/ops/op_api/CopyKernelOpApi.cpp": {
+      "bytes": 11724,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/aten/ops/op_api/CopyKernelOpApi.cpp",
+      "sha256": "6851928a5c78aec803c091f2c64a26f83c26e4867ffde7f534c8d7013596b1d9"
+    },
+    "torch_npu/csrc/core/npu/HostRegionCapture.cpp": {
+      "bytes": 91930,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/csrc/core/npu/HostRegionCapture.cpp",
+      "sha256": "5c5d6b84bd7797b7a08d481b082b03ae9a2d463b03ebe1cdd67c774f48f3037a"
+    },
+    "torch_npu/csrc/core/npu/HostRegionCapture.h": {
+      "bytes": 6150,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/csrc/core/npu/HostRegionCapture.h",
+      "sha256": "8629f6974db61d318eb057cc979c6210c9756ba95cf5977a36e005b141240b5b"
+    },
+    "torch_npu/csrc/core/npu/HostRegionNativeBindings.h": {
+      "bytes": 9823,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/HostRegionNativeBindings.h",
+      "sha256": "6f397b748f0fda383445c28071ee2233d1ff15c2e0e6a0204d4c7ce46d7c011a"
+    },
+    "torch_npu/csrc/core/npu/HostRegionNativeTls.h": {
+      "bytes": 6414,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/csrc/core/npu/HostRegionNativeTls.h",
+      "sha256": "f3327dc8aa7534de4ef996fa09a5a93b7f91dec87f004a86eea94d77534f8423"
+    },
+    "torch_npu/csrc/core/npu/HostRegionOpApiCommand.h": {
+      "bytes": 3910,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/csrc/core/npu/HostRegionOpApiCommand.h",
+      "sha256": "e15205205b3fc7eff28646af233ac616f530136632e5bb6be095ef9e7aac5231"
+    },
+    "torch_npu/csrc/core/npu/HostRegionOwnerCache.h": {
+      "bytes": 1385,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/HostRegionOwnerCache.h",
+      "sha256": "80430384eec3e55820c078d359868bfc0c731e9b07850a2452f825d4a7c5a8d6"
+    },
+    "torch_npu/csrc/core/npu/HostRegionPacket.h": {
+      "bytes": 11246,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/csrc/core/npu/HostRegionPacket.h",
+      "sha256": "833f8df4868c0b771bd1beb8ab6a4056699cade1a9247f1637da166cc96a7f8d"
+    },
+    "torch_npu/csrc/core/npu/HostRegionParameterArrays.h": {
+      "bytes": 3912,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/HostRegionParameterArrays.h",
+      "sha256": "5b4f4e4bd80ffa2a9ef8487b6372cedf3316568063d3231e8b34e0c145769cb7"
+    },
+    "torch_npu/csrc/core/npu/HostRegionParameterRelease.h": {
+      "bytes": 410,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/HostRegionParameterRelease.h",
+      "sha256": "7836c9c63780cd05452c7cbd556bf7546181866a94181dc1bc6213faf81af7f4"
+    },
+    "torch_npu/csrc/core/npu/HostRegionRetirement.h": {
+      "bytes": 11482,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/HostRegionRetirement.h",
+      "sha256": "3dcef9536f45c6c0f58709de17a02c720d15beab9bc3026c340a8156875cc186"
+    },
+    "torch_npu/csrc/core/npu/HostRegionStorageOwner.h": {
+      "bytes": 3350,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/HostRegionStorageOwner.h",
+      "sha256": "1e2fbbc2a3510ae2a0e01bfd8f473865759d91676922b76104690e49d32c1896"
+    },
+    "torch_npu/csrc/core/npu/HostRegionTensorOwner.h": {
+      "bytes": 2507,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/HostRegionTensorOwner.h",
+      "sha256": "bf2dc1615ffe7e1218593e241baa54f0a1968a2e49cb578bf4e1a4e0c1418f02"
+    },
+    "torch_npu/csrc/core/npu/NPUCachingAllocator.cpp": {
+      "bytes": 184823,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/csrc/core/npu/NPUCachingAllocator.cpp",
+      "sha256": "b48fb974ffcc84504137cabe7eb43913db8cda23f7d8558042b4df615e57fb14"
+    },
+    "torch_npu/csrc/core/npu/NPUQueue.cpp": {
+      "bytes": 73971,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/NPUQueue.cpp",
+      "sha256": "958680064aab542cf778dbdfd24f0788bc6a0ad2f1a26e69648e17de19b980a2"
+    },
+    "torch_npu/csrc/core/npu/NPUQueue.h": {
+      "bytes": 6836,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/NPUQueue.h",
+      "sha256": "d95cb76e8d0c102c378ff1120eb62e0efa476fe1270a39df96232d8350818858"
+    },
+    "torch_npu/csrc/core/npu/NPURecovery.cpp": {
+      "bytes": 3787,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/NPURecovery.cpp",
+      "sha256": "c7540c63109f5fc239e7fe6500fe094f005f5b46623b6a7adb5b6b905f2647da"
+    },
+    "torch_npu/csrc/core/npu/NPUStream.cpp": {
+      "bytes": 42532,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/NPUStream.cpp",
+      "sha256": "6ab5b0834b9f40357a114228effca81c475e2713c115db2ebac045123d8f96bf"
+    },
+    "torch_npu/csrc/core/npu/NPUStream.h": {
+      "bytes": 4963,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/NPUStream.h",
+      "sha256": "c2fc17e94483ce78748ee52513fd93ebccc87894ea82bcc33a574edb6e2436ba"
+    },
+    "torch_npu/csrc/core/npu/OrderedMpscQueueCore.h": {
+      "bytes": 16001,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/OrderedMpscQueueCore.h",
+      "sha256": "49334fe4afb07fd4a8c504e00e0f664c5e2a2c23500c465e54295148437d007a"
+    },
+    "torch_npu/csrc/core/npu/PrefixCompletion.h": {
+      "bytes": 10993,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/PrefixCompletion.h",
+      "sha256": "946ad3f12cf1ce5e8488c1a015f196171ac0716710ab1afbd8a052f5180b406c"
+    },
+    "torch_npu/csrc/core/npu/PrefixH2DGuard.h": {
+      "bytes": 849,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/PrefixH2DGuard.h",
+      "sha256": "ca1e336b2c55f97d84a2faef89f6890bf16884aa991cc56e2a8cc852e3265be5"
+    },
+    "torch_npu/csrc/core/npu/PrefixH2DPrewait.h": {
+      "bytes": 332,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/core/npu/PrefixH2DPrewait.h",
+      "sha256": "47d8fbc2456231269d26d6f1a139f936285320c71d10ca510d3a2aee05155ee3"
+    },
+    "torch_npu/csrc/framework/NPUDefine.cpp": {
+      "bytes": 3156,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/framework/NPUDefine.cpp",
+      "sha256": "f8a8880ea483aaa2051056879959961b7d9e85a01fe15b46e09c66500451e9a1"
+    },
+    "torch_npu/csrc/framework/OpCommand.cpp": {
+      "bytes": 35946,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/csrc/framework/OpCommand.cpp",
+      "sha256": "da68705d8ac9365cf0546c15cbf8d74ba5f4ee1382c7ae14b19111edd6525dc2"
+    },
+    "torch_npu/csrc/framework/OpCommand.h": {
+      "bytes": 7307,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/csrc/framework/OpCommand.h",
+      "sha256": "b01cfb6a691d1b2408a5ba6cd345d6887255870b9f85382b6d8d2b808886f07e"
+    },
+    "torch_npu/csrc/framework/OpParamMaker.cpp": {
+      "bytes": 40227,
+      "layer": "r22-source13",
+      "published_path": "torch_npu/csrc/framework/OpParamMaker.cpp",
+      "sha256": "c60244cc6a4d68cb668d446ff909fadd843cfb6041930b014e7a323d71950290"
+    },
+    "torch_npu/csrc/framework/OpParamMaker.h": {
+      "bytes": 16873,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/framework/OpParamMaker.h",
+      "sha256": "6316af50b05537fc8b2790c878abafc19e7a6bda1bcbbd42b0bae40bdb10f9fb"
+    },
+    "torch_npu/csrc/npu/Module.cpp": {
+      "bytes": 102865,
+      "layer": "r21-prerequisite",
+      "published_path": "torch_npu/csrc/npu/Module.cpp",
+      "sha256": "eb831cd9060bee26c74a2dc6d54716ea747e9df3f1d2e6b5926e2af3c2fb432b"
+    }
+  },
+  "schema": 1,
+  "scope": "Exact tested R22 inputs and inherited R21 prerequisites; no generated source or SDK redistribution.",
+  "unchanged_foundation": {
+    "CMakeLists.txt": {
+      "bytes": 16044,
+      "sha256": "9ddd5463f94987da26ffbe4a59bccaa48835567279bcfa9a3480e557580ed755",
+      "supplied_by_base_commit": true
+    },
+    "setup.py": {
+      "bytes": 29815,
+      "sha256": "78657707c1a05010305979a0ac715c1e3ea862a4f6366236d699c78bc4d55a8a",
+      "supplied_by_base_commit": true
+    },
+    "torch_npu/csrc/InitNpuBindings.cpp": {
+      "bytes": 8616,
+      "sha256": "cf5d9bdbfa7d76a0bf13b516017a62690bf97b3b574d36fcf526254b4041713e",
+      "supplied_by_base_commit": true
+    },
+    "torch_npu/csrc/core/npu/ExperimentalSequenceMpscQueueCore.h": {
+      "bytes": 10355,
+      "sha256": "c22cdfaddce3bf0ddf3c51704dd4a8ef7176298a12bd3859106e82eeb74dec20",
+      "supplied_by_base_commit": true
+    },
+    "torch_npu/csrc/utils/PythonThreadState.h": {
+      "bytes": 1132,
+      "sha256": "2589376cd837ba6d7f4ffe23d127f2ba0712e399aa96085d00de3c8b1e4e9991",
+      "supplied_by_base_commit": true
+    }
+  },
+  "upstream_base": "46936d18a18ba219fc5ed310fe2cc6409f94114b"
+}

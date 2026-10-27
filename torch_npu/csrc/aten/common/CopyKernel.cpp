@@ -5,6 +5,7 @@
 #include "torch_npu/csrc/core/npu/interface/AclInterface.h"
 #include "torch_npu/csrc/core/npu/NPUException.h"
 #include "torch_npu/csrc/core/npu/NPUGuard.h"
+#include "torch_npu/csrc/core/npu/PrefixH2DPrewait.h"
 #include "torch_npu/csrc/core/npu/NPUEvent.h"
 #include "torch_npu/csrc/core/npu/NPUPeerToPeerAccess.h"
 #include "torch_npu/csrc/framework/utils/CalcuOpUtil.h"
@@ -123,7 +124,11 @@ void copy_between_host_and_device(
         void* currentPtr = torch_npu::utils::is_npu(dst) ? src.data_ptr() : dst.data_ptr();
         process_non_blocking_copy(storage, currentPtr, stream, kind);
     } else {
-        aclError error = c10_npu::acl::AclrtSynchronizeStreamWithTimeout(stream);
+        aclError error = ACL_ERROR_NONE;
+        if (!(kind == aclrtMemcpyKind::ACL_MEMCPY_HOST_TO_DEVICE &&
+              c10_npu::prefix::TryH2DPrewait(stream))) {
+            error = c10_npu::acl::AclrtSynchronizeStreamWithTimeout(stream);
+        }
         auto ret = CalcuOpUtil::AclrtMemcpyWithModeSwitch(
             std::make_pair(dst.storage().unsafeGetStorageImpl(), dst.storage_offset() * dst.itemsize()),
             nbytes,

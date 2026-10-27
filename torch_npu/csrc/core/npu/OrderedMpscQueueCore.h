@@ -1,14 +1,37 @@
 #pragma once
 
 #include <condition_variable>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <mutex>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 namespace c10_npu::queue {
+
+// Process counters, not per-queue layout. Commit statistics are aggregated
+// once per burst, including an exception's accepted prefix.
+struct OrderedBatchCounters {
+    std::atomic<uint64_t> calls{0}, bursts{0}, items{0};
+};
+
+inline OrderedBatchCounters& GetOrderedBatchCounters() noexcept
+{
+    static OrderedBatchCounters counters;
+    return counters;
+}
+
+inline void RecordOrderedBatchCommit(size_t count) noexcept
+{
+    if (count != 0) {
+        auto& counters = GetOrderedBatchCounters();
+        counters.bursts.fetch_add(1, std::memory_order_relaxed);
+        counters.items.fetch_add(count, std::memory_order_relaxed);
+    }
+}
 
 enum class QueueMode {
     Stopped,
@@ -113,6 +136,76 @@ public:
     {
         NoopWaitHooks wait_hooks;
         return ConsumeOne(std::forward<Consume>(consume), wait_hooks);
+    }
+
+    // Copy includes the backend's functional ownership ACK. Each successful
+    // item is committed separately; a later exception never hides its prefix.
+    // A bounded burst amortizes admission/notification without starving stop
+    // or the consumer behind an arbitrarily large producer critical section.
+    template <typename Copy, typename WaitHooks>
+    size_t EnqueueBatch(size_t count, Copy&& copy, WaitHooks&& wait_hooks)
+    {
+        if (count == 0) {
+            return 0;
+        }
+        std::unique_lock<std::mutex> lock(mu_);
+        RethrowIfFailedLocked();
+        if (mode_ != QueueMode::Running) {
+            return 0;
+        }
+        ++active_producers_;
+        auto leave_producer = [this]() {
+            --active_producers_;
+            if (active_producers_ == 0) {
+                cv_no_active_producers_.notify_all();
+            }
+            NotifyDrainedIfLocked();
+        };
+        GetOrderedBatchCounters().calls.fetch_add(1, std::memory_order_relaxed);
+        size_t accepted = 0, reported = 0;
+        try {
+            while (accepted != count) {
+                while (size_ == capacity_ && mode_ == QueueMode::Running && error_ == nullptr) {
+                    // The consumer must see the preceding burst before this
+                    // producer sleeps waiting for its slots to become free.
+                    cv_not_empty_.notify_one();
+                    WaitOnce(cv_not_full_, lock, wait_hooks);
+                }
+                RethrowIfFailedLocked();
+                if (mode_ != QueueMode::Running) {
+                    leave_producer();
+                    cv_not_empty_.notify_one();
+                    return accepted;
+                }
+                const size_t available = capacity_ - size_;
+                const size_t remaining = count - accepted;
+                constexpr size_t max_burst = 32;
+                const size_t burst = available < remaining ? available : remaining;
+                const size_t bounded = burst < max_burst ? burst : max_burst;
+                for (size_t n = 0; n != bounded; ++n) {
+                    copy(tail_, accepted);
+                    tail_ = Next(tail_);
+                    ++size_;
+                    ++accepted;
+                }
+                RecordOrderedBatchCommit(accepted - reported);
+                reported = accepted;
+                cv_not_empty_.notify_one();
+                if (accepted != count) {
+                    lock.unlock();
+                    lock.lock();
+                }
+            }
+            leave_producer();
+            return accepted;
+        } catch (...) {
+            // Copy/prepare/ACK or runtime reattach may throw after several
+            // committed items. Publish their wakeup before propagating error.
+            RecordOrderedBatchCommit(accepted - reported);
+            leave_producer();
+            cv_not_empty_.notify_one();
+            throw;
+        }
     }
 
     template <typename Consume, typename WaitHooks>
@@ -372,6 +465,11 @@ private:
             }
             lock.lock();
             std::rethrow_exception(wait_error);
+        }
+        // Exact Noop hooks restore no runtime state. condition.wait already
+        // returned owning the queue mutex; retain that ownership on success.
+        if constexpr (std::is_same_v<WaitHooks, NoopWaitHooks>) {
+            return;
         }
         // Restoring an attached language-runtime state may take that
         // runtime's lock. Never invert its lock order with the queue mutex.

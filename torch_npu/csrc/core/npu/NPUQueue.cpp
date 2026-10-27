@@ -1,4 +1,16 @@
+#include "torch_npu/csrc/core/npu/HostRegionCapture.h"
+#include "torch_npu/csrc/core/npu/HostRegionRetirement.h"
 #include "torch_npu/csrc/core/npu/NPUQueue.h"
+#include "torch_npu/csrc/core/npu/PrefixCompletion.h"
+#include "torch_npu/csrc/core/npu/PrefixH2DGuard.h"
+#include "torch_npu/csrc/core/npu/PrefixH2DPrewait.h"
+#ifndef BUILD_LIBTORCH
+#include "torch_npu/csrc/sanitizer/NPUTrace.h"
+#endif
+#include "torch_npu/csrc/core/npu/NPUGuard.h"
+#include "torch_npu/csrc/core/npu/sys_ctrl/npu_sys_ctrl.h"
+#include "torch_npu/csrc/core/npu/interface/AclInterface.h"
+#include "torch_npu/csrc/core/npu/interface/AsyncTaskQueueInterface.h"
 #include "torch_npu/csrc/core/npu/NPUStream.h"
 #include "torch_npu/csrc/core/npu/npu_log.h"
 #include "torch_npu/csrc/core/npu/NPUAffinityController.h"
@@ -25,6 +37,8 @@
 namespace c10_npu {
 
 namespace {
+std::atomic<uint64_t> native_batch_fallback_calls{0};
+
 class CallBackManager {
 public:
     CallBackManager() {}
@@ -87,7 +101,8 @@ public:
     {
         TORCH_CHECK(this->releaseFunc, "Failed to find release function.", PTA_ERROR(ErrCode::NOT_FOUND));
         auto ptr = (uint8_t *)head + ParameterSize() * offset;
-        return this->releaseFunc(ptr, releaseQueue);
+        this->releaseFunc(ptr, releaseQueue);
+        host_regions::QueueReleased(ptr);
     }
 
     void CopyRealseParam(void *dstHead, int offset, void *src)
@@ -202,7 +217,244 @@ private:
     std::optional<torch_npu::utils::PythonThreadStateDetachGuard> python_state_;
 #endif
 };
+
+prefix::Registry& PrefixRegistry()
+{
+    // Explicit repository retirement owns cleanup; avoid static teardown order.
+    static auto* registry = new prefix::Registry;
+    return *registry;
+}
+
+std::exception_ptr PrefixStoppedError()
+{
+    static const auto error = std::make_exception_ptr(
+        std::runtime_error("FIFO prefix cancelled before successful event record"));
+    return error;
+}
+
+const void* PrefixEventKey(void* parameters)
+{
+    const auto* task = static_cast<queue::QueueParas*>(parameters);
+    if (task->paramType != queue::RECORD_EVENT) {
+        return nullptr;
+    }
+    return static_cast<queue::EventParas*>(task->paramVal)->event;
+}
+
+void PrefixStartGeneration(const Repository* repo)
+{
+    // Existing lifecycle has finished all old producer/consumer leases.
+    PrefixRegistry().FailQueue(repo, PrefixStoppedError());
+    PrefixRegistry().Quiescent(repo);
+    PrefixRegistry().StartQueue(repo);
+}
+
+void PrefixQuiescentIfStopped(const Repository* repo, const queue::QueueSnapshot& state)
+{
+    if (state.mode == queue::QueueMode::Stopped && state.active_producers == 0 && !state.consumer_active) {
+        PrefixRegistry().FailQueue(repo, PrefixStoppedError());
+        PrefixRegistry().Quiescent(repo);
+    }
+}
+
+class PrefixAclEvent final : public prefix::DeviceEvent {
+public:
+    explicit PrefixAclEvent(const NPUStream& stream) : device_(stream.device_index()), stream_(stream)
+    {
+        NPUGuard guard(device_);
+        LazySetDevice(device_);
+        flags_ = acl::IsExistCreateEventExWithFlag() ? ACL_EVENT_SYNC : ACL_EVENT_DEFAULT;
+        const auto ret = acl::AclrtCreateEventWithFlag(&event_, flags_);
+        NPU_CHECK_ERROR(ret);
+        TORCH_CHECK(ret == ACL_ERROR_NONE && event_ != nullptr,
+            "FIFO prefix event creation did not succeed with a nonnull handle, ret=", ret,
+            PTA_ERROR(ErrCode::ACL));
+    }
+
+    ~PrefixAclEvent() override
+    {
+        try {
+            if (!NpuSysCtrl::GetInstance().GetInitFlag()) {
+                return;
+            }
+            NPUGuard guard(device_);
+            // This private event has at most one outstanding record. Rejected
+            // publication and metadata-only discard may leave its manager
+            // count behind, after all actual raw users have quiesced.
+            auto& manager = NPUEventManager::GetInstance();
+            try {
+                if (!manager.IsEventRecorded(event_)) {
+                    manager.DecreaseUnrecordedCount(event_);
+                }
+            } catch (...) {
+                // ClearUnrecordedCount may have concurrently removed it.
+            }
+            // Existing flag-aware policy, without enqueueing a destructor task.
+            NPU_CHECK_ERROR(manager.LazyDestroy(event_));
+            if (!acl::IsExistCreateEventExWithFlag()) {
+                NPU_CHECK_ERROR(manager.QueryAndDestroyEvent());
+            }
+        } catch (...) {
+            ASCEND_LOGE("FIFO prefix event destruction failed.");
+        }
+    }
+
+    void Wait() override
+    {
+        NPUGuard guard(device_);
+        const auto ret = aclrtSynchronizeEvent(event_);
+        NPU_CHECK_ERROR(ret);
+        // NPU_CHECK_ERROR intentionally warns for some unsupported features.
+        // A completion boundary requires the original raw return to be zero.
+        TORCH_CHECK(ret == ACL_ERROR_NONE,
+            "FIFO prefix event wait did not complete successfully, ret=", ret,
+            PTA_ERROR(ErrCode::ACL));
+    }
+
+    aclrtEvent Event() const { return event_; }
+    unsigned int Flags() const { return flags_; }
+    c10::DeviceIndex Device() const { return device_; }
+    const NPUStream& Stream() const { return stream_; }
+    std::shared_ptr<const prefix::QueueRunToken> run_token;
+    std::mutex reuse_mu;
+    std::exception_ptr poisoned;
+
+private:
+    c10::DeviceIndex device_;
+    const NPUStream stream_;
+    aclrtEvent event_ = nullptr;
+    unsigned int flags_ = ACL_EVENT_DEFAULT;
+};
+
+thread_local std::weak_ptr<PrefixAclEvent> h2d_prefix_owner;
+thread_local const void* h2d_marker_event = nullptr;
+thread_local const prefix::QueueRunToken* h2d_marker_token = nullptr;
+thread_local bool h2d_prefix_active = false;
+
+class PrefixH2DMarkerScope final {
+public:
+    PrefixH2DMarkerScope(const std::shared_ptr<PrefixAclEvent>& owner, bool active)
+        : old_event_(h2d_marker_event), old_token_(h2d_marker_token), old_active_(h2d_prefix_active)
+    {
+        if (active) {
+            h2d_marker_event = owner->Event();
+            h2d_marker_token = owner->run_token.get();
+            h2d_prefix_active = true;
+        }
+    }
+    ~PrefixH2DMarkerScope()
+    {
+        h2d_marker_event = old_event_;
+        h2d_marker_token = old_token_;
+        h2d_prefix_active = old_active_;
+    }
+private:
+    const void* old_event_;
+    const prefix::QueueRunToken* old_token_;
+    bool old_active_;
+};
+
+[[noreturn]] void PrefixPoisonAndRethrow(
+    const std::shared_ptr<PrefixAclEvent>& owner, const prefix::Registry::Ticket& ticket,
+    std::exception_ptr error)
+{
+    owner->poisoned = std::move(error);
+    if (ticket) {
+        PrefixRegistry().Abandon(owner->Event(), owner->poisoned);
+    }
+    if (ticket && ticket->Published()) {
+        try { emptyAllNPUStream(); }
+        catch (...) { owner->poisoned = std::current_exception(); throw; }
+    }
+    std::rethrow_exception(owner->poisoned);
+}
+
+// Caller owns reuse_mu and is detached from Python. The caller's outer scope
+// must release reuse_mu before restoring Python state on return or exception.
+bool PrefixWaitLocked(const std::shared_ptr<PrefixAclEvent>& owner, bool h2d)
+{
+    if (owner->poisoned) {
+        std::rethrow_exception(owner->poisoned);
+    }
+    prefix::Registry::Ticket ticket;
+    try {
+        TORCH_CHECK(getCurrentNPUStream() == owner->Stream() && current_device() == owner->Device(),
+            "FIFO prefix event owner moved to another stream/device.", PTA_ERROR(ErrCode::NOT_SUPPORT));
+        if (owner->run_token && !owner->run_token->running.load(std::memory_order_acquire)) {
+            if (h2d) {
+                return false;
+            }
+            TORCH_CHECK(false, "FIFO prefix owner generation is inactive; recreate the factory.",
+                PTA_ERROR(ErrCode::INTERNAL));
+        }
+        ticket = PrefixRegistry().Register(owner->Event(), owner);
+        PrefixH2DMarkerScope marker_scope(owner, h2d);
+        const auto ret = queue::LaunchRecordEventTask(owner->Event(), owner->Stream(), owner->Flags());
+        NPU_CHECK_ERROR(ret);
+        TORCH_CHECK(ret == ACL_ERROR_NONE && ticket->Published(),
+            "FIFO prefix marker was not accepted successfully by its repository.", PTA_ERROR(ErrCode::INTERNAL));
+        auto token = ticket->QueueToken();
+        TORCH_CHECK(token && (!owner->run_token || owner->run_token == token),
+            "FIFO prefix owner crossed a repository generation; recreate the factory.",
+            PTA_ERROR(ErrCode::INTERNAL));
+        if (h2d && !token->running.load(std::memory_order_acquire)) {
+            throw prefix::PrefixNotRunning();
+        }
+        QueueWaitHooks wait_hooks(false);
+        ticket->WaitDevice(wait_hooks);
+        owner->run_token = std::move(token);
+        return true;
+    } catch (...) {
+        PrefixPoisonAndRethrow(owner, ticket, std::current_exception());
+    }
+}
+
+bool PrefixTryH2DDetached(const std::shared_ptr<PrefixAclEvent>& owner, const NPUStream& stream)
+{
+    if (h2d_prefix_active) {
+        return false;
+    }
+    std::unique_lock<std::mutex> reuse(owner->reuse_mu, std::try_to_lock);
+    TORCH_CHECK(reuse.owns_lock(), "FIFO prefix H2D event owner used concurrently.", PTA_ERROR(ErrCode::INTERNAL));
+    if (owner->poisoned) {
+        std::rethrow_exception(owner->poisoned);
+    }
+    prefix::H2DPrewaitGuard guard;
+    guard.bound_owner = owner->run_token != nullptr;
+    guard.default_stream = stream == getDefaultNPUStream(stream.device_index());
+    guard.same_owner_stream_device = stream == owner->Stream() && current_device() == owner->Device();
+    guard.task_queue = option::OptionsManager::GetTaskQueueEnable() != 0;
+    guard.shared_queue = option::OptionsManager::GetPerStreamQueue() == 0;
+    guard.running_generation = owner->run_token &&
+        owner->run_token->running.load(std::memory_order_acquire);
+    guard.resume_mode = option::OptionsManager::IsResumeModeEnable();
+    guard.stream_timeout = option::OptionsManager::GetACLExecTimeout();
+    guard.sync_debug = warning_state().get_sync_debug_mode() != SyncDebugMode::L_DISABLED;
+#ifndef BUILD_LIBTORCH
+    guard.trace_active = impl::NPUTrace::getTrace() != nullptr;
+#endif
+    guard.sync_launch = stream.isSyncLaunchStream();
+    guard.reentrant = h2d_prefix_active;
+    if (!prefix::AllowsH2DPrewait(guard)) {
+        return false;
+    }
+    return PrefixWaitLocked(owner, true);
+}
+
 } // namespace
+
+NativeQueueBatchSnapshot GetNativeQueueBatchSnapshot() noexcept
+{
+    NativeQueueBatchSnapshot result;
+#ifndef TORCH_NPU_EXPERIMENTAL_LOCKFREE_QUEUE
+    auto& counters = queue::GetOrderedBatchCounters();
+    result.fast_calls = counters.calls.load(std::memory_order_relaxed);
+    result.committed_bursts = counters.bursts.load(std::memory_order_relaxed);
+    result.committed_items = counters.items.load(std::memory_order_relaxed);
+#endif
+    result.fallback_calls = native_batch_fallback_calls.load(std::memory_order_relaxed);
+    return result;
+}
 
 namespace register_queue_cb {
 NPUCallBackRegisterBuilder::NPUCallBackRegisterBuilder(const ACL_EXEC_FUNC &execFunc, const ACL_COPY_FUNC &copyFunc,
@@ -239,6 +491,9 @@ std::unordered_map<RepoStatus, std::string> deviceErrorMap = {
 std::string get_func_error_msg(void *error_paras)
 {
     auto queueParam = static_cast<c10_npu::queue::QueueParas *>(error_paras);
+    if (queueParam->paramVal == nullptr) {
+        return "captured queue parameter already retired";
+    }
     auto type = queueParam->paramType;
     std::stringstream result;
     if (type == c10_npu::queue::EXECUTE_OPAPI) {
@@ -309,8 +564,12 @@ void Repository::SetStatus(RepoStatus desired)
             return;
         }
         repo_status.store(desired, std::memory_order_release);
+        PrefixRegistry().SetQueueRunning(this, desired == RepoStatus::RUN);
         ++status_epoch_;
         queue_core_.RequestStop();
+        if (desired != RepoStatus::NEED_EXIT) {
+            PrefixRegistry().FailQueue(this, PrefixStoppedError());
+        }
         return;
     }
 
@@ -350,13 +609,19 @@ void Repository::SetStatus(RepoStatus desired)
 
     try {
         const queue::QueueMode mode = queue_core_.Snapshot().mode;
+        if (mode == queue::QueueMode::Failed || mode == queue::QueueMode::Stopping) {
+            PrefixRegistry().FailQueue(this, PrefixStoppedError());
+        }
         if (mode == queue::QueueMode::Failed) {
             queue_core_.StopAndDiscardMetadata(wait_hooks);
+            host_regions::DiscardCapturedBufferOwners(data);
+            host_regions::QueueAbandoned(device_idx);
         } else if (mode == queue::QueueMode::Stopping) {
             queue_core_.StopAndDiscard(
                 [this](uint32_t slot) { manager().Release(data, slot, releaseQueue); },
                 wait_hooks);
         }
+        PrefixQuiescentIfStopped(this, queue_core_.Snapshot());
         {
             std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mu_);
             // A STOP/error published while cleanup was in progress wins over
@@ -364,13 +629,16 @@ void Repository::SetStatus(RepoStatus desired)
             if (status_epoch_ == previous_epoch &&
                 repo_status.load(std::memory_order_acquire) == previous_status) {
                 if (queue_core_.Snapshot().mode == queue::QueueMode::Stopped) {
+                    PrefixStartGeneration(this);
                     queue_core_.Start();
+                    PrefixRegistry().SetQueueRunning(this, GetStatus() == RepoStatus::RUN);
                 }
                 TORCH_CHECK(
                     queue_core_.Snapshot().mode == queue::QueueMode::Running,
                     "Task queue recovery did not restart the ordered queue core.",
                     PTA_ERROR(ErrCode::INTERNAL));
                 repo_status.store(desired, std::memory_order_release);
+                PrefixRegistry().SetQueueRunning(this, desired == RepoStatus::RUN);
                 ++status_epoch_;
             }
             lifecycle_.store(Lifecycle::Running, std::memory_order_release);
@@ -382,9 +650,12 @@ void Repository::SetStatus(RepoStatus desired)
             // A cleanup callback may have released only part of its payload.
             // Drop metadata without retrying that callback.
             queue_core_.StopAndDiscardMetadata(wait_hooks);
+            host_regions::DiscardCapturedBufferOwners(data);
+            host_regions::QueueAbandoned(device_idx);
         } catch (...) {
             ASCEND_LOGE("Task queue recovery metadata cleanup failed.");
         }
+        PrefixQuiescentIfStopped(this, queue_core_.Snapshot());
         {
             std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mu_);
             repo_status.store(RepoStatus::ERROR_EXIT, std::memory_order_release);
@@ -397,9 +668,12 @@ void Repository::SetStatus(RepoStatus desired)
         RecordRepositoryError("Task queue recovery failed with an unknown exception.");
         try {
             queue_core_.StopAndDiscardMetadata(wait_hooks);
+            host_regions::DiscardCapturedBufferOwners(data);
+            host_regions::QueueAbandoned(device_idx);
         } catch (...) {
             ASCEND_LOGE("Task queue recovery metadata cleanup failed.");
         }
+        PrefixQuiescentIfStopped(this, queue_core_.Snapshot());
         {
             std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mu_);
             repo_status.store(RepoStatus::ERROR_EXIT, std::memory_order_release);
@@ -429,16 +703,22 @@ void Repository::ChangeStatus(RepoStatus expected, RepoStatus desired)
             "Task queue cannot publish an active status while its core is stopped.",
             PTA_ERROR(ErrCode::INTERNAL));
         repo_status.store(desired, std::memory_order_release);
+        PrefixRegistry().SetQueueRunning(this, desired == RepoStatus::RUN);
         ++status_epoch_;
     } else {
         repo_status.store(desired, std::memory_order_release);
+        PrefixRegistry().SetQueueRunning(this, desired == RepoStatus::RUN);
         ++status_epoch_;
         queue_core_.RequestStop();
+        if (desired != RepoStatus::NEED_EXIT) {
+            PrefixRegistry().FailQueue(this, PrefixStoppedError());
+        }
     }
 }
 
 NPUStatus Repository::MakeSureQueueEmpty(bool check_error)
 {
+    host_regions::RejectEffect("queue drain");
     TORCH_NPU_QUEUE_LOGD("MakeSureQueueEmpty: start, device = %d, queued = %zu, status = %d",
         device_idx, queue_core_.Snapshot().size, GetStatus());
     std::string error_msg;
@@ -465,6 +745,11 @@ NPUStatus Repository::MakeSureQueueEmpty(bool check_error)
 #endif
         queue_core_.WaitDrained(wait_hooks);
     }
+
+    // ACL submission completion is not retirement of the eligible native
+    // Tensor/Storage owners moved to the bounded release lane. Keep that work
+    // inside the unchanged caller synchronization/timing boundary.
+    releaseQueue.WaitForEligibleOwners();
 
     const ErrorRecord error = SnapshotError();
 
@@ -573,16 +858,25 @@ bool Repository::ReadQueue()
 {
     bool execution_failed = false;
     const bool consumed = queue_core_.ConsumeOne([this, &execution_failed](uint32_t slot) {
+        const void* prefix_event = PrefixEventKey(manager().getCurrentParams(data, slot));
+        auto prefix_lease = prefix_event ? PrefixRegistry().Acquire(prefix_event) : prefix::Registry::Ticket{};
         const std::string current_para = get_func_error_msg(manager().getCurrentParams(data, slot));
         RecordCurrentParameter(current_para);
 #ifndef BUILD_LIBTORCH
-        at_npu::native::NpuUtils::ProfReportMarkDataToNpuProfiler(2, data, slot);
+        at_npu::native::NpuUtils::ProfReportMarkDataToNpuProfiler(2, manager().getCurrentParams(data, slot), 0);
         const auto ret = manager().Call(data, slot);
-        at_npu::native::NpuUtils::ProfReportMarkDataToNpuProfiler(3, data, slot);
+        at_npu::native::NpuUtils::ProfReportMarkDataToNpuProfiler(3, manager().getCurrentParams(data, slot), 0);
 #else
         const auto ret = manager().Call(data, slot);
 #endif
+        host_regions::QueueConsumed(manager().getCurrentParams(data, slot), ret);
         if (ret != 0) {
+            if (prefix_lease) {
+                // This receipt describes this record attempt, never an old event state.
+                PrefixRegistry().Recorded(prefix_event, prefix_lease,
+                    std::make_exception_ptr(std::runtime_error(
+                        "FIFO prefix event record failed, ACL error=" + std::to_string(ret))));
+            }
             execution_failed = true;
             std::string repository_error = current_para;
             RecordRepositoryError(repository_error);
@@ -615,6 +909,10 @@ bool Repository::ReadQueue()
             ASCEND_LOGI("ReadQueue: SynchronizeDevice with FORCE STOP, device = %d, slot = %u, "
                         "status = %d, ret = %d, acl_ret = %d",
                 device_idx, slot, GetStatus(), ret, acl_ret);
+        }
+        // Acknowledge only after real record and parameter release succeeded.
+        if (prefix_lease) {
+            PrefixRegistry().Recorded(prefix_event, prefix_lease);
         }
     });
     if (execution_failed) {
@@ -658,7 +956,9 @@ void Repository::Enqueue(void *cur_paras)
 
     const RepoStatus current_status = GetStatus();
     ThrowDeviceError(current_status, cur_paras);
-    const ErrorRecord error = SnapshotError();
+    const ErrorRecord error =
+        (current_status == RepoStatus::CAN_EXIT || current_status == RepoStatus::ERROR_EXIT)
+        ? SnapshotError() : ErrorRecord{};
 
     if (current_status == RepoStatus::CAN_EXIT) {
         ASCEND_LOGE("Inner error happened with CAN_EXIT status, detail: %s", error.repository.c_str());
@@ -735,7 +1035,16 @@ void Repository::Enqueue(void *cur_paras)
             // The deep copy is deliberately inside the core's short producer
             // commit section. Publishing tail/size before this returns would
             // expose a partially copied parameter record to the ACL thread.
+            const void* event = PrefixEventKey(cur_paras);
+            const auto* expected = event && event == h2d_marker_event ? h2d_marker_token : nullptr;
+            if (expected && GetStatus() != RepoStatus::RUN) {
+                throw prefix::PrefixNotRunning();
+            }
             manager().Copy(data, slot, cur_paras);
+            host_regions::QueueCopyAccepted(cur_paras);
+            if (event) {
+                PrefixRegistry().Published(event, this, expected);
+            }
         },
         wait_hooks);
     if (!accepted) {
@@ -748,6 +1057,105 @@ void Repository::Enqueue(void *cur_paras)
         TORCH_NPU_QUEUE_LOGI("Enqueue: producer admission closed, device = %d, status = %d",
             device_idx, rejected_status);
     }
+}
+
+void Repository::EnqueueBatch(void* const* items, size_t count,
+    void (*prepare)(size_t, void*), void* context)
+{
+    if (count == 0) {
+        return;
+    }
+    TORCH_CHECK(items != nullptr && prepare != nullptr,
+        "Batch queue requires items and a prepare callback.", PTA_ERROR(ErrCode::PARAM));
+    for (size_t i = 0; i != count; ++i) {
+        TORCH_CHECK(items[i] != nullptr, "Batch queue item is null.", PTA_ERROR(ErrCode::PARAM));
+    }
+    const bool packet = host_regions::IsPublishingPacketCommand(items[0]);
+    if (packet && GetStatus() == RepoStatus::INIT) {
+        // Packet parameters are still private here. Finish the original INIT
+        // drain before taking one core producer lease for the complete batch.
+        MakeSureQueueEmpty();
+        ChangeStatus(RepoStatus::INIT, RepoStatus::RUN);
+    }
+    // INIT requires the original per-item drain/status transition, and lazy
+    // fusion may publish work of its own. Do not fold either protocol into a
+    // running queue's batch commit section.
+    bool fallback = GetStatus() != RepoStatus::RUN || lazy_fusion::IsEnabled();
+#ifdef TORCH_NPU_EXPERIMENTAL_LOCKFREE_QUEUE
+    fallback = true;
+#endif
+    TORCH_CHECK(!packet || !fallback,
+        "Captured packets require a running ordered batch queue; no item was accepted.",
+        PTA_ERROR(ErrCode::INTERNAL));
+    if (fallback) {
+        native_batch_fallback_calls.fetch_add(1, std::memory_order_relaxed);
+        for (size_t i = 0; i != count; ++i) {
+            prepare(i, context);
+            Enqueue(items[i]);
+            host_regions::CheckCapturedPublishAccepted(items[i]);
+            if (GetStatus() == RepoStatus::INIT) {
+                MakeSureQueueEmpty();
+                ChangeStatus(RepoStatus::INIT, RepoStatus::RUN);
+            }
+        }
+        return;
+    }
+    TORCH_CHECK(lifecycle_.load(std::memory_order_acquire) == Lifecycle::Running,
+        "Task queue is not ready to accept a batch producer.", PTA_ERROR(ErrCode::INTERNAL));
+#ifndef TORCH_NPU_EXPERIMENTAL_LOCKFREE_QUEUE
+#ifndef BUILD_LIBTORCH
+    QueueWaitHooks wait_hooks(g_used_aclop);
+#else
+    QueueWaitHooks wait_hooks(false);
+#endif
+    struct BatchStopped { RepoStatus status; };
+    size_t accepted = 0;
+    try {
+        accepted = queue_core_.EnqueueBatch(count,
+        [this, items, prepare, context](uint32_t slot, size_t index) {
+            void* parameter = items[index];
+            const RepoStatus status = GetStatus();
+            ThrowDeviceError(status, parameter);
+            // Preserve per-item device/error checks. Normal status changes can
+            // close admission while a batch is waiting for queue capacity.
+            if (status != RepoStatus::RUN) {
+                throw BatchStopped{status};
+            }
+            prepare(index, context);
+            const void* event = PrefixEventKey(parameter);
+            const auto* expected = event && event == h2d_marker_event ? h2d_marker_token : nullptr;
+            if (expected && GetStatus() != RepoStatus::RUN) {
+                throw prefix::PrefixNotRunning();
+            }
+            manager().Copy(data, slot, parameter);
+            host_regions::QueueCopyAccepted(parameter);
+            if (event) {
+                PrefixRegistry().Published(event, this, expected);
+            }
+        }, wait_hooks);
+    } catch (const BatchStopped& stopped) {
+        // Status publication and OOM hooks can acquire queue/lifecycle locks
+        // or reenter. Run them only after the batch commit mutex is released.
+        if (stopped.status == RepoStatus::ERROR_EXIT) {
+            SetStatus(CAN_EXIT);
+            const auto error = SnapshotError();
+            const std::string message = "The Inner error is reported as above. " +
+                error.repository + ".\n" + error.acl + PTA_ERROR(ErrCode::ACL);
+            if (isCannOOM(GetQueueErrMsg())) {
+                if (c10_npu::option::OptionsManager::IsOomSnapshotEnable()) {
+                    c10_npu::option::oom_observer();
+                }
+                TORCH_CHECK_WITH(OutOfMemoryError, false, message.c_str());
+            }
+            throw std::runtime_error(message);
+        }
+        TORCH_CHECK(false,
+            "Task queue stopped before accepting a batch item.", PTA_ERROR(ErrCode::INTERNAL));
+    }
+    TORCH_CHECK(accepted == count,
+        "Task queue stopped after accepting ", accepted, " of ", count, " batch items.",
+        PTA_ERROR(ErrCode::INTERNAL));
+#endif
 }
 
 void Repository::Dequeue()
@@ -836,12 +1244,15 @@ void Repository::ClearQueue()
 #else
     QueueWaitHooks wait_hooks(false);
 #endif
+    PrefixRegistry().FailQueue(this, PrefixStoppedError());
     bool cleanup_failed = false;
     try {
         if (snapshot.failed) {
             // The callback that owns the head may have partially released it.
             // Metadata-only discard prevents a non-idempotent retry.
             queue_core_.StopAndDiscardMetadata(wait_hooks);
+            host_regions::DiscardCapturedBufferOwners(data);
+            host_regions::QueueAbandoned(device_idx);
         } else {
             queue_core_.StopAndDiscard(
                 [this](uint32_t slot) { manager().Release(data, slot, releaseQueue); },
@@ -853,6 +1264,8 @@ void Repository::ClearQueue()
         ASCEND_LOGE("Task queue cleanup failed, discarding metadata: %s", error.what());
         try {
             queue_core_.StopAndDiscardMetadata(wait_hooks);
+            host_regions::DiscardCapturedBufferOwners(data);
+            host_regions::QueueAbandoned(device_idx);
         } catch (...) {
             ASCEND_LOGE("Task queue metadata cleanup failed.");
         }
@@ -862,11 +1275,14 @@ void Repository::ClearQueue()
         ASCEND_LOGE("Task queue cleanup failed, discarding metadata.");
         try {
             queue_core_.StopAndDiscardMetadata(wait_hooks);
+            host_regions::DiscardCapturedBufferOwners(data);
+            host_regions::QueueAbandoned(device_idx);
         } catch (...) {
             ASCEND_LOGE("Task queue metadata cleanup failed.");
         }
     }
 
+    PrefixQuiescentIfStopped(this, queue_core_.Snapshot());
     {
         std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mu_);
         if (cleanup_failed) {
@@ -877,7 +1293,9 @@ void Repository::ClearQueue()
             repo_status.load(std::memory_order_acquire) == status &&
             (status == RepoStatus::RUN || status == RepoStatus::INIT) &&
             queue_core_.Snapshot().mode == queue::QueueMode::Stopped) {
+            PrefixStartGeneration(this);
             queue_core_.Start();
+            PrefixRegistry().SetQueueRunning(this, GetStatus() == RepoStatus::RUN);
         }
         lifecycle_.store(Lifecycle::Running, std::memory_order_release);
     }
@@ -908,6 +1326,7 @@ Repository::~Repository()
     }
 
     repo_status.store(RepoStatus::NEED_EXIT, std::memory_order_release);
+    PrefixRegistry().SetQueueRunning(this, false);
     queue_core_.RequestStop();
 #ifndef BUILD_LIBTORCH
     QueueWaitHooks wait_hooks(g_used_aclop);
@@ -921,11 +1340,14 @@ Repository::~Repository()
         queue_core_.StopAndDrain(wait_hooks);
     } catch (const std::exception& error) {
         ASCEND_LOGE("Task queue drain failed, discarding pending tasks: %s", error.what());
+        PrefixRegistry().FailQueue(this, std::current_exception());
         try {
             // StopAndDrain waits for active producers before surfacing a
             // shared callback error, so this fallback has no producer wait.
             if (queue_core_.Snapshot().failed) {
                 queue_core_.StopAndDiscardMetadata(wait_hooks);
+                host_regions::DiscardCapturedBufferOwners(data);
+            host_regions::QueueAbandoned(device_idx);
             } else {
                 queue_core_.StopAndDiscard(
                     [this](uint32_t slot) { manager().Release(data, slot, releaseQueue); },
@@ -935,6 +1357,8 @@ Repository::~Repository()
             ASCEND_LOGE("Task queue cleanup failed: %s", discard_error.what());
             try {
                 queue_core_.StopAndDiscardMetadata(wait_hooks);
+                host_regions::DiscardCapturedBufferOwners(data);
+            host_regions::QueueAbandoned(device_idx);
             } catch (...) {
                 ASCEND_LOGE("Task queue metadata cleanup failed.");
             }
@@ -942,15 +1366,20 @@ Repository::~Repository()
             ASCEND_LOGE("Task queue cleanup failed with an unknown exception.");
             try {
                 queue_core_.StopAndDiscardMetadata(wait_hooks);
+                host_regions::DiscardCapturedBufferOwners(data);
+            host_regions::QueueAbandoned(device_idx);
             } catch (...) {
                 ASCEND_LOGE("Task queue metadata cleanup failed.");
             }
         }
     } catch (...) {
         ASCEND_LOGE("Task queue drain failed with an unknown exception.");
+        PrefixRegistry().FailQueue(this, std::current_exception());
         try {
             if (queue_core_.Snapshot().failed) {
                 queue_core_.StopAndDiscardMetadata(wait_hooks);
+                host_regions::DiscardCapturedBufferOwners(data);
+            host_regions::QueueAbandoned(device_idx);
             } else {
                 queue_core_.StopAndDiscard(
                     [this](uint32_t slot) { manager().Release(data, slot, releaseQueue); },
@@ -960,6 +1389,8 @@ Repository::~Repository()
             ASCEND_LOGE("Task queue cleanup failed with an unknown exception.");
             try {
                 queue_core_.StopAndDiscardMetadata(wait_hooks);
+                host_regions::DiscardCapturedBufferOwners(data);
+            host_regions::QueueAbandoned(device_idx);
             } catch (...) {
                 ASCEND_LOGE("Task queue metadata cleanup failed.");
             }
@@ -982,6 +1413,7 @@ Repository::~Repository()
     } catch (...) {
         ASCEND_LOGE("Task queue storage cleanup failed with an unknown exception.");
     }
+    PrefixQuiescentIfStopped(this, queue_core_.Snapshot());
     lifecycle_.store(Lifecycle::Stopped, std::memory_order_release);
     lifecycle_cv_.notify_all();
 }
@@ -993,6 +1425,7 @@ bool Repository::CheckInit() const
 
 void StartConsume(Repository *repo, c10::DeviceIndex device_id)
 {
+    host_regions::CapturedRetirementWorkerScope retirement_worker;
     try {
         SetThreadType(ThreadType::ACL_THREAD);
         SetThreadAffinity(device_id);
@@ -1044,7 +1477,9 @@ void Repository::InitRepo(c10::DeviceIndex device_id)
         }
         data = manager().Init(static_cast<int>(queue_core_.Capacity()));
         ASCEND_LOGI("TaskQueue is enable");
+        PrefixStartGeneration(this);
         queue_core_.Start();
+        PrefixRegistry().SetQueueRunning(this, GetStatus() == RepoStatus::RUN);
 
         // Release storage must be live before the main consumer can transfer
         // ownership to it.
@@ -1080,6 +1515,7 @@ void Repository::InitRepo(c10::DeviceIndex device_id)
             ASCEND_LOGE("Task queue initialization storage cleanup failed.");
         }
         data = nullptr;
+        PrefixQuiescentIfStopped(this, queue_core_.Snapshot());
         lifecycle_.store(Lifecycle::Stopped, std::memory_order_release);
         lifecycle_cv_.notify_all();
         std::rethrow_exception(initialization_error);
@@ -1098,6 +1534,58 @@ std::string Repository::GetPara()
     });
     return repo_para;
 }
+
+namespace prefix {
+namespace {
+std::function<void()> MakePrefixWaiter(bool enable_h2d)
+{
+    TORCH_CHECK(option::OptionsManager::GetTaskQueueEnable(),
+        "FIFO prefix completion requires task queues.", PTA_ERROR(ErrCode::NOT_SUPPORT));
+    TORCH_CHECK(!option::OptionsManager::GetPerStreamQueue(),
+        "FIFO prefix completion requires the shared default-stream queue.", PTA_ERROR(ErrCode::NOT_SUPPORT));
+    const auto stream = getCurrentNPUStream();
+    TORCH_CHECK(stream == getDefaultNPUStream(stream.device_index()) && !stream.isSyncLaunchStream(),
+        "FIFO prefix completion requires the current default stream.", PTA_ERROR(ErrCode::NOT_SUPPORT));
+    auto owner = std::make_shared<PrefixAclEvent>(stream);
+    if (enable_h2d) {
+        TORCH_CHECK(h2d_prefix_owner.expired(), "A FIFO prefix H2D factory is already active on this producer.",
+            PTA_ERROR(ErrCode::INTERNAL));
+        h2d_prefix_owner = owner;
+    }
+    return [owner] {
+        std::unique_lock<std::mutex> reuse(owner->reuse_mu, std::try_to_lock);
+        TORCH_CHECK(reuse.owns_lock(), "FIFO prefix event owner used concurrently.", PTA_ERROR(ErrCode::INTERNAL));
+        (void)PrefixWaitLocked(owner, false);
+    };
+}
+} // namespace
+
+C10_NPU_API std::function<void()> MakeDefaultStreamPrefixWaiter()
+{
+    return MakePrefixWaiter(false);
+}
+
+C10_NPU_API std::function<void()> MakeDefaultStreamPrefixH2DWaiter()
+{
+    return MakePrefixWaiter(true);
+}
+
+C10_NPU_API bool TryH2DPrewait(const NPUStream& stream)
+{
+    auto owner = h2d_prefix_owner.lock();
+    if (!owner) {
+        return false;
+    }
+#ifndef BUILD_LIBTORCH
+    // Declare before invoking the inner function. Its reuse/ticket/registry
+    // locks all unwind first, including exceptions, before Python restoration.
+    torch_npu::utils::PythonThreadStateDetachGuard detach(true);
+#endif
+    return PrefixTryH2DDetached(owner, stream);
+}
+
+} // namespace prefix
+
 void ReleaseQueue::PushToReleaseQueue(void *cur_paras)
 {
     TORCH_CHECK(
@@ -1128,6 +1616,7 @@ void ReleaseQueue::PopFromReleaseQueue()
 
 void StartRelease(ReleaseQueue *releaseQue)
 {
+    host_regions::CapturedRetirementWorkerScope retirement_worker;
     try {
         SetThreadType(ThreadType::RELEASE_THREAD);
         SetThreadAffinity(releaseQue->GetDeviceID());
@@ -1197,6 +1686,39 @@ ReleaseQueue::~ReleaseQueue()
     } catch (...) {
         ASCEND_LOGE("Release queue cleanup failed with an unknown exception.");
     }
+}
+
+void ReleaseQueue::WaitForEligibleOwners()
+{
+    // Never wait for work whose completion includes this very ACL/release
+    // thread. Ordinary queues without moved capture owners retain the old
+    // fast path, rather than draining all ACL descriptor releases per request.
+    if (host_regions::IsCapturedRetirementWorker() || data == nullptr ||
+        !host_regions::HasCapturedOwnerRetirement(data)) {
+        return;
+    }
+#ifndef BUILD_LIBTORCH
+    QueueWaitHooks wait_hooks(g_used_aclop);
+#else
+    QueueWaitHooks wait_hooks(false);
+#endif
+    try {
+        queue_core_.WaitDrained(wait_hooks);
+    } catch (...) {
+        const auto error = std::current_exception();
+        // A partially executed ReleaseParam must never run again. Shutdown
+        // joins the failed worker and DeleteFunc only retires the additional
+        // capture owners in its constructed slots, without retrying ACL.
+        try {
+            Shutdown();
+        } catch (...) {
+            ASCEND_LOGE("Captured owner retirement cleanup also failed.");
+        }
+        std::rethrow_exception(error);
+    }
+    TORCH_CHECK(!host_regions::HasCapturedOwnerRetirement(data),
+        "Release queue drained before captured native owner retirement completed.",
+        PTA_ERROR(ErrCode::INTERNAL));
 }
 
 void ReleaseQueue::Shutdown()

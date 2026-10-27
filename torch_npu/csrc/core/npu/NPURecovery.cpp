@@ -1,4 +1,5 @@
 #include <shared_mutex>
+#include <atomic>
 #ifndef BUILD_LIBTORCH
 #include <torch/csrc/python_headers.h>
 #include <torch/csrc/utils/pybind.h>
@@ -13,21 +14,20 @@
 namespace c10_npu {
 namespace {
 
-static bool NPU_DATA_UNSAFE_FLAG = false;
+static std::atomic<bool> NPU_DATA_UNSAFE_FLAG{false};
 std::shared_mutex rw_mutex;
 
 }
 
 bool get_npu_data_unsafe_flag()
 {
-    std::shared_lock<std::shared_mutex> lock(rw_mutex);
-    return NPU_DATA_UNSAFE_FLAG;
+    return NPU_DATA_UNSAFE_FLAG.load(std::memory_order_acquire);
 }
 
 void set_npu_data_unsafe_flag(bool flag)
 {
     std::unique_lock<std::shared_mutex> lock(rw_mutex);
-    NPU_DATA_UNSAFE_FLAG = flag;
+    NPU_DATA_UNSAFE_FLAG.store(flag, std::memory_order_release);
     ASCEND_LOGI("Set npu data unsafe flag to %d", flag);
     return;
 }

@@ -14,6 +14,15 @@
 #include "torch_npu/csrc/framework/utils/NpuUtils.h"
 #include "torch_npu/csrc/logging/LogContext.h"
 #include "torch_npu/csrc/framework/OpCommand.h"
+#include "torch_npu/csrc/core/npu/HostRegionCapture.h"
+#include "torch_npu/csrc/core/npu/HostRegionRetirement.h"
+#include "torch_npu/csrc/core/npu/HostRegionTensorOwner.h"
+#include "torch_npu/csrc/core/npu/HostRegionParameterRelease.h"
+#include "torch_npu/csrc/core/NPUTensorImpl.h"
+#include "torch_npu/csrc/core/NPUStorageImpl.h"
+
+#include <typeinfo>
+#include <exception>
 
 #ifndef BUILD_LIBTORCH
 #include <Python.h>
@@ -22,6 +31,112 @@
 
 namespace at_npu {
 namespace native {
+
+namespace {
+namespace retirement = c10_npu::host_regions::retirement_detail;
+constexpr size_t queue_payload_bytes = sizeof(c10_npu::queue::QueueParas) + MAX_PARAS_BYTE_SIZE;
+
+retirement::SlotState& RetirementSlot(void* value) noexcept
+{
+    return retirement::Slot(value, queue_payload_bytes);
+}
+
+bool CanCreateCapturedStorageOwnerImpl(const at::Tensor& value) noexcept
+{
+    if (!value.defined()) return false;
+    try {
+        auto* impl = value.unsafeGetTensorImpl();
+        if ((typeid(*impl) != typeid(torch_npu::NPUTensorImpl) &&
+             typeid(*impl) != typeid(c10::TensorImpl)) ||
+            impl->device_type() != c10::DeviceType::PrivateUse1 ||
+            impl->key_set().has_any(c10::python_ks) ||
+            impl->get_backend_meta() || impl->fake_tensor_mode() ||
+            impl->has_symbolic_sizes_strides() || !impl->has_storage())
+            return false;
+        auto* storage = impl->storage().unsafeGetStorageImpl();
+        if (!storage || typeid(*storage) != typeid(torch_npu::NPUStorageImpl) ||
+            storage->pyobj_slot()->load_pyobj() ||
+            static_cast<torch_npu::NPUStorageImpl*>(storage)->lazy_fusion_data_)
+            return false;
+        return c10_npu::NPUCachingAllocator::IsNativeCapturedRetirementData(
+            storage->data_ptr(), storage->allocator());
+    } catch (...) {
+        // Exotic storage access is deliberately retained on the original path.
+        return false;
+    }
+}
+
+bool NativeRetirementOwner(const at::Tensor& value) noexcept
+{
+    if (!value.defined()) return true;
+    // Only a private never-exposed holder carries this certificate. Worker
+    // admission audited its strongly-held Storage, so the hot main commit must
+    // not repeat allocator lookup/locking. Immutable storage/hooks are required.
+    if (c10_npu::host_regions::IsCapturedStorageOwner(value)) return true;
+    // Preserve the original strict predicate for any old/exported owner that
+    // did not come from the private holder path; unsupported slots keep Copy.
+    auto* impl = value.unsafeGetTensorImpl();
+    if (impl->pyobj_slot()->load_pyobj() || impl->autograd_meta()) return false;
+    return CanCreateCapturedStorageOwnerImpl(value);
+}
+
+bool NativeRetirementOwners(const ExecuteParas& parameter, uint64_t& count) noexcept
+{
+    count = 0;
+    if (parameter.customHandler) return false;
+    for (const auto& owner : parameter.hostMemory) {
+        if (!NativeRetirementOwner(owner)) return false;
+        if (owner.defined()) ++count;
+    }
+    return true;
+}
+
+// The predicate admits only the live plain captured source. Destination is a
+// fresh, typed object. No user function copy or additional tensor incref occurs.
+void AdoptCapturedLegacy(ExecuteParas& destination, ExecuteParas& source)
+{
+    assert(!source.customHandler && destination.hostMemory.empty());
+    std::strncpy(destination.opType, source.opType, sizeof(destination.opType) - 1);
+    destination.isJitDisable = source.isJitDisable;
+    destination.pta_correlation_id = source.pta_correlation_id;
+    destination.hostMemory = std::move(source.hostMemory);
+    destination.paras = source.paras;
+    destination.attr = source.attr;
+    destination.constParams = source.constParams;
+    source.paras = ACL_PARAMS();
+    source.attr = nullptr;
+    source.constParams = CONST_PARAMS();
+}
+
+void DiscardPacketPayload(void* raw, retirement::SlotState& slot) noexcept
+{
+    auto& header = *static_cast<c10_npu::queue::QueueParas*>(raw);
+    retirement::RetirePacketHeader(slot, header, [](c10_npu::host_regions::PacketCommandRef& ref) noexcept {
+        try { c10_npu::host_regions::ReleasePacketCommand(ref); }
+        catch (...) { /* The generic release closes its lease even on ACL failure. */ }
+    });
+}
+
+void DestroyEmptyOrNativePayload(void* raw, retirement::SlotState& slot) noexcept
+{
+    if (slot.packet_pending) { DiscardPacketPayload(raw, slot); return; }
+    if (!slot.destroy) return;
+    if (slot.kind == c10_npu::queue::COMPILE_AND_EXECUTE) {
+        auto* value = static_cast<ExecuteParas*>(slot.payload);
+        retirement::Retire(slot, [value]() noexcept { value->hostMemory.clear(); });
+        if (slot.safe_cleanup) value->hostMemory.clear();
+        // A failed preexisting nonnative payload keeps its original fallback
+        // destruction policy. Never transfer its Python owner to shutdown caller.
+        if (!value->hostMemory.empty() || value->customHandler) return;
+    } else if (slot.kind == c10_npu::queue::EXECUTE_OPAPI &&
+        static_cast<ExecuteParasOpApi*>(slot.payload)->customHandler) {
+        return;
+    }
+    slot.destroy(slot.payload);
+    slot.payload = nullptr;
+    slot.destroy = nullptr;
+}
+} // namespace
 
 static bool deterministicaclnn_oldstatus = false;
 static bool aclop_deterministicaclnn_oldstatus = false;
@@ -555,14 +670,8 @@ void CopyFunc(void *dst, void *src)
 {
     auto dstPtr = static_cast<c10_npu::queue::QueueParas *>(dst);
     auto srcPtr = static_cast<c10_npu::queue::QueueParas *>(src);
+    auto& slot = RetirementSlot(dst);
     dstPtr->paramVal = static_cast<uint8_t *>(dst) + sizeof(c10_npu::queue::QueueParas);
-    if (dstPtr->paramType == c10_npu::queue::EXECUTE_OPAPI) {
-        // string or smallvector of struct is used, deconstructor need be called before memset
-        (static_cast<ExecuteParasOpApi *>(dstPtr->paramVal))->~ExecuteParasOpApi();
-    } else if (dstPtr->paramType == c10_npu::queue::COMPILE_AND_EXECUTE) {
-        // string or smallvector of struct is used, deconstructor need be called before memset
-        (static_cast<ExecuteParas *>(dstPtr->paramVal))->~ExecuteParas();
-    }
 
     const bool is_opapi_v2 = (srcPtr->paramType == c10_npu::queue::EXECUTE_OPAPI_V2);
     dstPtr->paramStream = srcPtr->paramStream;
@@ -573,8 +682,16 @@ void CopyFunc(void *dst, void *src)
     }
     dstPtr->paramLen = srcPtr->paramLen;
     dstPtr->correlation_id = srcPtr->correlation_id;
+    c10_npu::host_regions::PacketCommandRef packet;
+    if (c10_npu::host_regions::IsPublishingPacketCommand(src)) {
+        TORCH_CHECK(c10_npu::host_regions::AcquirePublishingPacketCommand(src, packet),
+            "Captured packet command cannot acquire queue admission", PTA_ERROR(ErrCode::VALUE));
+        retirement::BorrowPacket(slot, packet, dstPtr->paramType);
+        dstPtr->paramVal = c10_npu::host_regions::PacketCommandParameter(packet);
+        return;
+    }
     if (dstPtr->paramType == c10_npu::queue::EXECUTE_OPAPI) {
-        new (dstPtr->paramVal) ExecuteParasOpApi();
+        retirement::Construct<ExecuteParasOpApi>(slot, dstPtr->paramVal, dstPtr->paramType);
         if (is_opapi_v2) {
             (static_cast<ExecuteParasOpApi *>(dstPtr->paramVal))
                 ->Copy(*(static_cast<ExecuteParasOpApiV2 *>(srcPtr->paramVal)));
@@ -583,14 +700,30 @@ void CopyFunc(void *dst, void *src)
                 ->Copy(*(static_cast<ExecuteParasOpApi *>(srcPtr->paramVal)));
         }
     } else if (srcPtr->paramType == c10_npu::queue::COMPILE_AND_EXECUTE) {
-        new (dstPtr->paramVal) ExecuteParas();
-        (static_cast<ExecuteParas *>(dstPtr->paramVal))->Copy(*(static_cast<ExecuteParas *>(srcPtr->paramVal)));
+        auto& destination = retirement::Construct<ExecuteParas>(slot, dstPtr->paramVal, dstPtr->paramType);
+        auto& source = *static_cast<ExecuteParas*>(srcPtr->paramVal);
+        if (c10_npu::host_regions::IsPublishingCaptured(src)) {
+            uint64_t owners = 0;
+            const bool native_only = NativeRetirementOwners(source, owners);
+            slot.captured = true;
+            slot.safe_cleanup = native_only;
+            if (native_only) {
+                AdoptCapturedLegacy(destination, source);
+                if (owners) retirement::Adopt(slot, owners);
+            } else {
+                // Keep the captured block's original extra holder and its
+                // destruction timing/thread for Python/custom-owner fallbacks.
+                destination.Copy(source);
+            }
+        } else {
+            destination.Copy(source);
+        }
     } else if ((srcPtr->paramType == c10_npu::queue::ASYNC_MEMCPY)) {
-        new (dstPtr->paramVal) c10_npu::queue::CopyParas();
+        retirement::Construct<c10_npu::queue::CopyParas>(slot, dstPtr->paramVal, dstPtr->paramType);
         (static_cast<c10_npu::queue::CopyParas *>(dstPtr->paramVal))
             ->Copy(*(static_cast<c10_npu::queue::CopyParas *>(srcPtr->paramVal)));
     } else {
-        new (dstPtr->paramVal) c10_npu::queue::EventParas();
+        retirement::Construct<c10_npu::queue::EventParas>(slot, dstPtr->paramVal, dstPtr->paramType);
         (static_cast<c10_npu::queue::EventParas *>(dstPtr->paramVal))
             ->Copy(*(static_cast<c10_npu::queue::EventParas *>(srcPtr->paramVal)));
     }
@@ -603,17 +736,17 @@ void ReleaseFunc(void *ptr, c10_npu::ReleaseQueue &releaseQueue)
 
 void *NewFunc(int caption, int &size)
 {
-    size = static_cast<int>(sizeof(c10_npu::queue::QueueParas) + MAX_PARAS_BYTE_SIZE);
-    void *ptr = malloc(size * caption);
-    TORCH_CHECK(ptr != nullptr, "OpCommand new buffer must be not NULL", PTA_ERROR(ErrCode::PTR));
-    memset(ptr, 0, size * caption);
+    size_t stride = 0;
+    void* ptr = retirement::Allocate(queue_payload_bytes, static_cast<size_t>(caption), stride);
+    TORCH_CHECK(stride <= static_cast<size_t>(std::numeric_limits<int>::max()),
+        "OpCommand parameter stride is too large", PTA_ERROR(ErrCode::VALUE));
+    size = static_cast<int>(stride);
     return ptr;
 }
 
 void DeleteFunc(void *ptr)
 {
-    free(ptr);
-    ptr = nullptr;
+    retirement::DestroyBuffer(ptr, DestroyEmptyOrNativePayload);
 }
 
 int ValueWriteFunc(c10_npu::queue::QueueParas *in, aclrtStream stream)
@@ -689,6 +822,8 @@ AsyncFuncMap funcMap = {
 int AsncExecFunc(void *data)
 {
     auto queueParam = static_cast<c10_npu::queue::QueueParas *>(data);
+    auto& slot = RetirementSlot(data);
+    if (slot.packet_pending) c10_npu::host_regions::PacketCommandExecutionAttempted(slot.packet);
     auto type = queueParam->paramType;
     aclrtStream stream = queueParam->paramStream;
     auto ret = funcMap[type](queueParam, stream);
@@ -699,26 +834,68 @@ void CopyReleaseParamFunc(void *dst, void *src)
 {
     auto dstPtr = static_cast<c10_npu::queue::QueueParas *>(dst);
     auto srcPtr = static_cast<c10_npu::queue::QueueParas *>(src);
+    auto& slot = RetirementSlot(dst);
+    auto& source_slot = RetirementSlot(src);
+    if (source_slot.packet_pending) {
+        *dstPtr = *srcPtr;
+        retirement::TransferPacket(slot, source_slot);
+        srcPtr->paramVal = nullptr;
+        return;
+    }
     dstPtr->paramType = srcPtr->paramType;
     dstPtr->paramVal = static_cast<uint8_t *>(dst) + sizeof(c10_npu::queue::QueueParas);
     if (srcPtr->paramType == c10_npu::queue::EXECUTE_OPAPI) {
+        if (!slot.destroy || slot.kind != dstPtr->paramType)
+            retirement::Construct<ExecuteParasOpApi>(slot, dstPtr->paramVal, dstPtr->paramType);
         (static_cast<ExecuteParasOpApi *>(dstPtr->paramVal))->Copy(*(static_cast<ExecuteParasOpApi *>(srcPtr->paramVal)));
         (static_cast<ExecuteParasOpApi *>(srcPtr->paramVal))->Release();
     } else if (srcPtr->paramType == c10_npu::queue::COMPILE_AND_EXECUTE) {
-        (static_cast<ExecuteParas *>(dstPtr->paramVal))->CopyEx(*(static_cast<ExecuteParas *>(srcPtr->paramVal)));
-        (static_cast<ExecuteParas *>(srcPtr->paramVal))->hostMemory.clear();
+        if (!slot.destroy || slot.kind != dstPtr->paramType)
+            retirement::Construct<ExecuteParas>(slot, dstPtr->paramVal, dstPtr->paramType);
+        auto& destination = *static_cast<ExecuteParas*>(dstPtr->paramVal);
+        auto& source = *static_cast<ExecuteParas*>(srcPtr->paramVal);
+        // Main adoption already classified the complete mixed owner vector.
+        // Moving that same vector cannot change its certificate or count.
+        const uint64_t count = source_slot.owners;
+        const bool native_only = source_slot.captured && source_slot.safe_cleanup;
+        // CopyEx only copies ACL handles. Any reserve failure precedes a source
+        // owner move and leaves the current main-queue head intact for cleanup.
+        destination.CopyEx(source);
+        if (native_only && count) {
+            retirement::Transfer(slot, destination.hostMemory, source.hostMemory, count, &source_slot);
+        } else {
+            if (source_slot.captured && !source.hostMemory.empty())
+                retirement::counters.fallback.fetch_add(1, std::memory_order_relaxed);
+            retirement::Retire(source_slot, [&source]() noexcept { source.hostMemory.clear(); });
+            source.hostMemory.clear();
+        }
     }
 }
 
 void ReleaseParamFunc(void *ptr)
 {
     auto queueParam = static_cast<c10_npu::queue::QueueParas *>(ptr);
+    if (queueParam->paramVal == nullptr) return; // A retired borrowed command is an empty slot.
+    auto& slot = RetirementSlot(ptr);
+    if (slot.packet_pending) {
+        std::exception_ptr error;
+        retirement::RetirePacketHeader(slot, *queueParam,
+            [&error](c10_npu::host_regions::PacketCommandRef& ref) noexcept {
+                try { c10_npu::host_regions::ReleasePacketCommand(ref); }
+                catch (...) { error = std::current_exception(); }
+            });
+        // A last packet release may destroy the borrowed payload. Its header
+        // is already null before the original queue logs a cleanup error.
+        if (error) std::rethrow_exception(error);
+        return;
+    }
     auto type = queueParam->paramType;
     if (type == c10_npu::queue::EXECUTE_OPAPI) {
         auto cur_paras = static_cast<ExecuteParasOpApi *>(queueParam->paramVal);
         cur_paras->Release();
     } else if (type == c10_npu::queue::COMPILE_AND_EXECUTE) {
         auto cur_paras = static_cast<ExecuteParas *>(queueParam->paramVal);
+        retirement::OwnerGuard<decltype(cur_paras->hostMemory)> retire(slot, cur_paras->hostMemory);
         cur_paras->Release();
     }
 }
@@ -751,3 +928,27 @@ void OpCommandImpls::Pop()
 }
 }  // namespace native
 }  // namespace at_npu
+
+namespace c10_npu::host_regions {
+bool CanCreateCapturedStorageOwner(const at::Tensor& original) noexcept
+{
+    return at_npu::native::CanCreateCapturedStorageOwnerImpl(original);
+}
+
+void DiscardCapturedOwners(void* raw) noexcept
+{
+    if (!raw) return;
+    auto& slot = at_npu::native::RetirementSlot(raw);
+    if (slot.packet_pending) { at_npu::native::DiscardPacketPayload(raw, slot); return; }
+    if (!slot.destroy || slot.kind != c10_npu::queue::COMPILE_AND_EXECUTE) return;
+    auto* value = static_cast<at_npu::native::ExecuteParas*>(slot.payload);
+    retirement_detail::Retire(slot, [value]() noexcept { value->hostMemory.clear(); });
+    if (slot.safe_cleanup) value->hostMemory.clear();
+}
+void DiscardCapturedBufferOwners(void* buffer) noexcept
+{
+    retirement_detail::ForEachSlot(buffer, [](void* raw, retirement_detail::SlotState&) noexcept {
+        DiscardCapturedOwners(raw);
+    });
+}
+} // namespace c10_npu::host_regions

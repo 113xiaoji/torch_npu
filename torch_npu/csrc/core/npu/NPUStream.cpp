@@ -1,3 +1,4 @@
+#include "torch_npu/csrc/core/npu/HostRegionCapture.h"
 #include <array>
 #include <climits>
 #include <atomic>
@@ -418,6 +419,7 @@ NPUStream NPUStream_fromInternals(const LeakyStreamInternals* ptr)
 
 bool NPUStream::query() const
 {
+    host_regions::RejectEffect("bool NPUStream::query() const");
     TORCH_CHECK(!isExternalStreamId(this->id()),
         "Cannot query external NPU stream status. "
         "The caller must track stream completion externally.",
@@ -433,6 +435,7 @@ bool NPUStream::query() const
 
 void NPUStream::synchronize() const
 {
+    host_regions::RejectEffect("void NPUStream::synchronize() const");
     TORCH_CHECK(!isExternalStreamId(this->id()),
         "External NPU stream is not supported in NPUStream::synchronize. "
         "The caller is responsible for synchronization of external streams.",
@@ -443,6 +446,7 @@ void NPUStream::synchronize() const
 
 aclrtStream NPUStream::stream() const
 {
+    host_regions::RejectEffect("aclrtStream NPUStream::stream() const");
     auto cur_ptr = NPUStream_internals(*this);
     AT_ASSERT(cur_ptr, PTA_ERROR(ErrCode::PTR));
     if (isExternalStreamId(this->id())) {
@@ -642,6 +646,7 @@ aclrtStream getCurrentNPUStreamNoWait(c10::DeviceIndex device_index)
 
 NPUStatus emptyAllNPUStream(bool check_error)
 {
+    host_regions::RejectEffect("NPUStatus emptyAllNPUStream(bool check_error)");
     ensureGlobalStreamState();
     NPUStatus ret;
     for (auto i = decltype(num_npus){0}; i < num_npus; ++i) {
@@ -738,6 +743,7 @@ void setDefaultStreamsStatus(c10::DeviceIndex device_index, RepoStatus status)
 
 bool npuSynchronizeDevice(bool check_error)
 {
+    host_regions::RejectEffect("bool npuSynchronizeDevice(bool check_error)");
     ASCEND_LOGD("npuSynchronizeDevice start, check_error=%d.", check_error);
     if (c10_npu::option::OptionsManager::GetTaskQueueEnable()) {
         NPUStatus ret = c10_npu::emptyAllNPUStream(check_error);
@@ -767,6 +773,7 @@ bool npuSynchronizeDevice(bool check_error)
 
 bool npuSynchronizeUsedDevices(bool check_error)
 {
+    host_regions::RejectEffect("bool npuSynchronizeUsedDevices(bool check_error)");
     if (c10_npu::option::OptionsManager::GetTaskQueueEnable()) {
         NPUStatus ret = c10_npu::emptyAllNPUStream(check_error);
         if (ret != NPU_STATUS_SUCCESS) {
@@ -793,6 +800,14 @@ void enCurrentNPUStream(void* cur_paras, c10::DeviceIndex device_index, NPUStrea
     c10_npu::queue::QueueParas* queueParam = static_cast<c10_npu::queue::QueueParas* >(cur_paras);
     queueParam->correlation_id = c10_npu::queue::QueueParas::g_correlation_id++;
     queueParam->paramStream = current_streams[device_index]->stream.load(std::memory_order_acquire);
+    if (host_regions::IsCapturing()) {
+        if (task_stream != nullptr ||
+            current_streams[device_index] != &default_streams[device_index]) {
+            host_regions::RejectEffect("non-default or explicit task stream");
+        }
+        if (host_regions::Capture(cur_paras, device_index)) return;
+    }
+    host_regions::BeforeQueuePublish(cur_paras);
     if (c10_npu::option::OptionsManager::GetPerStreamQueue()) {
         LeakyStreamInternals* ptr = current_streams[device_index];
         if (task_stream != nullptr) {
@@ -828,8 +843,61 @@ void enCurrentNPUStream(void* cur_paras, c10::DeviceIndex device_index, NPUStrea
     }
 }
 
+void enCurrentNPUStreamBatch(void* const* items, size_t count, c10::DeviceIndex device_index,
+    void (*prepare)(size_t, void*), void* context)
+{
+    if (count == 0) {
+        return;
+    }
+    TORCH_CHECK(items != nullptr && prepare != nullptr,
+        "Batch stream publication requires items and prepare.", PTA_ERROR(ErrCode::PARAM));
+    // This entry publishes already captured blocks. Nested capture cannot
+    // silently bypass its own ownership channel through a batch interface.
+    host_regions::RejectEffect("batch stream publication");
+    initNPUStreamsOnce(device_index);
+    if (device_index == -1) {
+        device_index = current_device();
+    }
+    check_npu(device_index);
+    auto* stream = current_streams[device_index];
+    TORCH_CHECK(!isExternalStreamId(static_cast<c10::StreamId>(stream->stream_id)),
+        "External NPU stream is not supported by batch queue enqueue.", PTA_ERROR(ErrCode::NOT_SUPPORT));
+    auto* base_repository = c10_npu::option::OptionsManager::GetPerStreamQueue()
+        ? stream->repo.get() : default_streams[device_index].repo.get();
+    // Stream repositories are held through NPUQueueBase (including factories
+    // for alternate backends). This captured-block extension is specific to
+    // Repository and must reject an unsupported backend before any item or
+    // ownership callback is processed, rather than cast its object unchecked.
+    auto* repository = dynamic_cast<Repository*>(base_repository);
+    TORCH_CHECK(repository != nullptr,
+        "Captured batch publication requires the original Repository backend.",
+        PTA_ERROR(ErrCode::NOT_SUPPORT));
+    if (!repository->CheckInit()) {
+        std::lock_guard<std::mutex> lock(init_repo_mutex_);
+        if (!repository->CheckInit()) {
+            repository->InitRepo(device_index);
+        }
+    }
+    struct BatchContext {
+        void* const* items;
+        aclrtStream stream;
+        void (*prepare)(size_t, void*);
+        void* caller;
+    } batch{items, stream->stream.load(std::memory_order_acquire), prepare, context};
+    repository->EnqueueBatch(items, count, [](size_t index, void* raw) {
+        auto& batch = *static_cast<BatchContext*>(raw);
+        auto* parameter = static_cast<c10_npu::queue::QueueParas*>(batch.items[index]);
+        TORCH_CHECK(parameter != nullptr, "Batch stream item is null.", PTA_ERROR(ErrCode::PARAM));
+        parameter->correlation_id = c10_npu::queue::QueueParas::g_correlation_id++;
+        parameter->paramStream = batch.stream;
+        batch.prepare(index, batch.caller);
+        host_regions::BeforeQueuePublish(parameter);
+    }, &batch);
+}
+
 void setCurrentNPUStream(NPUStream stream)
 {
+    host_regions::RejectEffect("void setCurrentNPUStream(NPUStream stream)");
     initNPUStreamsOnce(stream.device_index());
     auto ptr = NPUStream_internals(stream);
     AT_ASSERT(ptr, PTA_ERROR(ErrCode::PTR));

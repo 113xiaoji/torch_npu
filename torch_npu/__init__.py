@@ -69,3 +69,9 @@ _initialize()
 def _autoload():
     # We should restore this switch as sub processes need to inherit its value
     os.environ["TORCH_DEVICE_BACKEND_AUTOLOAD"] = ORG_AUTOLOAD
+
+# Experimental coarse host regions: explicit opt-in and intrinsic policy guards.
+if os.environ.get("FTLAB_HOST_REGIONS", "0") == "1":
+    import sys as _hdb_regions_sys
+    from torch_npu._host_regions.torch_npu_provider import bootstrap as _hdb_regions_bootstrap
+    _host_regions_registration = _hdb_regions_bootstrap(torch, _hdb_regions_sys.modules[__name__])

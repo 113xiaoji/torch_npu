@@ -10,6 +10,8 @@
 #include "torch_npu/csrc/framework/utils/NpuUtils.h"
 #include "torch_npu/csrc/framework/utils/NPUDefinition.h"
 
+#include <memory>
+namespace c10_npu::host_regions { class OwnedOpApiPayload; }
 extern std::atomic<bool> g_used_aclop;
 
 namespace at_npu {
@@ -125,6 +127,8 @@ public:
 
     OpCommand& Sync();
 
+    static void RunOwnedOpApi(const string &op_name,
+        std::unique_ptr<c10_npu::host_regions::OwnedOpApiPayload> payload);
     static void RunOpApi(const string &op_name, PROC_FUNC func, bool sync = false);
     static void RunOpApiV2(const string &op_name, const PROC_FUNC &func, bool sync = false);
     static void RunOpApiV3(const string &op_name, const PROC_FUNC &func, bool sync = false, c10_npu::NPUStream *task_stream = nullptr);

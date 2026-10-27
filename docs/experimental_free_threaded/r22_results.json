@@ -1,0 +1,153 @@
+{
+  "environment": {
+    "architecture": "Linux AArch64",
+    "cann": "9.2.0",
+    "device": "910C A3",
+    "numpy": "2.5.3",
+    "python": "3.14.6 std and free-threaded",
+    "torch": "2.13.0+cpu",
+    "total_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ]
+  },
+  "experimental": true,
+  "exposure": {
+    "cold_gates": 4,
+    "short_processes": 20,
+    "short_samples_per_process": 2000,
+    "stability_processes": 4,
+    "stability_samples_per_process": 20000,
+    "warmups": 20
+  },
+  "lifecycle": {
+    "accepted_not_execute_commands_at_close": [
+      10,
+      14,
+      19,
+      16
+    ],
+    "fault_accepted_window_covered": {
+      "ft": false,
+      "std": false
+    },
+    "fault_quarantine_functional": {
+      "ft": true,
+      "std": true
+    },
+    "ft_fault_parent_observed_exit": 2,
+    "region_elements_checked_per_case": 53248,
+    "region_return_cases_passed": 4,
+    "std_fault_parent_exit_observed": false
+  },
+  "original_archives": {
+    "DEVICE16_FAULT17_KEY-20261027.zip": {
+      "bytes": 1523124,
+      "files": 57,
+      "manifest_sha256": "a35d39bff553576d21f7c5fef59bff846c468b201d1c81a99668c1e4863e9f7a",
+      "sha256": "8a5aebdc94e879ff560bf365427e1810b68e32eda55cbf638dca38f448094cb4"
+    },
+    "PERFORMANCE19_KEY-20261027.zip": {
+      "bytes": 2694358,
+      "files": 73,
+      "manifest_sha256": "7d651f0c3193a08711ca37dd184abc00e35aa3c9581cbdee06e5c43786e77241",
+      "sha256": "39528b58766ee7510cfdfb8247519d19bf42c862ff2dce9bf72a4a79d08a206e"
+    },
+    "REGION_RETURN18_KEY-20261027.zip": {
+      "bytes": 1742291,
+      "files": 71,
+      "manifest_sha256": "e2d15148beb6a3f927c1a306e5bda5faac9de06845ce0faa7bf5beeb4c193bab",
+      "sha256": "8fe606a16a76f202b9a502b21e5c63bf988ecae7c7fcc83fff3bcb07c6611fc2"
+    },
+    "SUBMIT_REGION20_KEY-20261027.zip": {
+      "bytes": 509901,
+      "files": 55,
+      "manifest_sha256": "ec5b4a01181b88b5be1c77398481a113bacdb1b68b0cc597babd8625193691e4",
+      "sha256": "5debb0467da3af6b8d012a8974b99ff1473b8d26960ee2d2e867385fd2035a33"
+    }
+  },
+  "overall_acceptance": false,
+  "performance": {
+    "ft-serial": {
+      "median_batch_per_second": 565.6293671341965,
+      "median_p99_ms": 1.843593,
+      "round_batch_per_second": [
+        575.5934636044875,
+        584.7666049805439,
+        558.1082249084694,
+        541.5178354873414,
+        565.6293671341965
+      ],
+      "round_p99_ms": [
+        1.807832,
+        1.786971,
+        1.843593,
+        2.106103,
+        1.852434
+      ]
+    },
+    "ft-worker4": {
+      "median_batch_per_second": 322.44940861603936,
+      "median_p99_ms": 3.402667,
+      "round_batch_per_second": [
+        322.44940861603936,
+        315.550024643108,
+        322.53000243668515,
+        326.24628740696704,
+        319.27532944410103
+      ],
+      "round_p99_ms": [
+        3.402667,
+        3.47421,
+        3.364146,
+        3.375386,
+        3.416017
+      ]
+    },
+    "std-serial": {
+      "median_batch_per_second": 627.0332672553241,
+      "median_p99_ms": 1.659447,
+      "round_batch_per_second": [
+        660.9493315713657,
+        634.7637177023977,
+        627.0332672553241,
+        621.9273276126534,
+        611.4063842368033
+      ],
+      "round_p99_ms": [
+        1.574184,
+        1.654317,
+        1.659447,
+        1.676278,
+        1.699988
+      ]
+    },
+    "std-worker4": {
+      "median_batch_per_second": 300.6332105938024,
+      "median_p99_ms": 3.665345,
+      "round_batch_per_second": [
+        298.6997357064414,
+        297.26282541058475,
+        300.6332105938024,
+        302.07713542794755,
+        306.93586868270404
+      ],
+      "round_p99_ms": [
+        3.737338,
+        3.721688,
+        3.654455,
+        3.663015,
+        3.665345
+      ]
+    }
+  },
+  "raw_receipts_in_repository": false,
+  "schema": 1,
+  "scope": "Historical R22 synchronized DLRM inference; publication does not rerun device validation"
+}
