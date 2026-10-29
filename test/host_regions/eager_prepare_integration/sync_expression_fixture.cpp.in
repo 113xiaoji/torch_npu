@@ -1,0 +1,52 @@
+#include <cassert>
+#include <stdexcept>
+#include <string>
+#include <utility>
+namespace {
+bool enabled=false,sdk_failure=false,fence_failure=false;
+int arguments=0,originals=0,fences=0,alive=0;
+struct ConvertedParams {
+    explicit ConvertedParams(int item) : value(item) { ++alive; }
+    ConvertedParams(const ConvertedParams&)=delete;
+    ConvertedParams& operator=(const ConvertedParams&)=delete;
+    ConvertedParams(ConvertedParams&& other) noexcept : value(other.value) { ++alive; }
+    ~ConvertedParams() { --alive; }
+    template<int Index> int Get() const { static_assert(Index==1); return value; }
+    int value;
+};
+int argument() { ++arguments; return 17; }
+ConvertedParams original_sync(int value) {
+    ++originals;
+    if (sdk_failure) throw std::runtime_error("unique-sync-sdk-error");
+    return ConvertedParams(value);
+}
+}
+namespace c10_npu::eager_prepare {
+bool Enabled() { return enabled; }
+bool Admit(const char*,bool,const char*,bool arguments_admitted) {
+    assert(!arguments_admitted); ++fences;
+    if (fence_failure) throw std::runtime_error("unique-sync-fence-error");
+    return false;
+}
+}
+namespace hdb_opapi { bool EagerSdkQualified(const char*) { return true; } }
+#define HDB_ORIGINAL_EXEC_NPU_CMD_SYNC(api, ...) original_sync(__VA_ARGS__)
+/*MACRO*/
+int main() {
+    // Same assignment and converted-parameter use as AdvancedIndex/Nonzero.
+    { auto npuAclParams=EXEC_NPU_CMD_SYNC(aclnnNonzeroV2,argument());
+      assert(npuAclParams.Get<1>()==17 && alive==1); }
+    assert(arguments==1 && originals==1 && fences==0 && alive==0);
+    enabled=true;
+    { auto npuAclParams=EXEC_NPU_CMD_SYNC(aclnnNonzeroV2,argument());
+      assert(npuAclParams.Get<1>()==17 && alive==1); }
+    assert(arguments==2 && originals==2 && fences==1 && alive==0);
+    sdk_failure=true;
+    try { auto npuAclParams=EXEC_NPU_CMD_SYNC(aclnnNonzeroV2,argument()); (void)npuAclParams; assert(false); }
+    catch (const std::runtime_error& e) { assert(std::string(e.what())=="unique-sync-sdk-error"); }
+    assert(arguments==3 && originals==3 && fences==2 && alive==0);
+    sdk_failure=false; fence_failure=true;
+    try { auto npuAclParams=EXEC_NPU_CMD_SYNC(aclnnNonzeroV2,argument()); (void)npuAclParams; assert(false); }
+    catch (const std::runtime_error& e) { assert(std::string(e.what())=="unique-sync-fence-error"); }
+    assert(arguments==3 && originals==3 && fences==3 && alive==0);
+}

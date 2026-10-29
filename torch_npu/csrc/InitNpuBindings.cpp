@@ -9,6 +9,8 @@
 #include "torch_npu/csrc/npu/DataParallelComm.h"
 #include "torch_npu/csrc/core/npu/NPUCachingAllocator.h"
 #include "torch_npu/csrc/core/npu/NPUSwappedMemoryAllocator.h"
+#include "torch_npu/csrc/core/npu/EagerPrepare.h"
+#include "torch_npu/csrc/core/npu/EagerPrepareLifecycle.h"
 #include "torch_npu/csrc/core/npu/sys_ctrl/npu_sys_ctrl.h"
 #include "torch_npu/csrc/core/npu/npu_log.h"
 #include "torch_npu/csrc/core/npu/CachingHostAllocator.h"
@@ -53,60 +55,83 @@ void AddPyMethodDefs(std::vector<PyMethodDef>& vector, PyMethodDef* methods)
 
 PyObject* THPModule_npu_shutdown(PyObject* self, PyObject* arg)
 {
-    std::lock_guard<std::mutex> shutdown_lock(npu_shutdown_mutex);
-    int check_error;
     if (!PyBool_Check(arg)) {
         PyErr_SetString(PyExc_TypeError, "Expected a boolean value");
-        return NULL;
+        return nullptr;
     }
-    check_error = PyObject_IsTrue(arg);
-
-    // cudaFree is blocking and will synchronize across all kernels executing
-    // on the current device, while aclrtFree Free device memory immediately.
-    // aclrtSynchronizeDevice should be called before aclrtFree to ensure that
-    // all of op tasks completed before device memory free.
-    ASCEND_LOGI("NPU shutdown begin.");
-    if (!c10_npu::NpuSysCtrl::GetInstance().GetInitFlag()) {
-        Py_RETURN_NONE;
-    }
-
-    ASCEND_LOGI("NPU shutdown ReleaseHcclCommList.");
-    torch_npu::data_parallel::ReleaseHcclCommList();
-    ASCEND_LOGI("NPU shutdown ReleaseHcclCommList success.");
-
-    c10_npu::NpuSysCtrl::GetInstance().HostFinalize();
+    const bool had_eager_domain = c10_npu::eager_prepare::Enabled();
     try {
-        ASCEND_LOGI("NPU shutdown CachingHostAllocator emptyCache.");
-        at_npu::native::CachingHostAllocator_emptyCache();
-    } catch (...) {
-        ASCEND_LOGE("CachingHostAllocator_emptyCache failed");
-    }
-    try {
-        ASCEND_LOGI("NPU shutdown NPUCachingAllocator emptyCache.");
-        c10_npu::NPUCachingAllocator::emptyCache(false);
-    } catch (...) {
-        ASCEND_LOGE("NPUCachingAllocator::emptyCache failed");
-    }
-    try {
-        ASCEND_LOGI("NPU shutdown NPUSwappedMemoryAllocator emptyCache.");
-        c10_npu::NPUSwappedMemoryAllocator::emptyCache();
-    } catch (...) {
-        ASCEND_LOGE("NPUSwappedMemoryAllocator::emptyCache failed");
-    }
+        // Close before contending on the original shutdown mutex. Configure
+        // and competing close callers detach before every lifecycle wait.
+        if (had_eager_domain) (void)c10_npu::eager_prepare::DrainClose();
+        auto finalize = [] {
+            // cudaFree is blocking and will synchronize across all kernels executing
+            // on the current device, while aclrtFree Free device memory immediately.
+            // aclrtSynchronizeDevice should be called before aclrtFree to ensure that
+            // all of op tasks completed before device memory free.
+            ASCEND_LOGI("NPU shutdown begin.");
+            if (!c10_npu::NpuSysCtrl::GetInstance().GetInitFlag()) {
+                return;
+            }
 
-    ASCEND_LOGI("NPU shutdown NpuSysCtrl Finalize.");
-    c10_npu::NpuSysCtrl::SysStatus status = c10_npu::NpuSysCtrl::GetInstance().Finalize();
-    if (status != c10_npu::NpuSysCtrl::SysStatus::FINALIZE_SUCC) {
-        ASCEND_LOGE("NPU shutdown failed.");
-    } else {
-        ASCEND_LOGI("NPU shutdown success.");
-    }
+            ASCEND_LOGI("NPU shutdown ReleaseHcclCommList.");
+            torch_npu::data_parallel::ReleaseHcclCommList();
+            ASCEND_LOGI("NPU shutdown ReleaseHcclCommList success.");
 
+            c10_npu::NpuSysCtrl::GetInstance().HostFinalize();
+            try {
+                ASCEND_LOGI("NPU shutdown CachingHostAllocator emptyCache.");
+                at_npu::native::CachingHostAllocator_emptyCache();
+            } catch (...) {
+                ASCEND_LOGE("CachingHostAllocator_emptyCache failed");
+            }
+            try {
+                ASCEND_LOGI("NPU shutdown NPUCachingAllocator emptyCache.");
+                c10_npu::NPUCachingAllocator::emptyCache(false);
+            } catch (...) {
+                ASCEND_LOGE("NPUCachingAllocator::emptyCache failed");
+            }
+            try {
+                ASCEND_LOGI("NPU shutdown NPUSwappedMemoryAllocator emptyCache.");
+                c10_npu::NPUSwappedMemoryAllocator::emptyCache();
+            } catch (...) {
+                ASCEND_LOGE("NPUSwappedMemoryAllocator::emptyCache failed");
+            }
+
+            ASCEND_LOGI("NPU shutdown NpuSysCtrl Finalize.");
+            c10_npu::NpuSysCtrl::SysStatus status = c10_npu::NpuSysCtrl::GetInstance().Finalize();
+            if (status != c10_npu::NpuSysCtrl::SysStatus::FINALIZE_SUCC) {
+                ASCEND_LOGE("NPU shutdown failed.");
+            } else {
+                ASCEND_LOGI("NPU shutdown success.");
+            }
+
+            return;
+        };
+        if (had_eager_domain) {
+            c10_npu::eager_prepare::LifecycleGuard shutdown_lock(npu_shutdown_mutex);
+            finalize();
+        } else {
+            std::lock_guard<std::mutex> shutdown_lock(npu_shutdown_mutex);
+            finalize();
+        }
+    } catch (const std::exception& error) {
+        PyErr_SetString(PyExc_RuntimeError,error.what());
+        return nullptr;
+    }
     Py_RETURN_NONE;
 }
 
 PyObject* THPModule_npu_shutdown_synchronize(PyObject* /* unused */)
 {
+    if (c10_npu::eager_prepare::Enabled()) {
+        try { (void)c10_npu::eager_prepare::DrainClose(); }
+        catch (const std::exception& error) {
+            PyErr_SetString(PyExc_RuntimeError,error.what());
+            return nullptr;
+        }
+        Py_RETURN_TRUE; // The cold close already performed its one synchronization.
+    }
     std::lock_guard<std::mutex> shutdown_lock(npu_shutdown_mutex);
     ASCEND_LOGI("NPU shutdown synchronize begin.");
     if (!c10_npu::NpuSysCtrl::GetInstance().GetInitFlag()) {

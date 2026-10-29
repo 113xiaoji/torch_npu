@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "scope": "CPU simulation source freeze; real_npu=false, simulated_prepare=true",
+  "files": {
+    "benchmarks/eager_prepare_cpu/.gitignore": {
+      "bytes": 22,
+      "sha256": "3c9f3aa8cc90718b4b544b01fafa74cecce1940a8e1317c6aae06f169ae27467"
+    },
+    "benchmarks/eager_prepare_cpu/simulation.py": {
+      "bytes": 20709,
+      "sha256": "20cffa4d982986de6bc80c4fd6cc97056879d42e029392d0de890576e3582a71"
+    },
+    "benchmarks/eager_prepare_cpu/run.py": {
+      "bytes": 23722,
+      "sha256": "086efb55a2d72a525db273f0525f7e83b5ef2d996b61281f8068aa2451db20b4"
+    },
+    "benchmarks/eager_prepare_cpu/README.md": {
+      "bytes": 9304,
+      "sha256": "6a1a5d9c2aded55ef21dbb6224df51b5db18d3f27b0564f58cfb8dcfd3c30dbc"
+    },
+    "test/eager_prepare_cpu/.gitignore": {
+      "bytes": 13,
+      "sha256": "32dae3052f331ee34d628ef535709b301259a45df7c7522c4d35dcf49873f00b"
+    },
+    "test/eager_prepare_cpu/test_campaign.py": {
+      "bytes": 3537,
+      "sha256": "63b71fa462f474d0e29e86cdca27f482d58f8fa55bf79c6f4b29a6d3e36a39aa"
+    },
+    "test/eager_prepare_cpu/test_cpu_simulation.py": {
+      "bytes": 12126,
+      "sha256": "5278d9ff31e22f3fe74101b4cc51afacff8568da253bbc3b1377ed9c6efe55bf"
+    },
+    "tools/eager_prepare_cpu/__init__.py": {
+      "bytes": 133,
+      "sha256": "3e1c419b3473d54b4a96e400ea84da6bb9d7b488746fa0874700053017cf9856"
+    },
+    "tools/eager_prepare_cpu/build_native.py": {
+      "bytes": 4892,
+      "sha256": "1d0d02cf0e3d834076bd00f7bc8fe4794a290179599c74e8cc26b40e43e092f9"
+    },
+    "tools/eager_prepare_cpu/native_bridge.cpp": {
+      "bytes": 28768,
+      "sha256": "2a99c55763847ec406e21faa6f780ef43dd6010d13b43c95eca183d729a5c744"
+    },
+    "torch_npu/csrc/core/npu/EagerPrepareQueueCore.h": {
+      "bytes": 22942,
+      "sha256": "704f99c5cfd8faeb8640dd52965f8e5b3d85a1a9069a26ab68d957d0b6fdb23d"
+    },
+    "torch_npu/csrc/core/npu/OrderedMpscQueueCore.h": {
+      "bytes": 16001,
+      "sha256": "49334fe4afb07fd4a8c504e00e0f664c5e2a2c23500c465e54295148437d007a"
+    },
+    "benchmarks/eager_prepare/models.py": {
+      "bytes": 5427,
+      "sha256": "d67d1f49708c154cabf7b04f4af1eda2f368b03d450a9536928e2cadf50d11db"
+    },
+    "benchmarks/eager_prepare/SOURCE_PINS.json": {
+      "bytes": 1936,
+      "sha256": "ada6b4d11bae79ad93d69478349aa56e6ee37c600e21bc85229f9945f20e624a"
+    }
+  }
+}

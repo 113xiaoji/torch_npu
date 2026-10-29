@@ -1,4 +1,5 @@
 #include "torch_npu/csrc/core/npu/HostRegionCapture.h"
+#include "torch_npu/csrc/core/npu/EagerPrepare.h"
 #include <array>
 #include <climits>
 #include <atomic>
@@ -435,6 +436,7 @@ bool NPUStream::query() const
 
 void NPUStream::synchronize() const
 {
+    TORCH_CHECK(!eager_prepare::NativeJobActive(),"eager Prepare native jobs cannot synchronize their own execution stream");
     host_regions::RejectEffect("void NPUStream::synchronize() const");
     TORCH_CHECK(!isExternalStreamId(this->id()),
         "External NPU stream is not supported in NPUStream::synchronize. "
@@ -446,6 +448,7 @@ void NPUStream::synchronize() const
 
 aclrtStream NPUStream::stream() const
 {
+    TORCH_CHECK(!eager_prepare::NativeJobActive(),"eager Prepare native jobs cannot drain their own original FIFO");
     host_regions::RejectEffect("aclrtStream NPUStream::stream() const");
     auto cur_ptr = NPUStream_internals(*this);
     AT_ASSERT(cur_ptr, PTA_ERROR(ErrCode::PTR));
@@ -646,6 +649,7 @@ aclrtStream getCurrentNPUStreamNoWait(c10::DeviceIndex device_index)
 
 NPUStatus emptyAllNPUStream(bool check_error)
 {
+    TORCH_CHECK(!eager_prepare::NativeJobActive(),"eager Prepare native jobs cannot wait for the original FIFO");
     host_regions::RejectEffect("NPUStatus emptyAllNPUStream(bool check_error)");
     ensureGlobalStreamState();
     NPUStatus ret;
@@ -790,8 +794,18 @@ bool npuSynchronizeUsedDevices(bool check_error)
     return acl_ret == ACL_ERROR_NONE;
 }
 
+bool eagerPrepareDefaultQueueHealthy()
+{
+    initNPUStreamsOnce(0);
+    auto* repository = default_streams[0].repo.get();
+    if (!repository->CheckInit()) return true;
+    const auto status = repository->GetStatus();
+    return status == RepoStatus::RUN || status == RepoStatus::INIT;
+}
+
 void enCurrentNPUStream(void* cur_paras, c10::DeviceIndex device_index, NPUStream *task_stream)
 {
+    TORCH_CHECK(!eager_prepare::NativeJobActive(),"eager Prepare native jobs cannot recursively enqueue into the original FIFO");
     initNPUStreamsOnce(device_index);
     if (device_index == -1) {
         device_index = current_device();
@@ -846,6 +860,7 @@ void enCurrentNPUStream(void* cur_paras, c10::DeviceIndex device_index, NPUStrea
 void enCurrentNPUStreamBatch(void* const* items, size_t count, c10::DeviceIndex device_index,
     void (*prepare)(size_t, void*), void* context)
 {
+    TORCH_CHECK(!eager_prepare::NativeJobActive(),"eager Prepare native jobs cannot recursively publish an original FIFO batch");
     if (count == 0) {
         return;
     }

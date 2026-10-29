@@ -1,0 +1,98 @@
+#ifdef _WIN32
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+#include <array>
+#include <atomic>
+#include <cassert>
+#include <cstdlib>
+#include <cstring>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <stdexcept>
+#include <vector>
+using aclrtStream=void*;
+namespace c10 {
+struct Allocator {};
+struct Device { int value; int index() const { return value; } };
+struct DataPtr {
+    using Deleter=void(*)(void*);
+    void* context=nullptr; Deleter deleter=nullptr; int index=0;
+    void* get_context() const { return context; }
+    Deleter get_deleter() const { return deleter; }
+    Device device() const { return {index}; }
+};
+}
+namespace c10_npu {
+namespace eager_prepare { bool enabled=false; bool Enabled() noexcept { return enabled; } }
+namespace impl { bool traced=false; struct NPUTrace { static void* getTrace() { return traced ? reinterpret_cast<void*>(1) : nullptr; } }; }
+namespace NPUCachingAllocator {
+struct Pool { void* owner_PrivatePool=nullptr; };
+struct Block {
+    int device=0; void* stream=nullptr; Pool* pool=nullptr;
+    Block *prev=nullptr,*next=nullptr;
+    void *context_when_allocated=nullptr,*context_when_segment_allocated=nullptr;
+    std::set<int> stream_uses;
+};
+enum class RecordContext { NEVER, OTHER };
+struct DeviceAllocator {
+    std::recursive_mutex mutex;
+    bool record_history=false;
+    std::atomic<void*> context_recorder_{nullptr};
+    RecordContext record_context_=RecordContext::NEVER;
+    std::vector<int> trace_trackers_,captures_underway;
+    /*LEAF*/
+};
+struct Allocator : c10::Allocator {
+    std::vector<std::unique_ptr<DeviceAllocator>> device_allocator;
+    Block* allocated=nullptr;
+    Allocator() { device_allocator.emplace_back(std::make_unique<DeviceAllocator>()); }
+    Block* get_allocated_block(void* context) { return context==allocated ? allocated : nullptr; }
+} caching_allocator;
+void local_raw_delete(void*) {}
+void other_delete(void*) {}
+std::atomic<bool> captured_retirement_instrumentation_seen{false};
+/*ON_STREAM*/
+/*OLD_ENTRY*/
+/*EAGER_ENTRY*/
+}
+}
+void legacy_env(const char* value) {
+#ifdef _WIN32
+    _putenv_s("FTLAB_HOST_OWNER_RETIREMENT",value ? value : "");
+#else
+    if (value) setenv("FTLAB_HOST_OWNER_RETIREMENT",value,1); else unsetenv("FTLAB_HOST_OWNER_RETIREMENT");
+#endif
+}
+int main() {
+    using namespace c10_npu;
+    using namespace NPUCachingAllocator;
+    Pool pool; Block block; block.pool=&pool; block.stream=reinterpret_cast<void*>(7);
+    caching_allocator.allocated=&block;
+    c10::DataPtr pointer{&block,&local_raw_delete,0};
+    auto admitted=[&] { return IsNativeEagerRetirementData(pointer,&caching_allocator,0,block.stream); };
+    legacy_env(nullptr); assert(!IsNativeCapturedRetirementData(pointer,&caching_allocator));
+    eager_prepare::enabled=true; assert(admitted());
+    legacy_env("0"); assert(!IsNativeCapturedRetirementData(pointer,&caching_allocator) && admitted());
+    legacy_env("1"); assert(!IsNativeCapturedRetirementData(pointer,&caching_allocator) && admitted());
+    eager_prepare::enabled=false; assert(!admitted()); eager_prepare::enabled=true;
+    auto& device=*caching_allocator.device_allocator[0];
+    captured_retirement_instrumentation_seen=true; assert(!admitted()); captured_retirement_instrumentation_seen=false;
+    impl::traced=true; assert(!admitted()); impl::traced=false;
+    pointer.deleter=&other_delete; assert(!admitted()); pointer.deleter=&local_raw_delete;
+    pointer.index=1; assert(!admitted()); pointer.index=0;
+    assert(!IsNativeEagerRetirementData(pointer,&caching_allocator,0,reinterpret_cast<void*>(8)));
+    c10::Allocator other; assert(!IsNativeEagerRetirementData(pointer,&other,0,block.stream));
+    device.record_history=true; assert(!admitted()); device.record_history=false;
+    device.context_recorder_=reinterpret_cast<void*>(1); assert(!admitted()); device.context_recorder_=nullptr;
+    device.record_context_=RecordContext::OTHER; assert(!admitted()); device.record_context_=RecordContext::NEVER;
+    device.trace_trackers_.push_back(1); assert(!admitted()); device.trace_trackers_.clear();
+    device.captures_underway.push_back(1); assert(!admitted()); device.captures_underway.clear();
+    pool.owner_PrivatePool=reinterpret_cast<void*>(1); assert(!admitted()); pool.owner_PrivatePool=nullptr;
+    block.stream_uses.insert(1); assert(!admitted()); block.stream_uses.clear();
+    block.context_when_allocated=reinterpret_cast<void*>(1); assert(!admitted()); block.context_when_allocated=nullptr;
+    Block neighbor; block.prev=&neighbor; neighbor.context_when_segment_allocated=reinterpret_cast<void*>(1);
+    assert(!admitted()); block.prev=nullptr;
+    assert(admitted());
+    return 0;
+}

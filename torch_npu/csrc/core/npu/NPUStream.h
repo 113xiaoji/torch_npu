@@ -142,6 +142,7 @@ void setRepoErrMsg(const char* errmsg);
 void setDefaultStreamsStatus(c10::DeviceIndex device_index, RepoStatus status);
 
 C10_NPU_API bool npuSynchronizeDevice(bool check_error = true);
+C10_NPU_API bool eagerPrepareDefaultQueueHealthy();
 
 void enCurrentNPUStream(void* cur_paras, c10::DeviceIndex device_index = -1, NPUStream *task_stream = nullptr);
 

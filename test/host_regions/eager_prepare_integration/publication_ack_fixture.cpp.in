@@ -1,0 +1,64 @@
+#include "torch_npu/csrc/core/npu/EagerPrepareQueueCore.h"
+#include "torch_npu/csrc/core/npu/OrderedMpscQueueCore.h"
+#include <cassert>
+#include <chrono>
+#include <string>
+#include <thread>
+#define TORCH_CHECK(condition, message) do { if (!(condition)) throw std::runtime_error(message); } while (false)
+namespace c10_npu::eager_prepare {
+using Core=c10_npu::queue::EagerPrepareQueueCore;
+/*MARKER*/
+/*CALLBACK*/
+struct Job final : Core::Job {
+    void Prepare() override {}
+    void Execute() override { ++executions; }
+    void Cancel() noexcept override { bytes=0; }
+    size_t RetainedBytes() const noexcept override { return bytes; }
+    int executions=0;
+    size_t bytes=7;
+};
+void run_case(int late) {
+    auto core=std::make_shared<Core>(Core::Config{1,64,1});
+    c10_npu::queue::OrderedMpscQueueCore fifo(1); fifo.Start();
+    c10_npu::queue::NoopWaitHooks hooks;
+    Core::TicketPtr slot;
+    std::mutex mutex; std::condition_variable changed;
+    bool consumed=false,completed_synchronously=false;
+    std::exception_ptr consumer_error;
+    auto job=std::make_shared<Job>();
+    std::thread consumer([&] {
+        try { assert(fifo.ConsumeOne([&](uint32_t) { core->Consume(slot); })); }
+        catch (...) { consumer_error=std::current_exception(); }
+        { std::lock_guard<std::mutex> lock(mutex); consumed=true; }
+        changed.notify_all();
+    });
+    auto ticket=core->Submit(job,[&](const Core::TicketPtr& value) {
+        int queue_parameter=0,wrong_parameter=0;
+        std::atomic<bool> accepted{false},commit_failed{false};
+        /*CONSTRUCTION*/
+        assert(fifo.Enqueue([&](uint32_t) {
+            slot=value;
+            QueueCopyAccepted(&wrong_parameter); assert(!accepted.load());
+            QueueCopyAccepted(&queue_parameter); QueueCopyAccepted(&queue_parameter);
+            assert(accepted.load() && !commit_failed.load());
+        },hooks));
+        // Repository INIT's enqueue waits for its original FIFO to drain.
+        // Core publication must already be visible from the exact copy ACK.
+        { std::unique_lock<std::mutex> lock(mutex);
+          completed_synchronously=changed.wait_for(lock,std::chrono::seconds(2),[&] { return consumed; }); }
+        if (late==1) throw std::runtime_error("late-publisher-throw");
+        return Core::PublishReceipt{late==2 ? Core::PublishState::NotAccepted : Core::PublishState::Committed,
+            late==3 ? std::make_exception_ptr(std::runtime_error("late-publisher-status")) : nullptr};
+    });
+    consumer.join();
+    assert(completed_synchronously && !consumer_error && job->executions==1);
+    assert(core->Publication(ticket)==Core::PublishState::Committed);
+    assert(!core->Snapshot().quarantined);
+    bool failed=false; try { core->RethrowIfFailed(); } catch (...) { failed=true; }
+    assert(failed==(late!=0));
+    core->Retire(ticket,true); core->Shutdown();
+    assert(core->Snapshot().slots_in_use==0 && core->Snapshot().retained_bytes==0);
+    assert(job->executions==1 && job->bytes==0);
+}
+} // namespace c10_npu::eager_prepare
+int main() { for (int late=0;late<4;++late) c10_npu::eager_prepare::run_case(late); }

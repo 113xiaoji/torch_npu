@@ -11,6 +11,7 @@
 #include <fstream>
 
 #include "torch_npu/csrc/core/npu/sys_ctrl/npu_sys_ctrl.h"
+#include "torch_npu/csrc/core/npu/EagerPrepare.h"
 #include "torch_npu/csrc/core/npu/npu_log.h"
 #include "torch_npu/csrc/core/npu/interface/AclInterface.h"
 #include "torch_npu/csrc/core/npu/NPUCachingAllocator.h"
@@ -423,6 +424,9 @@ NpuSysCtrl::SysStatus NpuSysCtrl::OverflowSwitchEnable()
 // Environment Finalize, return SysStatus
 NpuSysCtrl::SysStatus NpuSysCtrl::Finalize()
 {
+    // No SDK/init/finalization lock may precede this cold gate. A failed ACK
+    // keeps Prepare workers/TLS/owners and never enters forced SDK cleanup.
+    eager_prepare::BeforeRuntimeFinalize();
     std::map<ReleasePriority, std::vector<ReleaseFn>> release_callbacks;
     {
         std::unique_lock<std::mutex> lifecycle_lock(init_mutex_);

@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "base_commit": "02cf0df717064b025629be3a6b7a0a7fe66eea5b",
+  "scope": "benchmark/tests only; no native execution claimed",
+  "files": {
+    "benchmarks/eager_prepare/.gitignore": {
+      "bytes": 17,
+      "sha256": "682351f5311533c3c8d08ae96a9b0195f3d5c607f2d7b7724f671e6f06d4e7a5"
+    },
+    "benchmarks/eager_prepare/analyze.py": {
+      "bytes": 1564,
+      "sha256": "2d4cc544094ef3df3aa34f28aa05856c2407c467763e5ab3ec9363a6d41bc8da"
+    },
+    "benchmarks/eager_prepare/campaign_plan.py": {
+      "bytes": 2582,
+      "sha256": "48248c9e6d0fbed5f508bfd3daa1d3f505dc1d17bca63d6eafa09a09b6eb9683"
+    },
+    "benchmarks/eager_prepare/contracts.py": {
+      "bytes": 13855,
+      "sha256": "3bb6cea759fc5b1cee37212c7c4ef32ab958c2e341480f30bfe105c8fe00f891"
+    },
+    "benchmarks/eager_prepare/models.py": {
+      "bytes": 5427,
+      "sha256": "d67d1f49708c154cabf7b04f4af1eda2f368b03d450a9536928e2cadf50d11db"
+    },
+    "benchmarks/eager_prepare/README.md": {
+      "bytes": 18651,
+      "sha256": "9a7cf542d147df34565c80faa6dfaae794e1d56c84bec49eb1abf95234a3edf3"
+    },
+    "benchmarks/eager_prepare/runner.py": {
+      "bytes": 26718,
+      "sha256": "3f6fd93cdc43399f562c1c85a13276101d18693794230f5435c6b7b0b8213e4a"
+    },
+    "test/eager_prepare/test_campaign_plan.py": {
+      "bytes": 1499,
+      "sha256": "bef9a950a12543579c924c05f7a61336cc143c561e3f8dd1b5cdc771229e05f9"
+    },
+    "test/eager_prepare/test_contracts.py": {
+      "bytes": 9601,
+      "sha256": "7af0de31b1cfc88ecbff3b443b145f89101050ffd4a6417b6b1ac91cbe325004"
+    },
+    "test/eager_prepare/test_models.py": {
+      "bytes": 4388,
+      "sha256": "1930bc5e07bfab81711b26ff804389a62268380c6406aca026be9bd83fed0c51"
+    },
+    "test/eager_prepare/test_runner.py": {
+      "bytes": 14316,
+      "sha256": "61153d13fa9660dec2aa7bc6fb522383247ceefb8500137b31ab1df367ddff81"
+    }
+  }
+}

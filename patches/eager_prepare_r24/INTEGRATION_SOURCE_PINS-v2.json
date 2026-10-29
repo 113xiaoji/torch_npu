@@ -1,0 +1,236 @@
+{
+  "schema": 1,
+  "disposition": "frozen_native_integration_candidate_for_independent_host_source_review",
+  "base_commit": "02cf0df717064b025629be3a6b7a0a7fe66eea5b",
+  "op_plugin_base_commit": "312921458e7d396c54a1e92e90385d7d5f02dede",
+  "files": {
+    "torch_npu/csrc/core/npu/EagerPrepare.h": {
+      "bytes": 1532,
+      "sha256": "e9d213729c9dcda986e758a32811a317298db178c6a6138ca864ca1ddcf8212d"
+    },
+    "torch_npu/csrc/core/npu/EagerPrepare.cpp": {
+      "bytes": 31340,
+      "sha256": "ab6f183f4b6357bf8608999296a9c1b8d7a5aca0a8ceb138559e126e4b8058c5"
+    },
+    "torch_npu/csrc/core/npu/EagerPrepareOwnedJob.h": {
+      "bytes": 3669,
+      "sha256": "dd6d82317ef1d2b4805b344077105245f8e1500622b0cbf8e89604b6710a8478"
+    },
+    "torch_npu/csrc/core/npu/EagerPrepareLifecycle.h": {
+      "bytes": 2646,
+      "sha256": "f7e908d12722e5f7b0e0c7f1d304d6f4d1fe1b05d4da86706b92bd3f1c1e6a13"
+    },
+    "torch_npu/csrc/core/npu/EagerPrepareEligibility.h": {
+      "bytes": 625,
+      "sha256": "79fe5d070163b6647ac0e27dca38356d1c1803e999b39d9b6f0d727d892013df"
+    },
+    "torch_npu/csrc/core/npu/EagerPrepareDispatch.h": {
+      "bytes": 1599,
+      "sha256": "d38d99e3dfc01eb79e21c3d0d574fb867a7569d76000b6c935de1bb658e926c5"
+    },
+    "torch_npu/csrc/core/npu/EagerPrepareStorage.h": {
+      "bytes": 354,
+      "sha256": "0e25899733e35d7650d028a0a673b3bec4a06b916969d3b6d76ce22946ec668d"
+    },
+    "torch_npu/csrc/npu/EagerPreparePython.cpp": {
+      "bytes": 1715,
+      "sha256": "85a86d712cf5302624715592b8db2e9dd559b44efab4b01b035d70622de90928"
+    },
+    "torch_npu/csrc/npu/EagerPreparePython.h": {
+      "bytes": 231,
+      "sha256": "23bc1ba4dbebf6929567e48884efc572a5f5fe4c5c043b5a744d87a1b19350b1"
+    },
+    "torch_npu/_eager_prepare.py": {
+      "bytes": 2981,
+      "sha256": "c7f65ac1f937cdf9d9c4e5df3e3ebd09b981dfaa1a1b7a5c839cc355128ea6ca"
+    },
+    "torch_npu/csrc/core/npu/NPUQueue.cpp": {
+      "bytes": 74078,
+      "sha256": "c87e875f7a254cb17864c48c27a2ce1c33f3fb1641a4390a94f6a890a0c8f00b"
+    },
+    "torch_npu/csrc/core/npu/NPUStream.h": {
+      "bytes": 5015,
+      "sha256": "e08c232d04318b5ad165b9f296c4914ff4758d96ef95b057f27510682646f2a9"
+    },
+    "torch_npu/csrc/core/npu/NPUStream.cpp": {
+      "bytes": 43488,
+      "sha256": "7f63f505bce1bb8cfa975a47538c84521ae2f476ee0ed89fd97c85f54f0c27b6"
+    },
+    "torch_npu/csrc/core/npu/NPUCachingAllocator.cpp": {
+      "bytes": 185598,
+      "sha256": "3aac7f8f0c2ab570f09dea6493364fbd072acedd74a92e637b372c50a81202b3"
+    },
+    "torch_npu/csrc/core/npu/sys_ctrl/npu_sys_ctrl.cpp": {
+      "bytes": 22274,
+      "sha256": "b5033cdfe48a74de847767604b43a3b35273eea9f3a6fb54d311449d144ca86c"
+    },
+    "torch_npu/csrc/InitNpuBindings.cpp": {
+      "bytes": 10273,
+      "sha256": "eb2edf7aa2c8d1066a42b91abe3fbcfd8cf358969d50d632e244ddf750f19dd3"
+    },
+    "torch_npu/csrc/npu/Module.cpp": {
+      "bytes": 103240,
+      "sha256": "35202b79e22e69a3ae2f200b4e09d8563b8b986da18c99f8594aeee3af574259"
+    },
+    "docs/eager_prepare_r24.md": {
+      "bytes": 12287,
+      "sha256": "7998cb6e11aab0ad86d9b303824a33fb9632e4b4fa2de30b561cedef3ba0d33a"
+    },
+    "tools/host_regions/apply_eager_prepare_overlay_r24.py": {
+      "bytes": 12291,
+      "sha256": "3871b654e702d9de2d5ccfcce8c6ef189b4a23f17ab7586b041f46f1ef34c113"
+    },
+    "patches/eager_prepare_r24/op-plugin-manifest.json": {
+      "bytes": 1435,
+      "sha256": "38fe514f799945ccb95ae718e2169c6b4ffe36a1def35350e3e83eab2f441225"
+    },
+    "test/host_regions/test_eager_prepare_integration.py": {
+      "bytes": 15937,
+      "sha256": "7c5dee72dcf451adada45074ff50fc30a04c1389b4893301060fb7b3f87cf05c"
+    },
+    "test/host_regions/eager_prepare_integration/owned_job_test.cpp": {
+      "bytes": 4069,
+      "sha256": "11b8e1d464d2162108d6ac668523d772df1a0a4541d76882616dbc62f490c299"
+    },
+    "test/host_regions/eager_prepare_integration/dispatch_test.cpp": {
+      "bytes": 2580,
+      "sha256": "1049eb33dabfb2fa4066a6829cc47c52e75f329680b379b5ed021c73364268a1"
+    },
+    "test/host_regions/eager_prepare_integration/lifecycle_fixture.cpp": {
+      "bytes": 3478,
+      "sha256": "b06e9537938aff89677d1e4517440edb149848acf6f2c8ecff8b113c95610fe2"
+    },
+    "test/host_regions/eager_prepare_integration/storage_gate_fixture.cpp.in": {
+      "bytes": 4661,
+      "sha256": "7b8018b55ecf52fb7ffa5ba2db13c13128a89dcb409d8028fc0dcab06b9d4ce6"
+    },
+    "patches/eager_prepare_r24/op-plugin/op_plugin/utils/op_api_common.cpp": {
+      "bytes": 81610,
+      "sha256": "1019fa662f67484855f27f8cdcf665962564551f23b52066825f572d8eaba4b1"
+    },
+    "patches/eager_prepare_r24/op-plugin/op_plugin/utils/op_api_common.h": {
+      "bytes": 66671,
+      "sha256": "746e7f4cf3e3c60d99327eaaed924c0b778a61ec7fb931de05a2020f59d2340d"
+    },
+    "patches/eager_prepare_r24/op-plugin/op_plugin/utils/op_api_common_base.h": {
+      "bytes": 32140,
+      "sha256": "120cf8bfc022ee5170f4fd752a9099410fbb84f6765df5c3b3c819556c91504a"
+    },
+    "patches/eager_prepare_r24/op-plugin/op_plugin/utils/op_api_eager_prepare_r24.h": {
+      "bytes": 12323,
+      "sha256": "94302b23bd9e405771fe380328668d0896be10efd7762bc7961445c6939011a9"
+    },
+    "patches/eager_prepare_r24/op-plugin/op_plugin/utils/op_api_owned_pack_r22.h": {
+      "bytes": 6582,
+      "sha256": "dfaea9ea90a7bbf8caebdf8754712b62b5e474d5c3dbaa6d6493a4ac260d033b"
+    },
+    "patches/eager_prepare_r24/op-plugin/op_plugin/utils/op_api_owned_payload_r22.h": {
+      "bytes": 8585,
+      "sha256": "5eff67885603249f92914c1b0745d8b14e50322ff6ad51d8dd4d2d259b1ac507"
+    },
+    "patches/eager_prepare_r24/op-plugin/op_plugin/utils/op_api_owned_r22.h": {
+      "bytes": 7473,
+      "sha256": "5a1c7d166f3087aff1f56542e7a9b0d53155c14811584df0e806012ac6d58444"
+    },
+    "patches/eager_prepare_r24/op-plugin/op_plugin/utils/op_api_sdk_profile_r22.h": {
+      "bytes": 4030,
+      "sha256": "77e00c02e2ba0e7048a1b0674bccd989c534122b21c181dc58c8b470d9e98f55"
+    },
+    "test/host_regions/eager_prepare_integration/publication_ack_fixture.cpp.in": {
+      "bytes": 3130,
+      "sha256": "34a3daa59c03f607f410a95257209f451c1eb53ed9c27efa016f1e309206291d"
+    }
+  },
+  "dependencies": {
+    "torch_npu/csrc/core/npu/EagerPrepareQueueCore.h": {
+      "bytes": 22942,
+      "sha256": "704f99c5cfd8faeb8640dd52965f8e5b3d85a1a9069a26ab68d957d0b6fdb23d"
+    }
+  },
+  "verification": {
+    "host_command": "python -I -B -m unittest discover -s test/host_regions -p 'test_*.py' -v",
+    "observed_tool_session": 50538,
+    "tests_run": 64,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "exit_code": 0,
+    "reported_seconds": 40.104,
+    "host_python": "3.13.12 (tags/v3.13.12:1cbe481, Feb  3 2026, 18:22:25) [MSC v.1944 64 bit (AMD64)]",
+    "host_platform": "Windows-11-10.0.26200-SP0",
+    "compiled_host_components": [
+      "actual owned-job adapter with actual queue core",
+      "actual single-evaluation dispatch and argument-domain policies",
+      "actual extracted allocator eligibility functions with CPU allocator facts",
+      "CPython3.13 real-GIL lifecycle helper extension",
+      "actual extracted native publication marker/copy-ACK callback with real OrderedMpscQueueCore and EagerPrepareQueueCore"
+    ],
+    "overlay_check": {
+      "checked_files": 8,
+      "idempotent": true,
+      "state": "applied",
+      "written_files": 0,
+      "exit_code": 0
+    },
+    "git_diff_check_exit_code": 0,
+    "legacy_overlay_and_installer_git_diff_exit_code": 0,
+    "init_publication_regression": {
+      "old_native_callback_red": {
+        "command": "python -I -B test/host_regions/test_eager_prepare_integration.py NativeOwnedJobTests.test_actual_copy_ack_unblocks_synchronous_publisher_and_keeps_late_commit -v",
+        "compiler_passed": true,
+        "test_exit_code": 1,
+        "child_assertion_exit_code": 3221226505,
+        "failed_condition": "completed_synchronously && !consumer_error && job->executions==1",
+        "bounded_consumer_wait_seconds": 2
+      },
+      "new_native_callback_green": {
+        "test_exit_code": 0,
+        "tests_run": 1,
+        "reported_seconds": 1.746
+      },
+      "cases": [
+        "exact-copy-ACK before synchronous publisher wait",
+        "duplicate ACK does not duplicate consumption",
+        "unmatched source parameter does not ACK",
+        "late publisher throw retains committed ownership",
+        "late NotAccepted receipt cannot revoke committed ownership",
+        "late Committed error retains ownership and first error"
+      ],
+      "observed_sdk_execution": false
+    }
+  },
+  "limits": {
+    "full_pta_cann_native_translation_units_compiled": false,
+    "npu_device_execution_performed": false,
+    "new_sdk_operator_qualification_performed": false,
+    "portable_host_fixtures_are_device_evidence": false,
+    "registered_ops": [
+      "aclnnEmbeddingBag",
+      "aclnnAdd",
+      "aclnnRelu",
+      "aclnnMm"
+    ],
+    "only_preexisting_sdk_qualified_op": "aclnnEmbeddingBag",
+    "new_ops_remain_unqualified": [
+      "aclnnAdd",
+      "aclnnRelu",
+      "aclnnMm"
+    ],
+    "arbitrary_dynamic_alias_rng_or_training_eager_certified": false,
+    "model_performance_measured": false,
+    "independent_native_source_review": "pending",
+    "current_device_unavailable_handling": "no remote/browser/NPU execution; CPU trace-driven simulations are separately owned and are not live CPU/NPU backend evidence",
+    "known_target_build_blocker": "none confirmed by current host checks; complete target native compile/API/link compatibility remains unverified",
+    "notes": [
+      "EmbeddingBag existing SDK profile is reused only within the documented restricted parameter/storage/caller domain.",
+      "Host checks do not establish actual allocator/SDK phase1/cache, original FIFO deep-copy ACK wiring, event retirement, target GIL mode, or device resource cleanup.",
+      "Fallback fences protect intercepted SDK phase1 only; host metadata before macros and earlier legacy aclop branches remain outside automatic coverage.",
+      "Failed close/finalize preserves workers/TLS/resources and requires an owned external timeout controller; forced termination is not a graceful retirement ACK."
+    ]
+  },
+  "supersedes": {
+    "path": "patches/eager_prepare_r24/INTEGRATION_SOURCE_PINS.json",
+    "sha256": "044c50bfa66030c69022ab4ddabbfc2813fc202c26034b37e31be71eb4ff24ec",
+    "reason": "original FIFO INIT synchronous publication requires immediate Core commit ACK"
+  }
+}

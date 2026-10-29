@@ -1,0 +1,39 @@
+{
+  "base_commit": "312921458e7d396c54a1e92e90385d7d5f02dede",
+  "files": {
+    "op_plugin/utils/op_api_common.cpp": {
+      "bytes": 81610,
+      "sha256": "1019fa662f67484855f27f8cdcf665962564551f23b52066825f572d8eaba4b1"
+    },
+    "op_plugin/utils/op_api_common.h": {
+      "bytes": 66690,
+      "sha256": "306fe9ed42c4acaf921ee26f14a6ba399b64ce97f58577fd1ff525cae2376c95"
+    },
+    "op_plugin/utils/op_api_common_base.h": {
+      "bytes": 32140,
+      "sha256": "120cf8bfc022ee5170f4fd752a9099410fbb84f6765df5c3b3c819556c91504a"
+    },
+    "op_plugin/utils/op_api_eager_prepare_r24.h": {
+      "bytes": 12323,
+      "sha256": "94302b23bd9e405771fe380328668d0896be10efd7762bc7961445c6939011a9"
+    },
+    "op_plugin/utils/op_api_owned_pack_r22.h": {
+      "bytes": 6582,
+      "sha256": "dfaea9ea90a7bbf8caebdf8754712b62b5e474d5c3dbaa6d6493a4ac260d033b"
+    },
+    "op_plugin/utils/op_api_owned_payload_r22.h": {
+      "bytes": 8585,
+      "sha256": "5eff67885603249f92914c1b0745d8b14e50322ff6ad51d8dd4d2d259b1ac507"
+    },
+    "op_plugin/utils/op_api_owned_r22.h": {
+      "bytes": 7473,
+      "sha256": "5a1c7d166f3087aff1f56542e7a9b0d53155c14811584df0e806012ac6d58444"
+    },
+    "op_plugin/utils/op_api_sdk_profile_r22.h": {
+      "bytes": 4030,
+      "sha256": "77e00c02e2ba0e7048a1b0674bccd989c534122b21c181dc58c8b470d9e98f55"
+    }
+  },
+  "payload_root": "op-plugin",
+  "schema": 1
+}

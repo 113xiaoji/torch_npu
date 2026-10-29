@@ -56,6 +56,7 @@
 #include <torch_npu/csrc/logging/LogContext.h>
 #include <torch_npu/csrc/npu/DataParallelComm.h>
 #include <torch_npu/csrc/npu/Module.h>
+#include <torch_npu/csrc/npu/EagerPreparePython.h>
 #include <torch_npu/csrc/npu/NPUPluggableAllocator.h>
 #include <torch_npu/csrc/npu/NPURecovery.h>
 #include <torch_npu/csrc/npu/Stream.h>
@@ -2580,6 +2581,9 @@ PyObject* THNPModule_hasPrimaryContext_wrap(PyObject* self, PyObject* arg) {
 }
 
 static struct PyMethodDef THNPModule_methods[] = {
+    {"_npu_eager_prepare_configure", (PyCFunction)THNPModule_eagerPrepareConfigure, METH_VARARGS, nullptr},
+    {"_npu_eager_prepare_snapshot", (PyCFunction)THNPModule_eagerPrepareSnapshot, METH_NOARGS, nullptr},
+    {"_npu_eager_prepare_drain_close", (PyCFunction)THNPModule_eagerPrepareDrainClose, METH_NOARGS, nullptr},
     {"_npu_init", (PyCFunction)THNPModule_initExtension, METH_NOARGS, nullptr},
     {"_npu_set_run_yet_variable_to_false",
      (PyCFunction)THNPModule_set_run_yet_variable_to_false_wrap,

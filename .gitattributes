@@ -82,3 +82,25 @@ benchmarks/host_regions/r23/test_run_profile_campaign_r23.py -text whitespace=tr
 benchmarks/host_regions/r23/README.md text eol=lf
 benchmarks/host_regions/r23/summarize_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
 benchmarks/host_regions/r23/test_summarize_r23.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+
+# Preserve raw bytes bound by the R24 source manifests on Windows checkouts.
+torch_npu/_eager_prepare.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+torch_npu/csrc/InitNpuBindings.cpp -text whitespace=trailing-space,space-before-tab,cr-at-eol
+torch_npu/csrc/core/npu/EagerPrepare* -text whitespace=trailing-space,space-before-tab,cr-at-eol
+torch_npu/csrc/core/npu/NPUCachingAllocator.cpp -text whitespace=trailing-space,space-before-tab,cr-at-eol
+torch_npu/csrc/core/npu/NPUQueue.cpp -text whitespace=trailing-space,space-before-tab,cr-at-eol
+torch_npu/csrc/core/npu/NPUStream.cpp -text whitespace=trailing-space,space-before-tab,cr-at-eol
+torch_npu/csrc/core/npu/NPUStream.h -text whitespace=trailing-space,space-before-tab,cr-at-eol
+torch_npu/csrc/core/npu/sys_ctrl/npu_sys_ctrl.cpp -text whitespace=trailing-space,space-before-tab,cr-at-eol
+torch_npu/csrc/npu/EagerPreparePython.* -text whitespace=trailing-space,space-before-tab,cr-at-eol
+patches/eager_prepare_r24/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+tools/host_regions/apply_eager_prepare_overlay_r24.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+tools/eager_prepare_cpu/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/eager_prepare/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/eager_prepare_cpu/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+test/cpp/eager_prepare/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+test/eager_prepare/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+test/eager_prepare_cpu/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+test/eager_prepare_cpu_native/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+test/host_regions/test_eager_prepare_integration.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+test/host_regions/eager_prepare_integration/** -text whitespace=trailing-space,space-before-tab,cr-at-eol

@@ -25,6 +25,8 @@
 #include "third_party/acl/inc/acl/acl_rt.h"
 #include "torch_npu/csrc/core/npu/interface/AsyncTaskQueueInterface.h"
 #include "torch_npu/csrc/core/npu/NPUCachingAllocator.h"
+#include "torch_npu/csrc/core/npu/EagerPrepare.h"
+#include "torch_npu/csrc/core/npu/EagerPrepareStorage.h"
 #include "torch_npu/csrc/core/npu/NPUAllocatorConfig.h"
 #include "torch_npu/csrc/core/npu/NPUWorkspaceAllocator.h"
 #include "torch_npu/csrc/core/npu/NPURecovery.h"
@@ -4279,6 +4281,19 @@ bool IsNativeCapturedRetirementDataOnStream(const c10::DataPtr& pointer, const c
         return block && block->device == device && block->stream == stream &&
             caching_allocator.device_allocator[device]->capturedRetirementEligible(block);
     } catch (...) { return false; }
+}
+
+bool IsNativeEagerRetirementData(const c10::DataPtr& pointer,const c10::Allocator* source,
+    int device,void* stream) noexcept
+{
+    if (!eager_prepare::Enabled() || captured_retirement_instrumentation_seen.load(std::memory_order_acquire)) return false;
+#ifndef BUILD_LIBTORCH
+    if (c10_npu::impl::NPUTrace::getTrace()) return false;
+#endif
+    // Preserve concrete allocator/deleter/device/stream ownership and the full
+    // history/context/tracker/private-pool/neighbor/stream-use audit. Only the
+    // activation authority differs from R22's process-cached environment bit.
+    return IsNativeCapturedRetirementDataOnStream(pointer,source,device,stream);
 }
 
 bool IsNativeCapturedRetirementData(const c10::DataPtr& pointer, const c10::Allocator* source) noexcept

@@ -4,6 +4,7 @@
 #include "torch_npu/csrc/core/npu/PrefixCompletion.h"
 #include "torch_npu/csrc/core/npu/PrefixH2DGuard.h"
 #include "torch_npu/csrc/core/npu/PrefixH2DPrewait.h"
+#include "torch_npu/csrc/core/npu/EagerPrepare.h"
 #ifndef BUILD_LIBTORCH
 #include "torch_npu/csrc/sanitizer/NPUTrace.h"
 #endif
@@ -1042,6 +1043,7 @@ void Repository::Enqueue(void *cur_paras)
             }
             manager().Copy(data, slot, cur_paras);
             host_regions::QueueCopyAccepted(cur_paras);
+            eager_prepare::QueueCopyAccepted(cur_paras);
             if (event) {
                 PrefixRegistry().Published(event, this, expected);
             }
