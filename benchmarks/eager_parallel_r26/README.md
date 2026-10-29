@@ -12,6 +12,25 @@ device qualification and measurement adapter exists. A configuration file,
 cannot enable E/EI. The schema unit tests contain artificial records, not real
 NPU evidence. No speedup is established by these files.
 
+`host_e2e.py` is a separate executable host-sim timing worker for the available
+off/shadow modes. It measures diagnostic overhead, not E/EI scheduling. The
+completed paired screen is recorded in [the host E2E report](../../docs/R26_HOST_E2E.md).
+
+```bash
+python benchmarks/eager_parallel_r26/host_e2e.py --config shadow-config.json --output fresh-off --arm off --kind perf --round 0 --warmup 50 --samples 3000
+python benchmarks/eager_parallel_r26/host_e2e.py --config shadow-config.json --output fresh-shadow --arm shadow --kind perf --round 0 --warmup 50 --samples 3000
+```
+
+Use the shadow config described below, additionally pinning `host_e2e.py` in
+`source_pins`; its legacy `forwards` field is not used. Launch each row with the
+same CPU/NUMA binding and explicit environment in a fresh owned process group.
+Run cold off/shadow gates first (`--kind cold --warmup 0 --samples 1`), then ten
+paired rounds with alternating arm order. A perf window shorter than two seconds
+fails: choose a larger fixed sample count and rerun the complete cohort. Samples
+are original forward through synchronize; setup, warmup, snapshots and close are
+excluded. `host_latency_measured` is separate from the false real-device,
+device-overlap and optimization-speedup flags.
+
 ## Commands
 
 Run from the repository root. Each output file must be new; commands do not

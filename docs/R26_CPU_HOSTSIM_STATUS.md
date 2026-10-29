@@ -6,6 +6,10 @@ It does **not** enable or claim production NPU side-stream scheduling. The user
 confirmed that real NPU hardware is still unavailable and requested CPU/host-sim
 validation first. No speedup is claimed by this checkpoint.
 
+The subsequent [host E2E screen](R26_HOST_E2E.md) measured same-package off versus
+shadow over ten paired rounds. Shadow increased paired median latency by 2.10%
+and p95 by 1.99%. This quantifies diagnostic cost, not the unfinished E/EI optimizer.
+
 ## Implemented components
 
 - `DependencyScheduler.h`: caller-owned logical sequence, whole-allocation
