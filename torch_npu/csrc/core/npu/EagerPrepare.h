@@ -1,7 +1,9 @@
 #pragma once
 #include "torch_npu/csrc/core/npu/NPUMacros.h"
 #include "torch_npu/csrc/core/npu/HostRegionOpApiCommand.h"
+#include "torch_npu/csrc/core/npu/EagerPrepareBackend.h"
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
 namespace at { class Tensor; }
@@ -14,6 +16,16 @@ struct Configuration {
     std::vector<std::string> allowed_ops;
 };
 C10_NPU_API bool Enabled() noexcept;
+// The experimental simulator never broadens the real SDK lifecycle contract.
+#ifdef TORCH_NPU_EAGER_PREPARE_HOST_SIM
+C10_NPU_API bool SdkContractAvailable(const char* operation) noexcept;
+C10_NPU_API void CheckSdkConfiguration();
+#else
+inline bool SdkContractAvailable(const char* operation) noexcept {
+    return operation && std::strcmp(operation,"aclnnEmbeddingBag")==0 && host_regions::OwnedOpApiSdkContractAvailable();
+}
+inline void CheckSdkConfiguration() {}
+#endif
 C10_NPU_API bool DiagnosticTracing() noexcept;
 // Every enabled macro invocation is counted once. false means the original
 // route is still responsible; true transfers no owner until Submit succeeds.

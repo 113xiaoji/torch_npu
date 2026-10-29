@@ -1,0 +1,5 @@
+#pragma once
+// Generated per isolated build. This is simulation identity, never real SDK qualification.
+#define TORCH_NPU_R25_HOST_SIM_PATH "@R25_HOST_SIM_PATH@"
+#define TORCH_NPU_R25_HOST_SIM_SHA256 "@R25_HOST_SIM_SHA256@"
+#define TORCH_NPU_R25_HOST_SIM_BYTES @R25_HOST_SIM_BYTES@ULL

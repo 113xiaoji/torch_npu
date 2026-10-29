@@ -49,6 +49,14 @@ EXPERIMENTAL_FREE_THREADED_DEFINE_MACROS = (
     if EXPERIMENTAL_FREE_THREADED == "1"
     else []
 )
+EAGER_PREPARE_HOST_SIM = os.environ.get("TORCH_NPU_EAGER_PREPARE_HOST_SIM", "0")
+if EAGER_PREPARE_HOST_SIM not in {"0", "1"}:
+    raise RuntimeError("TORCH_NPU_EAGER_PREPARE_HOST_SIM must be exactly 0 or 1")
+EAGER_PREPARE_HOST_SIM_LIBRARY = os.environ.get("TORCH_NPU_EAGER_PREPARE_HOST_SIM_LIBRARY", "")
+if EAGER_PREPARE_HOST_SIM == "1" and (
+    not os.path.isabs(EAGER_PREPARE_HOST_SIM_LIBRARY) or not os.path.isfile(EAGER_PREPARE_HOST_SIM_LIBRARY)
+):
+    raise RuntimeError("R25 HostSim requires an existing absolute TORCH_NPU_EAGER_PREPARE_HOST_SIM_LIBRARY")
 
 DISABLE_TORCHAIR = "FALSE"
 if os.environ.get("DISABLE_INSTALL_TORCHAIR") is not None:
@@ -371,6 +379,9 @@ class CPPLibBuild(build_clib, object):
             "-DTORCH_NPU_EXPERIMENTAL_FREE_THREADED="
             + ("ON" if EXPERIMENTAL_FREE_THREADED == "1" else "OFF")
         )
+        cmake_args.append("-DTORCH_NPU_EAGER_PREPARE_HOST_SIM=" + ("ON" if EAGER_PREPARE_HOST_SIM == "1" else "OFF"))
+        if EAGER_PREPARE_HOST_SIM == "1":
+            cmake_args.append("-DTORCH_NPU_EAGER_PREPARE_HOST_SIM_LIBRARY=" + EAGER_PREPARE_HOST_SIM_LIBRARY)
 
         if DISABLE_TORCHAIR == 'FALSE':
             if check_torchair_valid(BASE_DIR):
@@ -770,6 +781,7 @@ setup(
                     ('_GLIBCXX_USE_CXX11_ABI', '1' if USE_CXX11_ABI else '0'),
                     ('GLIBCXX_USE_CXX11_ABI', '1' if USE_CXX11_ABI else '0'),
                 ] + EXPERIMENTAL_FREE_THREADED_DEFINE_MACROS
+                + ([("TORCH_NPU_EAGER_PREPARE_HOST_SIM", "1")] if EAGER_PREPARE_HOST_SIM == "1" else [])
             ),
     ],
     install_requires=[

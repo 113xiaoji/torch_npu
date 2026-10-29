@@ -1,0 +1,80 @@
+#include <cassert>
+#include <cstdint>
+#include <cstring>
+#include <optional>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include "torch_npu/csrc/core/npu/EagerPrepareEligibility.h"
+namespace c10 { template<class T> using optional=std::optional<T>; }
+namespace at {
+enum ScalarType { kFloat,kLong };
+struct Storage { const void* identity; const void* unsafeGetStorageImpl() const { return identity; } };
+struct TensorImpl { const void* identity; Storage storage() const { return {identity}; } };
+struct Tensor {
+    ScalarType type=kFloat; int rank=2; TensorImpl impl{this};
+    bool present=true; int64_t elements=1;
+    bool defined() const { return present; }
+    ScalarType scalar_type() const { return type; }
+    int dim() const { return rank; }
+    int64_t numel() const { return elements; }
+    const TensorImpl* unsafeGetTensorImpl() const { return &impl; }
+};
+}
+enum aclDataType { ACL_FLOAT };
+struct TensorWrapper { at::Tensor tensor; aclDataType type; };
+namespace c10_npu::eager_prepare { bool CanQueueTensor(const at::Tensor&) { return true; } }
+namespace hdb_opapi {
+bool EagerNameEquals(const char* left,const char* right) { return std::strcmp(left,right)==0; }
+/*DOMAIN*/
+}
+#define EXEC_NPU_CMD(api,...) assert(!hdb_opapi::EagerArgumentDomain(#api,std::forward_as_tuple(__VA_ARGS__)))
+void actual_dynamic_mx_quant_callsite() {
+    const at::Tensor x1,x2,gamma;
+    const c10::optional<at::Tensor> beta;
+    double epsilon=1e-5; int64_t scale_alg=0; char mode[]="rint"; char* round_mode_ptr=mode;
+    aclDataType y_acltype=ACL_FLOAT; bool output_rstd=false;
+    at::Tensor y,x_out,mxscale,rstd;
+    TensorWrapper y_wrapper{y,y_acltype},mxscale_wrapper{mxscale,y_acltype};
+    /*DYNAMIC_CALL*/
+}
+void actual_quant_callsite() {
+    const at::Tensor x1,x2,gamma,scales1;
+    const c10::optional<at::Tensor> scales2,zero_points1,zero_points2;
+    int64_t axis=-1; double epsilon=1e-5; bool div_mode=true;
+    at::Tensor y1,y2,x_out;
+    TensorWrapper y1_wrapper{y1,ACL_FLOAT},y2_wrapper{y2,ACL_FLOAT};
+    /*QUANT_CALL*/
+}
+int main() {
+    at::Tensor weight,indices,offsets,out,out1,out2,out3;
+    indices.type=offsets.type=at::kLong; indices.rank=offsets.rank=1;
+    bool scale_grad_by_freq=false,sparse=true,include_last_offset=false;
+    int64_t mode=0,padding_idx=-1;
+    c10::optional<at::Tensor> per_sample_weights;
+    auto admitted=std::forward_as_tuple(weight,indices,offsets,scale_grad_by_freq,mode,sparse,
+        per_sample_weights,include_last_offset,padding_idx,out,out1,out2,out3);
+    assert(hdb_opapi::EagerArgumentDomain("aclnnEmbeddingBag",admitted));
+    assert(!hdb_opapi::EagerArgumentDomain("unrelated",admitted));
+    // The actual inner _embedding_bag_forward_only call wraps its absent
+    // weights in an engaged optional whose Tensor is undefined.
+    at::Tensor undefined; undefined.present=false;
+    per_sample_weights=undefined;
+    assert(per_sample_weights.has_value() && !per_sample_weights.value().defined());
+    assert(hdb_opapi::EagerArgumentDomain("aclnnEmbeddingBag",admitted));
+    per_sample_weights=out;
+    assert(!hdb_opapi::EagerArgumentDomain("aclnnEmbeddingBag",admitted));
+    per_sample_weights.value().elements=0;
+    assert(!hdb_opapi::EagerArgumentDomain("aclnnEmbeddingBag",admitted));
+    per_sample_weights.reset();
+    assert(hdb_opapi::EagerArgumentDomain("aclnnEmbeddingBag",admitted));
+    TensorWrapper wrapped{out,ACL_FLOAT}; char text[]="wrong type"; char* pointer=text;
+    auto wrapper=std::forward_as_tuple(weight,indices,offsets,scale_grad_by_freq,mode,sparse,
+        per_sample_weights,include_last_offset,padding_idx,wrapped,out1,out2,out3);
+    auto string_optional=std::forward_as_tuple(weight,indices,offsets,scale_grad_by_freq,mode,sparse,
+        pointer,include_last_offset,padding_idx,out,out1,out2,out3);
+    assert(!hdb_opapi::EagerArgumentDomain("aclnnEmbeddingBag",wrapper));
+    assert(!hdb_opapi::EagerArgumentDomain("aclnnEmbeddingBag",string_optional));
+    assert(!hdb_opapi::EagerArgumentDomain("aclnnEmbeddingBag",std::forward_as_tuple(weight)));
+    actual_dynamic_mx_quant_callsite(); actual_quant_callsite();
+}

@@ -1,0 +1,102 @@
+#include <cassert>
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <stdexcept>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+#include "patches/eager_prepare_r25/op-plugin/op_plugin/utils/op_api_owned_pack_r22.h"
+#define TORCH_CHECK(condition,...) do { if (!(condition)) throw std::runtime_error("fixture check"); } while (false)
+enum aclDataType { ACL_FLOAT,ACL_STRING };
+enum aclFormat { ACL_FORMAT_ND,ACL_FORMAT_NCL,ACL_FORMAT_NCHW,ACL_FORMAT_NCDHW };
+struct StorageImpl { virtual ~StorageImpl()=default; };
+StorageImpl storage_identity;
+namespace c10 {
+template<class T> using optional=std::optional<T>;
+inline constexpr auto nullopt=std::nullopt;
+struct Storage {
+    StorageImpl* unsafeGetStorageImpl() const { return &storage_identity; }
+    const void* data() const { return &storage_identity; }
+    size_t nbytes() const { return 16; }
+};
+}
+namespace at {
+using IntArrayRef=std::vector<int64_t>;
+struct TensorImpl { c10::Storage owner; const c10::Storage& storage() const { return owner; } };
+struct Tensor {
+    bool present=false; TensorImpl impl;
+    bool defined() const { return present; }
+    const TensorImpl* unsafeGetTensorImpl() const { return &impl; }
+    int scalar_type() const { return 0; }
+    size_t itemsize() const { return 4; }
+    int64_t storage_offset() const { return 0; }
+    IntArrayRef sizes() const { return {4}; }
+    IntArrayRef strides() const { return {1}; }
+};
+}
+int validations=0,creates=0,destroys=0;
+namespace c10_npu::eager_prepare { void ValidateTensor(const at::Tensor&) { ++validations; } }
+namespace torch_npu {
+struct NPUStorageImpl : StorageImpl {
+    struct Description { aclFormat npu_format_=ACL_FORMAT_ND; std::vector<int64_t> storage_sizes_{4}; } npu_desc_;
+};
+namespace NPUBridge { const NPUStorageImpl* GetNpuStorageImpl(const at::Tensor&) { static NPUStorageImpl value; return &value; } }
+}
+namespace at_npu::native {
+struct OpPreparation { static aclDataType convert_to_acl_data_type(int) { return ACL_FLOAT; } };
+struct FormatHelper { static bool IsBaseFormatType(aclFormat) { return true; } };
+}
+struct TensorStruct {
+    void* data_ptr; aclDataType acl_type; aclFormat acl_format; size_t nbytes,itemsize; int64_t storage_offset;
+    std::vector<int64_t> sizes,strides,storage_sizes;
+    TensorStruct(void* p,aclDataType t,aclFormat f,size_t n,size_t i,int64_t o,
+        std::vector<int64_t> s,std::vector<int64_t> st,std::vector<int64_t> ss)
+        : data_ptr(p),acl_type(t),acl_format(f),nbytes(n),itemsize(i),storage_offset(o),
+          sizes(std::move(s)),strides(std::move(st)),storage_sizes(std::move(ss)) {}
+};
+using TensorStructPtr=std::shared_ptr<TensorStruct>;
+struct aclTensor {};
+aclTensor* aclCreateTensor(const int64_t*,size_t,aclDataType,const int64_t*,int64_t,aclFormat,const int64_t*,size_t,void*) {
+    ++creates;return new aclTensor;
+}
+aclTensor* ConvertTypeV2(const TensorStructPtr&) { throw std::runtime_error("unexpected special-dtype conversion"); }
+#define GET_OP_API_FUNC(name) (&name)
+struct TensorWrapper { at::Tensor tensor_; aclDataType dtype; };
+namespace hdb_opapi {
+using NativeOwners=UniqueOwners<c10::Storage>;
+struct OwnedTensor { TensorStructPtr metadata; };
+bool Is4BitDtype(aclDataType) { return false; }
+OwnedTensor SnapshotEagerOwnedTensor(NativeOwners&,const at::Tensor&,c10::optional<aclDataType> = c10::nullopt);
+/*SNAPSHOT_FUNCTION*/
+// Only the base's native owner binding is needed; every overload exercised
+// here is extracted unchanged from the actual R25 EagerSnapshotter.
+struct OwnedSnapshotter { NativeOwners& owners; void operator()() const {} };
+/*EAGER_SNAPSHOTTER*/
+struct OwnedConvertPolicy {
+    aclTensor* Convert(const OwnedTensor&) const;
+    /*OPTIONAL_CONVERT*/
+    void Release(aclTensor* value) const { if (value) { ++destroys;delete value; } }
+};
+/*TENSOR_CONVERT*/
+}
+int main() {
+    using namespace hdb_opapi;
+    NativeOwners owners;
+    c10::optional<at::Tensor> missing,undefined{at::Tensor{}};
+    auto arguments=SnapshotArgs(EagerSnapshotter{owners},missing,undefined);
+    assert(!std::get<0>(arguments).has_value());
+    assert(std::get<1>(arguments).has_value() && !std::get<1>(arguments)->metadata);
+    assert(owners.Size()==0 && owners.Bytes()==0 && validations==0 && creates==0);
+    ConvertedPack<decltype(arguments),OwnedConvertPolicy> converted(arguments,OwnedConvertPolicy{});
+    assert(std::get<0>(converted.Get())==nullptr && std::get<1>(converted.Get())==nullptr);
+    assert(converted.Reset() && owners.Size()==0 && validations==0 && creates==0 && destroys==0);
+    // Positive control proves the complete extracted snapshot/converter bodies
+    // do validate, retain and allocate when the Tensor is actually defined.
+    at::Tensor defined;defined.present=true;
+    auto present=EagerSnapshotter{owners}(c10::optional<at::Tensor>{defined});
+    assert(present.has_value() && present->metadata && owners.Size()==1 && validations==1);
+    OwnedConvertPolicy policy;auto* descriptor=policy.Convert(present);
+    assert(descriptor && creates==1);policy.Release(descriptor);assert(destroys==1);
+}

@@ -11,6 +11,7 @@ else()
 endif()
 
 project(TORCHNPU CXX C)
+include(cmake/EagerPrepareHostSim.cmake)
 option(TORCH_NPU_EXPERIMENTAL_LOCKFREE_QUEUE "Use experimental sequence-ring queue" OFF)
 if(TORCH_NPU_EXPERIMENTAL_LOCKFREE_QUEUE)
   add_compile_definitions(TORCH_NPU_EXPERIMENTAL_LOCKFREE_QUEUE)

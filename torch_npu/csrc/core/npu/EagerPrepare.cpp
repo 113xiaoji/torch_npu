@@ -1,4 +1,5 @@
 #include "torch_npu/csrc/core/npu/EagerPrepare.h"
+#include "torch_npu/csrc/core/npu/EagerPrepareOrder.h"
 #include "torch_npu/csrc/core/npu/EagerPrepareOwnedJob.h"
 #include "torch_npu/csrc/core/npu/EagerPrepareLifecycle.h"
 #include "torch_npu/csrc/core/npu/EagerPrepareStorage.h"
@@ -60,6 +61,7 @@ struct State {
     uint64_t caller_tid=0;
     size_t active_submitters=0;
     std::map<std::string,Counts> operators;
+    SequenceOrderEvidence admission_order, execution_order;
     std::exception_ptr first_error;
     std::string error_phase, error_operation;
     uint64_t error_sequence=0;
@@ -133,10 +135,13 @@ void note_error(const char* phase, const std::string& operation, uint64_t sequen
         s.closure_passed=false;
     } catch (...) { /* The core separately retains the actual first exception. */ }
 }
-void count_event(const std::string& operation, const char* event) {
+void count_event(const std::string& operation, const char* event, const Identity& identity) {
     auto& s=state(); std::lock_guard<std::mutex> lock(s.mu); auto& n=s.operators[operation];
     if (std::strcmp(event,"prepared")==0) ++n.prepared;
-    else if (std::strcmp(event,"executed")==0) ++n.executed;
+    else if (std::strcmp(event,"executed")==0) {
+        ++n.executed;
+        if (BuildUsesHostSimulation()) s.execution_order.Record(identity.sequence.load(std::memory_order_acquire),operation.c_str());
+    }
     else if (std::strcmp(event,"returned")==0) ++n.returned;
 }
 void check_queue_configuration() {
@@ -336,7 +341,7 @@ void SubmitImpl(const char* name,std::unique_ptr<host_regions::OwnedOpApiPayload
     { std::lock_guard<std::mutex> lock(s.mu); tracing=s.config.diagnostic_trace; }
     auto identity=std::make_shared<Identity>(); if (tracing) identity->caller_tid=native_tid();
     auto job=std::make_shared<OwnedQueueJob>(std::move(payload),std::make_shared<NativeContext>(caller,identity,operation,tracing,std::move(signature)),stream,
-        [operation](const char* event) { count_event(operation,event); });
+        [operation,identity](const char* event) { count_event(operation,event,*identity); });
     auto retirement=std::make_shared<Retirement>(); retirement->core=core; retirement->job=job; retirement->operation=operation;
     retirement->fence=std::make_unique<Fence>(completion_hooks,caller->context(),stream);
     try {
@@ -345,6 +350,7 @@ void SubmitImpl(const char* name,std::unique_ptr<host_regions::OwnedOpApiPayload
         hdb_native::WaitDetach detached;
         auto ticket=core->Submit(job,[&](const Core::TicketPtr& value) {
             identity->sequence.store(value->sequence,std::memory_order_release);
+            if (BuildUsesHostSimulation()) { std::lock_guard<std::mutex> lock(s.mu); s.admission_order.Record(value->sequence,name); }
             retirement->ticket=value;
             std::atomic<bool> accepted{false},commit_failed{false};
             std::exception_ptr error;
@@ -398,17 +404,18 @@ std::string Configure(Configuration config) {
         hdb_native::CallerTls caller(true);
         TORCH_CHECK(caller.context(),"eager Prepare configure requires the initialized device0 primary Context");
         host_regions::PrepareOwnedOpApiCallerState();
-        const bool embedding_qualified=host_regions::OwnedOpApiSdkContractAvailable();
+        CheckSdkConfiguration();
         std::vector<Trace> trace; trace.reserve(config.diagnostic_trace ? config.trace_limit : 0);
         auto core=std::make_shared<Core>(Core::Config{config.capacity,config.byte_limit,config.workers});
         std::lock_guard<std::mutex> lock(s.mu); s.core=std::move(core); s.config=config; s.operators.clear();
         s.fifo_drained=false; s.device_synchronized=false; s.workers_stopped=false; s.closure_passed=false;
         s.peak_slots=0; s.peak_bytes=0;
+        s.admission_order=SequenceOrderEvidence{}; s.execution_order=SequenceOrderEvidence{};
         s.trace=std::move(trace); s.trace_dropped=0; s.trace_errors=0;
         s.cold_close.Reset();
         s.caller_thread=std::this_thread::get_id(); s.caller_tid=native_tid();
         s.sdk_stop=false;
-        for (const auto& name:config.allowed_ops) s.operators[name].qualified=name=="aclnnEmbeddingBag" && embedding_qualified;
+        for (const auto& name:config.allowed_ops) s.operators[name].qualified=SdkContractAvailable(name.c_str());
         s.enabled.store(true,std::memory_order_release);
         enabled_flag.store(true,std::memory_order_release);
         trace_flag.store(config.diagnostic_trace,std::memory_order_release);
@@ -427,10 +434,18 @@ std::string Snapshot() {
     out << "{\"schema\":1,\"mode\":" << quote(s.enabled ? "eager_prepare" : "off") << ",\"enabled\":" << boolean(s.enabled)
         << ",\"workers\":" << s.config.workers << ",\"capacity\":" << s.config.capacity << ",\"byte_limit\":" << s.config.byte_limit;
     out << ",\"caller_tid\":" << s.caller_tid;
+    out << ",\"backend\":" << quote(BackendName())
+        << ",\"real_sdk_qualified\":" << boolean(!BuildUsesHostSimulation() && std::any_of(s.operators.begin(),s.operators.end(),
+            [](const auto& entry) { return entry.second.qualified; }))
+        << ",\"simulated_prepare\":" << boolean(BuildUsesHostSimulation())
+        << ",\"pta_cache_enabled\":" << (BuildUsesHostSimulation() ? "false" : "null")
+        << ",\"numerical_kernels_verified\":false";
     out << ",\"allowed_ops\":["; bool first=true;
     for (const auto& name:s.config.allowed_ops) { if (!first) out << ','; first=false; out << quote(name); }
     out << "],\"qualified_ops\":["; first=true;
-    for (const auto& entry:s.operators) if (entry.second.qualified) { if (!first) out << ','; first=false; out << quote(entry.first); }
+    for (const auto& entry:s.operators) if (entry.second.qualified && !BuildUsesHostSimulation()) { if (!first) out << ','; first=false; out << quote(entry.first); }
+    out << "],\"qualified_sim_ops\":["; first=true;
+    for (const auto& entry:s.operators) if (entry.second.qualified && BuildUsesHostSimulation()) { if (!first) out << ','; first=false; out << quote(entry.first); }
     out << "],\"operators\":{"; first=true;
     for (const auto& entry:s.operators) {
         if (!first) out << ','; first=false; const auto& n=entry.second;
@@ -457,6 +472,11 @@ std::string Snapshot() {
         if (s.error_sequence==std::numeric_limits<uint64_t>::max()) out << "null"; else out << s.error_sequence;
         out << ",\"message\":" << quote(describe(s.first_error)) << '}';
     }
+    out << ",\"order_evidence\":{\"enabled\":" << boolean(BuildUsesHostSimulation())
+        << ",\"admitted_count\":" << s.admission_order.count << ",\"executed_count\":" << s.execution_order.count
+        << ",\"admitted_sequence_hash\":" << s.admission_order.hash << ",\"executed_sequence_hash\":" << s.execution_order.hash
+        << ",\"passed\":" << boolean(BuildUsesHostSimulation() && s.closure_passed && s.admission_order.ordered &&
+            s.execution_order.ordered && s.admission_order.count==s.execution_order.count && s.admission_order.hash==s.execution_order.hash) << '}';
     out << ",\"diagnostic_trace\":{\"enabled\":" << boolean(s.config.diagnostic_trace) << ",\"limit\":" << s.config.trace_limit
         << ",\"dropped\":" << s.trace_dropped+s.trace_errors.load(std::memory_order_relaxed)
         << ",\"incomplete\":" << boolean(s.trace_dropped!=0 || s.trace_errors.load(std::memory_order_relaxed)!=0)

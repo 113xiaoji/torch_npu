@@ -1,0 +1,20 @@
+option(TORCH_NPU_EAGER_PREPARE_HOST_SIM "Build isolated experimental R25 HostSim Prepare profile" OFF)
+set(TORCH_NPU_EAGER_PREPARE_HOST_SIM_LIBRARY "" CACHE FILEPATH "Exact isolated R25 libopapi.so to attest")
+if(TORCH_NPU_EAGER_PREPARE_HOST_SIM)
+  if(NOT IS_ABSOLUTE "${TORCH_NPU_EAGER_PREPARE_HOST_SIM_LIBRARY}" OR
+     NOT EXISTS "${TORCH_NPU_EAGER_PREPARE_HOST_SIM_LIBRARY}" OR
+     IS_DIRECTORY "${TORCH_NPU_EAGER_PREPARE_HOST_SIM_LIBRARY}")
+    message(FATAL_ERROR "R25 HostSim requires an existing absolute TORCH_NPU_EAGER_PREPARE_HOST_SIM_LIBRARY")
+  endif()
+  get_filename_component(R25_HOST_SIM_PATH "${TORCH_NPU_EAGER_PREPARE_HOST_SIM_LIBRARY}" REALPATH)
+  if(R25_HOST_SIM_PATH MATCHES "[\"\\\n\r]")
+    message(FATAL_ERROR "R25 HostSim provider path cannot contain quotes, backslashes or newlines")
+  endif()
+  file(SHA256 "${R25_HOST_SIM_PATH}" R25_HOST_SIM_SHA256)
+  file(SIZE "${R25_HOST_SIM_PATH}" R25_HOST_SIM_BYTES)
+  configure_file("${CMAKE_CURRENT_LIST_DIR}/EagerPrepareHostSimProfile.h.in"
+    "${CMAKE_BINARY_DIR}/r25_hostsim/EagerPrepareHostSimProfile.h" @ONLY)
+  include_directories("${CMAKE_BINARY_DIR}/r25_hostsim")
+  add_compile_definitions(TORCH_NPU_EAGER_PREPARE_HOST_SIM=1)
+  message(STATUS "Experimental R25 HostSim provider ${R25_HOST_SIM_PATH} SHA256=${R25_HOST_SIM_SHA256}")
+endif()
