@@ -4,11 +4,12 @@
 
 **Goal:** 保留模型 forward/API，在经过资格验证的算子域内提高真实 NPU 性能，并把线程同步正确性、可观察语义与收益列为独立硬门槛。
 
-**Architecture:** 先优化单个 kernel，沿用原调用 stream，不新增 host worker。通用 effect/lease/依赖层采用独立开关和单一状态所有者，只有协议与真实设备测试通过后才启用跨算子调度；host Prepare 和多表融合分别评估。
+**Architecture:** 首版只改 PTA/op-plugin，复用原 CANN kernel，将 Embedding 和 Interaction 联合作为依赖流水线。通用 effect/lease/依赖层采用单一状态所有者，先验证串行 shadow，再启用 Embedding side streams 与 Interaction fan-in；host Prepare、kernel 改造、多表融合均为后续独立选项。
 
 **Tech Stack:** 当前固定 revision 的 PyTorch/torch_npu/op-plugin、C++17、Python std/FT、CANN/Ascend C、CPU oracle、host-sim、真实 NPU。
 
 设计依据：[R26 设计与验收规格](../specs/2026-10-29-generic-eager-npu-parallelism-design.md)。
+当前优先级依据：[PTA Embedding＋Interaction 联合设计](../specs/2026-10-29-pta-embedding-interaction-pipeline.md)。
 代码基线：`60246fe9a9fff2fc724bf9155f0f38fb4266b0bc`。
 本文件是待执行计划；下述新增文件、API、测试命令均须由对应任务实现，不能声称现已可运行或已通过。
 仓库路径均相对本 checkout；外部 `<ops_nn_root>` 必须由任务 0 的真实 qualification manifest 解析，不是假定本地存在的路径。
@@ -16,14 +17,13 @@
 ## 执行顺序与独立交付
 
 ```text
-0 目标资格/证据工具 -> 1 数值合同 -> 2 单 kernel 优化(K) -> 真机 K 验收
-                       |
-                       +-> 3 effect 入口 -> 4 lease/mutation -> 5 协议核/模拟
-                                                        -> 6 双 stream(S) -> 真机 S 验收
+0 目标资格/证据工具 -> 1 数值合同 -> 3 effect入口 -> 4 lease/mutation
+                                -> 5 协议核/模拟 -> 6 PTA联合流水线 -> 真机EI验收
+仅在真实kernel瓶颈成立时：任务2 单kernel(K) -> 单独K/O验收
 7 性能选择/模型矩阵贯穿各模式；P/F 只有对应前提通过后才有实现任务。
 ```
 
-任务 0–2 可以单独交付真实 kernel 收益。任务 3–6 不阻挡 K；没有真机时只完成
+首版执行 0、1、3、4、5、6、7，任务 2 延后为可选路线。没有真机时只完成
 工具、CPU 与模拟合同，不把 kernel/S 标记为合格。每项以聚焦回归、独立 review、
 对应证据和单独 commit 为完成条件；不一次性落地全部模块后再测试。
 
@@ -37,7 +37,7 @@
 - `test/eager_parallel/test_measurement_contracts.py`：拒绝错产物、漏轮次、错误计时及混用模拟证据。
 
 - [ ] 先写负例：provider hash 不符、未知 SoC、无真实 kernel、少一臂、重复 forward、只测 default stream、把 cold trace 放进 perf 必须失败。
-- [ ] 实现 qualification schema；`source_root/revision`、`loaded_libraries`、`sdk_contracts`、`device_kind` 均可追溯。real kernel 资格必须来自真机与目标源码，不从 host-sim 填充。
+- [ ] 实现 qualification schema；`source_root/revision`、`loaded_libraries`、`sdk_contracts`、`device_kind` 均可追溯。K 资格需要真机与目标内核源码；S/EI 资格需要固定的已加载 vendor 产物与真实 SDK 合同，不要求修改其内核源码。两者都不从 host-sim 填充。
 - [ ] 实现 O/K/P/S/F 五种单项模式；同一次实验各臂加载同一候选，开关选择原或新路径。独立记录实际 kernel/API 路由，防止“全部 fallback 却报告加速”。
 - [ ] CPU wall 包含原 forward 与完整 join；device event 结束点在所有 stream 完成之后。context-switch/CPU/内存统计位于样本窗之外或以各臂相同的窗口计数读取。
 - [ ] 原始 DLRM 固定 source/state/input hash；新增模型清单固定类、版本、shape、seed、state hash。输出 artifact 放新目录，不覆盖 R25。
@@ -50,7 +50,7 @@ python benchmarks/eager_parallel_r26/qualification.py --config target.json --out
 python benchmarks/eager_parallel_r26/run.py --config experiment.json --plan-only --output fresh-plan
 ```
 
-通过条件：所有负例拒绝；未得到目标 kernel 源码/工具链或真实资格时，K/S 不可执行，O/CPU/host-sim 仍可工作。
+通过条件：所有负例拒绝。K 需要目标 kernel 源码/工具链；PTA-only 的 S/EI 可以复用已资格 vendor kernel，但必须证明真实 SDK/设备合同。O/CPU/host-sim 与两者分别报告。
 
 ## 任务 1：EmbeddingBag 数值与接口合同
 
@@ -85,7 +85,7 @@ python -m pytest test/npu/test_eager_parallel_embedding_bag.py -q
 
 通过条件：oracle、原 NPU、候选三方一致；确定性开关与 baseline 的行为一致；数值不合格则不测对应优化域性能。
 
-## 任务 2：单 kernel 内并行（优先交付 K）
+## 任务 2：单 kernel 内并行（可选后续 K）
 
 **修改：** 固定目标的 `<ops_nn_root>/index/embedding_bag/op_host/`、`op_kernel/`、`tests/`；
 `third_party/op-plugin/op_plugin/ops/opapi/EmbeddingBagNpuOpApi.cpp` 的 route。
@@ -195,7 +195,7 @@ ASan 使用另一个 build 目录重跑；不能把未 instrument 的 vendor SDK
 正常用例资源全清零；预期失败用例要求受控隔离、首错稳定、无新 admission。
 任何 race/deadlock/lost-wakeup/提前释放均阻断任务 6，不以“压测暂未复现”替代失败修复。
 
-## 任务 6：双 stream 的实际设备调度
+## 任务 6：Embedding＋Interaction 的 PTA 联合调度
 
 **新增：** `eager_parallel/ExecutionAdapter.{h,cpp}`、`torch_npu/_eager_parallel.py`；
 `test/npu/test_eager_parallel_runtime.py`。
@@ -207,12 +207,17 @@ ASan 使用另一个 build 目录重跑；不能把未 instrument 的 vendor SDK
 - [ ] 实现原 stream 前驱接入、已 ready 节点 launch、事件 record 提交 ACK、consumer wait；不能把 host record 返回当成已提交。
 - [ ] 实现 scope exit、未知 op、D2H/.item/mutation/显式同步的 frontier join；所有输入输出和 workspace 记录 stream 使用与 lease。
 - [ ] 先启用两条 stream；原 kernel 不变，host Prepare worker 仍 off。注册 EmbeddingBag 加最小纯算子集，未知效果正确 fallback。
+- [ ] 两条内部 side stream 承载独立 Embedding；x 和完整 Interaction 留在原消费 stream。Cat 对实际 producer frontier 做 device fan-in，不能无差别等待 S0 当前 tail。
+- [ ] 覆盖 Cat、Bmm、Index、view/transpose/slice alias 以及 MLP 实际路由；补 `AdvancedIndex.cpp` 的 CPU index H2D 与 bool/Nonzero 数据依赖 shape 边界。
+- [ ] 新增 `test/cpp/eager_parallel/fan_in_test.cpp`、`test/eager_parallel/test_feature_interaction_reference.py`、`test/npu/test_eager_parallel_feature_pipeline.py`，按补充设计核乱序完成但原表/三角索引顺序不变。
+- [ ] 原四输出、x 两次消费、T/transpose只读别名、CPU索引源保活全部纳入 lease；只在明确效果和目标路由资格通过后免除全域 host fence。
 - [ ] 真实设备 timeline 证明独立 kernel 区间重叠，依赖节点没有提前读取；再跑 S/O 性能和完整模型矩阵。
 
 验证命令：
 
 ```bash
 python -m pytest test/npu/test_eager_parallel_runtime.py -q
+python -m pytest test/npu/test_eager_parallel_feature_pipeline.py -q
 python benchmarks/eager_parallel_r26/run.py --config schedule-ab.json --modes O,S --execute --output fresh-schedule-ab
 ```
 
@@ -227,6 +232,7 @@ python benchmarks/eager_parallel_r26/run.py --config schedule-ab.json --modes O,
 - [ ] 加严格依赖链、饱和大 GEMM/带宽、频繁 `.item()`、alias/in-place、未知 custom 等负例。
 - [ ] 冷诊断测 stage：caller capture、admission wait、Prepare CPU/wall、launch、event wait/join、retirement；另测 mutex 等待/通知次数。带 trace 的结果只用于归因。
 - [ ] 性能按 O/K/P/S/F 独立对照，组合后置；在线查询策略表必须足够便宜且不重复执行算子来试错。
+- [ ] PTA首版额外比较 O、B（新运行时串行）、E（仅Embedding分流）、EI（整链调度）；同一原模型统计 Embedding、EI、完整forward，局部收益不能代替整链收益。
 - [ ] P 的资格额外要求共享锁/唤醒压力对照、W1 相对 O 的总成本门槛；SDK 内部串行或 Prepare 很轻的域保持 P=off。
 - [ ] F 仅在已经 ready 的同族独立节点上分组，记录 group size/等待预算/flush；保留全部输出和原消费者映射。不为了凑够“26表”等待未来模型调用。
 - [ ] 10个独立配对轮次、每进程≥200样本且窗≥2秒；以进程为单位统计。收益≥5%、p95/control回退≤3%、置信范围与噪声门槛按规格执行。
@@ -245,8 +251,10 @@ python benchmarks/eager_parallel_r26/run.py --config schedule-ab.json --modes O,
 ## 交付审计与当前状态
 
 - 设计阶段已完成本仓库改码位置核查、独立代码地图与独立测试方案调查。
-- 最终整稿审阅代理未完成（调用额度限制）；本稿由主代理做一致性与边界自审，
-  不标记为“独立完整架构审查通过”。实施前及每个协议提交仍须完成对应独立 review。
+- 后续 PTA-only 联合修订已对设计、联合流水线和计划三份文档完成独立只读审阅，
+  未发现阻断项；补齐 vendor 资格/内核源码的区别与分阶段数值门槛。
+  该结论仅针对文档设计，每个实际协议提交仍须独立代码 review 和对应测试。
 - 当前没有 R26 生产改动或新性能承诺。本文列出的测试是实施验收项目，尚未执行。
-- 实施工作首先做任务 0/1；有真实 NPU 与目标 kernel 源码时推进 2，同时可在 CPU
-  上推进 3–5。不能在 host-sim 上宣称完成真实查表/求和的优化。
+- 实施工作首先做任务 0/1，并在 CPU 推进 3–5；有真实 NPU 且 vendor API 合同时
+  推进 6/7，不要求先改 CANN。任务 2 由后续 kernel 瓶颈证据触发。
+  不能在 host-sim 上宣称完成真实查表/求和/Interaction 的优化。

@@ -3,6 +3,10 @@
 日期：2026-10-29（客户端时区 Asia/Singapore）。设计基线：`60246fe9a9fff2fc724bf9155f0f38fb4266b0bc`。
 本交付为设计、改码地图和验收方案，尚未实现下述 R26 模块。
 
+**后续范围修订：PTA-only 优先，Embedding 与 Interaction 联合验收。**
+参见[联合流水线设计](2026-10-29-pta-embedding-interaction-pipeline.md)。首版复用
+现有 CANN kernel；下文单 kernel 改造改为可选后续路线，不是通用调度的前提。
+
 ## 1. 目标与选择
 
 模型继续调用原来的 PyTorch 算子，保留 `forward`、权重、输入与公开语义。
@@ -13,13 +17,13 @@ device kernel、效果描述和 SDK 资格仍需要适配与验证。不能承�
 
 | 方向 | 优点 | 代价/边界 | 决策 |
 | --- | --- | --- | --- |
-| 优先优化单个算子的 device kernel | 模型不改；保持原 stream/FIFO；不新增 CPU worker | 需要真实 NPU、对应内核源码和访存分析 | 主路线，首先验证 |
-| 通用依赖调度，多算子跨 stream 重叠 | 可服务不同模型的独立分支 | 需要完整 effect boundary、别名和跨 stream 生命周期 | 第二阶段，独立开关 |
+| 通用依赖调度，多算子跨 stream 重叠 | 只改 PTA，复用原 CANN；联合覆盖 Embedding/Interaction | 需要完整 effect boundary、别名和跨 stream 生命周期 | 首版主路线，从串行 shadow 到双 side stream |
+| 优化单个算子的 device kernel | 模型不改；保持原 stream/FIFO；不新增 CPU worker | 需要真实 NPU、对应内核源码和访存分析 | 实测证明 kernel 内瓶颈后独立推进 |
 | 多表/同族算子融合 | 减少 launch，可能改善访存 | 算子族专用；eager 聚合等待可能损害 latency | 有设备证据后再做 |
 
 首版优化域为 Eager、推理/no-grad、原生 NPU Tensor、已资格化设备/SDK。
 训练、RNG、有副作用 custom op、图捕获、通信、外部 stream/allocator 等未资格域
-执行原路径。首个 kernel 域为 EmbeddingBag FP32/sum；表数、batch、embedding
+执行原路径。首个算子资格域为 EmbeddingBag FP32/sum；表数、batch、embedding
 维数和 bag 长度均为参数，生产路径不能写死 DLRM、26 张表或 128 batch。
 FP16/BF16、mean/max、sample weights 和 backward 分别扩展资格，不混在首批提交。
 
@@ -54,8 +58,8 @@ flowchart TD
 
 ```python
 with torch.inference_mode(), torch_npu._eager_parallel.scope(
-    kernel_policy="qualified",       # off / qualified
-    device_schedule="off",           # off / qualified；先 off
+    kernel_policy="off",             # 首版复用原 kernel
+    device_schedule="qualified",     # 资格/测试未通过时拒绝启用
     host_prepare="off",              # off / qualified；默认 off
     grouped_fusion="off",            # 后期独立实验
 ):
@@ -64,10 +68,11 @@ with torch.inference_mode(), torch_npu._eager_parallel.scope(
 
 正常退出 scope 必须 join 并确认所有资源退休；异常退出保留首个错误。
 单算子 kernel 替换不改变调用 stream。跨算子模式允许独立节点物理重排，
-保持 eager 的可观察结果和必需依赖；不能同时要求所有 device launch 严格全局 FIFO
-又要求这些 launch 在不同 stream 重叠。R25 同流模式继续使用 FIFO hash 验证。
+保持 eager 的可观察结果和必需依赖。host 提交顺序可以保持原 FIFO，不同 stream
+上的独立 kernel 仍能重叠；不能同时要求设备执行全局串行完成和设备重叠。
+R25 同流模式继续使用 FIFO hash 验证，跨流另验设备 happens-before 依赖。
 
-## 4. 第一优先级：单算子内核并行
+## 4. 可选后续：单算子内核并行
 
 先记录真实 SoC/driver/CANN/op-plugin revision、实际加载库、kernel 名称与设备
 timeline。确认现有 vendor kernel 已怎样并行，区分 host launch、内核计算、
@@ -94,7 +99,7 @@ CANN 的 device kernel 不在本 torch_npu 仓库。官方算子表列出了 Emb
 外部改动区域是固定 revision 的 `<ops_nn_root>/index/embedding_bag/op_host/`
 （tiling/策略）、`op_kernel/`（实际读取与归约）、`op_api/`（确有接口变更时才改）
 及 `tests/`。此工作区未检出该完整 kernel 树；不得把其他架构子目录当成 910C 实现。
-阶段 0 必须绑定实际 SoC 到可编译实现和 SDK 工具链；若开源实现不覆盖目标，
+启用 K 前必须绑定实际 SoC 到可编译实现和 SDK 工具链；若开源实现不覆盖目标，
 保留 vendor baseline，使用独立自定义 op 工程验证同一 schema，或停止 kernel 分支。
 
 ## 5. 通用运行时合同
@@ -169,7 +174,7 @@ stream、`stream_uses.empty()` 以及 Prepare/Execute 同 stream 条件保持冻
 
 ## 6. 线程同步正确性是硬门槛
 
-主路线 K 不新增 CPU worker。设备调度 S 由一个 owner 管理可变 DAG、状态、
+可选路线 K 不新增 CPU worker。首版设备调度 S 由一个 owner 管理可变 DAG、状态、
 额度和退休表；P（host Prepare）只有实测收益且 SDK 并发资格通过后才启用。
 外部 CANN 内部是否有锁无法由本项目承诺；不合格时保持 P=off。
 
@@ -261,7 +266,7 @@ R24/R25 payload。只改 generator 也不够：manual/foreach/special/custom 注
   辅助 shape 按 mode/include_last_offset/SoC 分支记录；训练扩展必须跑 backward 消费。
 - 覆盖空/连续空/全 padding、重复索引、热点和随机索引、尾部非对齐维度、长短 bag、
   `None`/C++ engaged-undefined/defined-empty optional、错误 indices/offsets/sample weights。
-- 初始 FP32、有限输入 [-1,1]、bag 长度≤64：主输出预设 `rtol=1e-4, atol=1e-5`；
+- 初始 FP32、有限输入 [-1,1]、bag 长度≤64：Embedding 主输出预设 `rtol=1e-4, atol=1e-5`；
   长 bag 用 FP64 oracle 与预声明累加误差界校验，并记录 baseline 误差，失败不临时放宽。
   NaN/Inf 单独核对语义；其他 dtype 在资格表中另定阈值。确定性模式重复运行须满足
   baseline 的确定性/报错合同，不能用平均正确掩盖竞态。
@@ -307,16 +312,17 @@ device events 的 end 位于全部 side streams join 后；不把 kernel 时长�
 
 ## 9. 分阶段交付与停止规则
 
-1. **R26-A 基线与单 kernel**：真实资格/数值/设备计时，优化 EmbeddingBag kernel，
-   模型和原 stream 不变。这是首先争取收益且最少新增主机同步的路径。
-2. **R26-B 通用边界与 host 成本**：effect registry、入口覆盖、lease/mutation、serial
-   shadow DAG；合并验证、任务/event pool、分离通知。先把 W1 与 O 的开销差压到门槛内。
-3. **R26-C 两条内部 stream**：完成新生命周期合同后，仅已证明独立的节点并行；
-   无依赖宽度或带宽已满就选原路径，逐算子扩域，不按模型名特判。
-4. **R26-D 多表融合**：仅同族独立 ready 节点、保留输出映射；默认不等待未来未知
+1. **基线与通用边界**：测原 Embedding→Cat/View→BMM→Index→Cat→Top 的整链，
+   建立 effect registry、入口覆盖、lease/mutation、serial shadow DAG。
+2. **PTA 联合调度**：在原消费 stream 之外从两条 side stream 开始，独立 Embedding
+   分流，Cat 以已发布 tail event 汇合，Interaction 原 kernel 链连续消费。
+   host Prepare 保持 off；未知 route 正确回退，不按模型名特判。
+3. **可选 K**：只有真实证据表明现有 kernel 内部是瓶颈，才改目标 kernel/tiling，
+   另设 K/O 对照，不作为 PTA-only 实现前置。
+4. **可选融合**：仅同族独立 ready 节点、保留输出映射；默认不等待未来未知
    eager 调用。任何 batching 等待预算必须单独实验并在观察边界 flush。
 
 数值错误、竞态、缺依赖、重复提交、提前释放、丢唤醒/死锁、不能确认 completion、
-或未资格 SDK 一律阻断对应模式。P/B 未通过不妨碍 K 单独验证；没有真 NPU 时完成
+或未资格 SDK 一律阻断对应模式。P/K 未通过不妨碍独立评估 S；没有真 NPU 时完成
 CPU/hostsim 合同与工具，真实 kernel 和设备调度保持未资格。代码、证据和默认开关
 不能把“待真机验证”改写成“已保证没有同步问题”。
