@@ -82,6 +82,7 @@ from torchnpugen.gen_functionalization_type import (
     gen_functionalization_registration,
 )
 from torchnpugen.gen_npu_c_shim import gen_npu_c_shim_files
+from torchnpugen.eager_parallel import wrap_entry_body
 from torchnpugen.utils import (
     DEVICE_NOCHECK_SET,
     field_tag,
@@ -780,6 +781,7 @@ def gen_dispatcher_registrations(
 #include "torch_npu/csrc/core/npu/NPUGuard.h"
 #include "torch_npu/csrc/core/npu/NpuVariables.h"
 #include "torch_npu/csrc/core/npu/NPUException.h"
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #ifndef BUILD_LIBTORCH
 #include "torch_npu/csrc/profiler/utils.h"
 #endif
@@ -1116,7 +1118,9 @@ return {sig.name()}({", ".join(e.expr for e in translate(cpp_sig.arguments(), si
             )
 
     sig_body.append(gen_npu_structured_return_with_op_hook(f, sig, npu_structured_return_expr(f, k)))
-    sig_body_str = "\n".join(sig_body)
+    sig_body_str = wrap_entry_body(
+        f"aten::{f.func.name}", "structured", sig.returns_type().cpp_type(),
+        [argument.name for argument in sig.arguments()], "\n".join(sig_body))
 
     return f"""\
 {self.gen_class(

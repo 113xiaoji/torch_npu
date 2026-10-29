@@ -3,6 +3,7 @@
 #include <ATen/ATen.h>
 
 #include "torch_npu/csrc/core/npu/NPUStream.h"
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #include "torch_npu/csrc/core/npu/interface/AsyncTaskQueueInterface.h"
 #include "torch_npu/csrc/framework/utils/NpuUtils.h"
 #include "torch_npu/csrc/framework/FormatHelper.h"
@@ -23,6 +24,7 @@ static void storage_resize_npu(
     c10::IntArrayRef new_size,
     bool force_refresh = false)
 {
+    c10_npu::eager_parallel::Boundary("storage.resize");
     if (!storage.resizable()) {
         TORCH_CHECK(false, "Trying to resize storage that is not resizable", OPS_ERROR(ErrCode::NOT_SUPPORT));
         return;

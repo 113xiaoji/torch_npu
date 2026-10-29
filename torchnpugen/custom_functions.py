@@ -16,6 +16,7 @@ from torchgen.api import cpp
 from torchgen.dest.register_dispatch_key import RegisterDispatchKey
 from torchnpugen.utils import (enable_opplugin, is_op_valid, field_tag, get_opplugin_wrap_name, parse_npu_yaml,
                            gen_op_hook_post_code)
+from torchnpugen.eager_parallel import wrap_entry_body
 
 
 # Parse native_functions.yaml into a sequence of NativeFunctions and Backend Indices.
@@ -77,13 +78,17 @@ def parse_custom_yaml(custom_path: str, tag_path: str) -> ParsedYaml:
 
 METHOD_DEFINITION = CodeTemplate("""\
 ${return_type} ${name}(${args_str}) {
+  ${entry_body}
+}
+
+""")
+
+ENTRY_BODY = CodeTemplate("""\
   ${unpack_out}
   ${unsafe_tensor_check}
   ${device_check}
   ${device_guard}
   ${type_definition_body}
-}
-
 """)
 
 TRACE_DISPATCH = CodeTemplate("""\
@@ -195,16 +200,21 @@ if (C10_UNLIKELY(at_npu::native::env::CheckOpHookEnable())) {{
 }}
 """
 
-    return [METHOD_DEFINITION.substitute(
-        return_type=out_return_type if out_num > 1 else cpp.returns_type(f.func.returns).cpp_type(),
-        name=name,
-        args_str=','.join(a.defn() for a in args[:-out_num]) + ', at::TensorList out' if out_num > 1 else args_str,
+    return_type = out_return_type if out_num > 1 else cpp.returns_type(f.func.returns).cpp_type()
+    entry_arguments = ([argument.name for argument in args[:-out_num]] + ['out']
+                       if out_num > 1 else [argument.name for argument in args])
+    entry_body = ENTRY_BODY.substitute(
         unpack_out=unpack_out,
         unsafe_tensor_check=unsafe_tensor_check,
         device_check=device_check,
         device_guard=device_guard,
         type_definition_body=[TRACE_DISPATCH.substitute(impl_name=impl_name, args_exprs_str=args_exprs_str,
-                                                        op_hook_check=op_hook_check)]
+                                                        op_hook_check=op_hook_check)])
+    return [METHOD_DEFINITION.substitute(
+        return_type=return_type,
+        name=name,
+        args_str=','.join(a.defn() for a in args[:-out_num]) + ', at::TensorList out' if out_num > 1 else args_str,
+        entry_body=wrap_entry_body(f'npu::{op_key}', 'dispatcher', return_type, entry_arguments, entry_body)
     )]
 
 

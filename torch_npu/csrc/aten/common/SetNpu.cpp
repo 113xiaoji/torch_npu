@@ -1,4 +1,5 @@
 #include "torch_npu/csrc/aten/common/SetNpu.h"
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 
 namespace at_npu {
 namespace native {
@@ -11,6 +12,7 @@ void set_storage_nd_npu(
     c10::IntArrayRef size,
     c10::IntArrayRef stride)
 {
+    c10_npu::eager_parallel::Boundary("tensor.set_storage");
     // Flush pending DVM ops on self's current storage before replacing it —
     // if self holds the last reference, the old storage will be freed.
     auto *old_impl = self.storage().unsafeGetStorageImpl();

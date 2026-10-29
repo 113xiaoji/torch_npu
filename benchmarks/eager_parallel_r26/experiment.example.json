@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "modes": ["O", "B", "E", "EI"],
+  "rounds": 10,
+  "samples": 200,
+  "warmup": 20,
+  "minimum_window_seconds": 2,
+  "host_prepare": false,
+  "side_streams": 2
+}

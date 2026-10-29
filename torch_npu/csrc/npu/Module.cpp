@@ -57,6 +57,7 @@
 #include <torch_npu/csrc/npu/DataParallelComm.h>
 #include <torch_npu/csrc/npu/Module.h>
 #include <torch_npu/csrc/npu/EagerPreparePython.h>
+#include <torch_npu/csrc/npu/EagerParallelPython.h>
 #include <torch_npu/csrc/npu/NPUPluggableAllocator.h>
 #include <torch_npu/csrc/npu/NPURecovery.h>
 #include <torch_npu/csrc/npu/Stream.h>
@@ -2582,6 +2583,9 @@ PyObject* THNPModule_hasPrimaryContext_wrap(PyObject* self, PyObject* arg) {
 
 static struct PyMethodDef THNPModule_methods[] = {
     {"_npu_eager_prepare_configure", (PyCFunction)THNPModule_eagerPrepareConfigure, METH_VARARGS, nullptr},
+    {"_npu_eager_parallel_configure", (PyCFunction)THNPModule_eagerParallelConfigure, METH_VARARGS, nullptr},
+    {"_npu_eager_parallel_snapshot", (PyCFunction)THNPModule_eagerParallelSnapshot, METH_NOARGS, nullptr},
+    {"_npu_eager_parallel_drain_close", (PyCFunction)THNPModule_eagerParallelDrainClose, METH_NOARGS, nullptr},
     {"_npu_eager_prepare_snapshot", (PyCFunction)THNPModule_eagerPrepareSnapshot, METH_NOARGS, nullptr},
     {"_npu_eager_prepare_drain_close", (PyCFunction)THNPModule_eagerPrepareDrainClose, METH_NOARGS, nullptr},
     {"_npu_init", (PyCFunction)THNPModule_initExtension, METH_NOARGS, nullptr},

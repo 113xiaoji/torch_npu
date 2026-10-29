@@ -5,6 +5,7 @@
 #include "third_party/acl/inc/acl/acl_base.h"
 #include "third_party/acl/inc/acl/acl_rt.h"
 #include "torch_npu/csrc/core/npu/NPUStream.h"
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #include "torch_npu/csrc/framework/utils/CalcuOpUtil.h"
 #include "torch_npu/csrc/aten/NPUNativeFunctions.h"
 
@@ -13,6 +14,7 @@ namespace native {
 
 c10::Scalar NPUNativeFunctions::_local_scalar_dense(const at::Tensor& self)
 {
+    c10_npu::eager_parallel::Boundary("tensor.item");
     c10::Scalar r;
     TORCH_CHECK(self.numel() > 0, "_local_scalar_dense(): Empty tensor not supported");
     AT_DISPATCH_V2(

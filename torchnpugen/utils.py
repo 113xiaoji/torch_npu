@@ -26,6 +26,7 @@ from typing_extensions import assert_never
 
 import torch
 import yaml
+from torchnpugen.eager_parallel import wrap_entry_body
 from torchgen.api import cpp
 from torchgen.api.translate import translate
 from torchgen.api.types import Binding, CppSignatureGroup, kernel_signature
@@ -594,10 +595,9 @@ if (C10_UNLIKELY(at_npu::native::env::CheckOpHookEnable())) {{
     return {impl_name}({args_exprs_str});
 """
 
-            return f"""\
-namespace {{
-
-{returns_type} {name}({args_str}) {{
+            entry_body = wrap_entry_body(
+                f"aten::{op_key}", "dispatcher", returns_type,
+                [argument.name for argument in args], f"""
 {device_check}
 {unsafe_tensor_check}
 {device_guard}
@@ -605,6 +605,12 @@ namespace {{
 {record_func_def}
 {op_hook_check}
 {return_code}
+""")
+            return f"""\
+namespace {{
+
+{returns_type} {name}({args_str}) {{
+{entry_body}
 }}
 
 }} // anonymous namespace
@@ -906,8 +912,12 @@ ${native_kernels}
                 f.func, prefix="", symint=kernel_name.endswith("symint")
             )
             args_exprs_str = ", ".join(a.name for a in sig.arguments())
+            entry_body = wrap_entry_body(
+                f"aten::{f.func.name}", "native_shared", sig.returns_type().cpp_type(),
+                [argument.name for argument in sig.arguments()],
+                f"return at::native::{kernel_name}({args_exprs_str});")
             return f"""{sig.decl(name=wrap_func_name)} {{
-    return at::native::{kernel_name}({args_exprs_str});
+    {entry_body}
 }}
 """
 

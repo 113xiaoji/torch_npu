@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "base_commit": "312921458e7d396c54a1e92e90385d7d5f02dede",
+  "files": {
+    "torchnpugen/eager_parallel.py": {
+      "bytes": 371,
+      "sha256": "0b759c1f74bcd3484e14bbc9ed919c35f01c590c363163c6687d11571adedc54",
+      "base_sha256": null
+    },
+    "torchnpugen/gen.py": {
+      "bytes": 17352,
+      "sha256": "80bea13b30cd4444eeb4b7ace7e8d88b88f38c2840a9253d85726c4c7f65700f",
+      "base_sha256": "2ec5a5a22a1aca2fa18759a332142a8e8943b03f21138ab91bd958e09f535397"
+    },
+    "torchnpugen/templates/OpInterface.cpp": {
+      "bytes": 817,
+      "sha256": "c79df9a3467e79d50260b77a465c9a38cbdee315d6cfe6bd3c7249e71de87578",
+      "base_sha256": "706c67dce9d91e565a419cbef9a15a0f991e42d8174cd4fbe4ded305bfdca7e6"
+    }
+  }
+}
