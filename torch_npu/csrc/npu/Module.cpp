@@ -9,6 +9,7 @@
 #include <unordered_map>
 
 #include <ATen/ATen.h>
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #include <ATen/CachedTensorUtils.h>
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/Generator.h>
@@ -838,6 +839,7 @@ void THNPModule_setDevice(int device) {
 PyObject* THNPModule_setDevice_wrap(PyObject* self, PyObject* arg) {
   HANDLE_TH_ERRORS
   int device = THPUtils_unpackLong(arg);
+  c10_npu::eager_parallel::Boundary("device.set");
   torch_npu::utils::npu_lazy_init();
   NPU_CHECK_ERROR_WITHOUT_UCE(
       c10_npu::NpuSysCtrl::GetInstance().ExchangeDevice(device));
@@ -1172,6 +1174,7 @@ PyObject* THNPModule_setStream_wrap(
     PyObject* args,
     PyObject* kwargs) {
   HANDLE_TH_ERRORS
+  c10_npu::eager_parallel::Boundary("stream.set_current");
   int64_t stream_id = 0;
   int64_t device_index = 0;
   int64_t device_type = 0;

@@ -14,6 +14,7 @@
 #include <utility>
 #include <vector>
 #include "torch_npu/csrc/core/npu/NPUMacros.h"
+#include "torch_npu/csrc/core/npu/eager_parallel/ImmediateInvoke.h"
 
 namespace c10_npu::eager_parallel {
 
@@ -120,6 +121,7 @@ template <class... Args> std::size_t NoThrowTensorCount(const Args&... args) noe
 template <class F, class... Args>
 decltype(auto) Invoke(const char* schema, const char* route, F&& body, const Args&... args)
 {
+    if (RuntimeEnabled()) return InvokeImmediate(schema, route, std::forward<F>(body), args...);
     if (!Enabled()) return std::forward<F>(body)();
     EntryGuard guard(schema, route, detail::NoThrowTensorCount(args...));
     try {

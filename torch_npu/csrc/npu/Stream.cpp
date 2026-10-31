@@ -10,6 +10,7 @@
 #include "torch_npu/csrc/core/npu/sys_ctrl/npu_sys_ctrl.h"
 #include "torch_npu/csrc/npu/Module.h"
 #include "torch_npu/csrc/npu/Stream.h"
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 
 PyObject *THNPStreamClass = nullptr;
 
@@ -89,6 +90,7 @@ static PyObject* THNPStream_get_device(THNPStream *self, void *unused)
 static PyObject* THNPStream_get_npu_stream(THNPStream *self, void *unused)
 {
     HANDLE_TH_ERRORS
+    c10_npu::eager_parallel::Boundary("stream.raw_handle");
     return PyLong_FromVoidPtr(self->npu_stream.stream());
     END_HANDLE_TH_ERRORS
 }

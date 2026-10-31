@@ -1,3 +1,4 @@
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #include "torch_npu/csrc/aten/NPUNativeFunctions.h"
 #include "torch_npu/csrc/core/NPUBridge.h"
 #include "torch_npu/csrc/core/npu/NPUException.h"
@@ -8,6 +9,7 @@ namespace native {
 
 int64_t NPUNativeFunctions::npu_change_data_ptr(const at::Tensor& dst, const at::Tensor& src, int64_t index)
 {
+    c10_npu::eager_parallel::Boundary("tensor.change_data_ptr");
     TORCH_CHECK(
         index >= 0,
         "Expect offset(index) equal or greater than zero, got: ", index, PTA_ERROR(ErrCode::VALUE));

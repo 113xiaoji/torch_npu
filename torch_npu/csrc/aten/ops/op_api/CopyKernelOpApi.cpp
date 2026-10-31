@@ -13,6 +13,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #include <ATen/core/CachingHostAllocator.h>
 
 #include "torch_npu/csrc/core/npu/NPUGuard.h"
@@ -232,6 +233,7 @@ void copy_d2h_baseformat_opapi(at::Tensor& dst, const at::Tensor& src, bool non_
 
 at::Tensor& NPUNativeOpApiFunctions::copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking)
 {
+    c10_npu::eager_parallel::Boundary("tensor.copy");
     DO_COMPATIBILITY(aclnnInplaceCopy, NPUNativeFunctions::copy_(self, src, non_blocking));
     if (self.numel() == 0) {
         return self;

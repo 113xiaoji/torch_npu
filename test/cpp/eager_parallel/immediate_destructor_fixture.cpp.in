@@ -1,0 +1,55 @@
+#include <array>
+#include <cassert>
+#include <iostream>
+#include <memory>
+
+namespace c10_npu::eager_parallel {
+thread_local unsigned internal_depth=0,entry_depth=0;
+unsigned unsafe_releases=0,releases=0,restores=0,failures=0;
+bool poisoned=false;
+struct InternalScope {
+    InternalScope() { ++internal_depth; }
+    ~InternalScope() { --internal_depth; }
+};
+struct Allocation {
+    ~Allocation() {
+        ++releases;
+        // A caching allocator's event bookkeeping calls Boundary here. In the
+        // actual backend this rejected call throws through a noexcept Tensor
+        // destructor; the fixture records that condition without terminating.
+        if(poisoned && !internal_depth) ++unsafe_releases;
+    }
+};
+struct ImmediateGuardImpl {
+    bool finished=true;
+    std::array<std::shared_ptr<Allocation>,4> inputs,outputs;
+    void restore() noexcept { ++restores; }
+};
+class ImmediateGuard {
+public:
+    explicit ImmediateGuard(bool present=true) {
+        if(!present) return;
+        impl_=std::make_unique<ImmediateGuardImpl>();++entry_depth;
+        for(auto& value:impl_->inputs) value=std::make_shared<Allocation>();
+        for(auto& value:impl_->outputs) value=std::make_shared<Allocation>();
+    }
+    ~ImmediateGuard() noexcept;
+    void fail() noexcept { ++failures;impl_->finished=true;poisoned=true; }
+    std::unique_ptr<ImmediateGuardImpl> impl_;
+};
+/*DESTRUCTOR*/
+} // namespace
+int main() {
+    using namespace c10_npu::eager_parallel;
+    poisoned=true;
+    { ImmediateGuard guard; } // recovery completed; guard owns the last references
+    assert(releases==8 && restores==1 && entry_depth==0 && internal_depth==0);
+    assert(unsafe_releases==0);
+    { ImmediateGuard guard;guard.impl_->finished=false; }
+    assert(releases==16 && failures==1 && entry_depth==0 && internal_depth==0);
+    assert(unsafe_releases==0);
+    { ImmediateGuard guard(false); }
+    assert(releases==16 && entry_depth==0 && internal_depth==0);
+    assert(poisoned); // cleanup protection must not reopen failed admission
+    std::cout<<"PASS actual ImmediateGuard destructor: scoped last-reference release and persistent poison\n";
+}

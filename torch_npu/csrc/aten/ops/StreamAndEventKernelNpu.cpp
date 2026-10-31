@@ -1,3 +1,4 @@
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #include "torch_npu/csrc/aten/NPUNativeFunctions.h"
 #include "torch_npu/csrc/core/npu/NPUCachingAllocator.h"
 #include "torch_npu/csrc/core/npu/NPUStreamUtils.h"
@@ -8,6 +9,7 @@ namespace native {
 
 void NPUNativeFunctions::record_stream(at::Tensor& self, c10::Stream stream)
 {
+    c10_npu::eager_parallel::Boundary("tensor.record_stream");
     struct c10::StreamData3 data = stream.pack3();
     auto npu_stream = c10_npu::NPUStream::unpack3(
         data.stream_id, data.device_index, data.device_type);

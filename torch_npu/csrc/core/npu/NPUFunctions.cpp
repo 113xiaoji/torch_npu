@@ -1,3 +1,4 @@
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #include <atomic>
 #include <array>
 #include <mutex>
@@ -271,6 +272,7 @@ aclError DestroyUsedStreams()
 
 aclError SynchronizeUsedDevices()
 {
+    c10_npu::eager_parallel::Boundary("device.synchronize_used");
     int32_t cur_device = 0;
     NPU_CHECK_ERROR_WITHOUT_UCE(GetDevice(&cur_device));
     std::lock_guard<std::recursive_mutex> lock(mtx);
@@ -361,6 +363,7 @@ void set_device(c10::DeviceIndex device)
 
 void device_synchronize()
 {
+    c10_npu::eager_parallel::Boundary("device.synchronize");
     NPU_CHECK_ERROR_WITHOUT_UCE(c10_npu::acl::AclrtSynchronizeDeviceWithTimeout());
 #ifndef BUILD_LIBTORCH
     const c10_npu::impl::PyCallbackTrigger* trigger = c10_npu::impl::NPUTrace::getTrace();

@@ -1,3 +1,4 @@
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #include "torch_npu/csrc/core/npu/NPUEvent.h"
 #include "torch_npu/csrc/core/npu/NPUCachingAllocator.h"
 #include "torch_npu/csrc/core/npu/NPUFunctions.h"
@@ -83,6 +84,7 @@ NPUEvent& NPUEvent::operator=(NPUEvent&& other)
 
 bool NPUEvent::query() const
 {
+    c10_npu::eager_parallel::Boundary("event.query");
     if (!is_created_) {
         return true;
     }
@@ -114,6 +116,7 @@ void NPUEvent::recordOnce(const NPUStream& stream)
 
 void NPUEvent::record(const NPUStream& stream)
 {
+    c10_npu::eager_parallel::Boundary("event.record");
     c10_npu::detail::checkNotExternalStream(stream, "NPUEvent::record");
     if (!is_created_) {
         createEvent(stream.device_index());
@@ -133,6 +136,7 @@ void NPUEvent::record(const NPUStream& stream)
 
 void NPUEvent::block(const NPUStream& stream)
 {
+    c10_npu::eager_parallel::Boundary("event.wait");
     c10_npu::detail::checkNotExternalStream(stream, "NPUEvent::block");
     if (is_created_) {
         // If using multiple task queues or using IPC events across devices in a single process,
@@ -158,6 +162,7 @@ void NPUEvent::block(const NPUStream& stream)
 
 float NPUEvent::elapsed_time(const NPUEvent& other) const
 {
+    c10_npu::eager_parallel::Boundary("event.elapsed_time");
     TORCH_CHECK(is_created_ && other.isCreated(),
         "Both events must be recorded before calculating elapsed time.",
         PTA_ERROR(ErrCode::INTERNAL));
@@ -184,6 +189,7 @@ float NPUEvent::elapsed_time(const NPUEvent& other) const
 
 uint64_t NPUEvent::recorded_time() const
 {
+    c10_npu::eager_parallel::Boundary("event.recorded_time");
     TORCH_CHECK(is_created_, "Event must be recorded before getting recorded timestamp.", PTA_ERROR(ErrCode::INTERNAL));
     NPUStatus ret = c10_npu::emptyAllNPUStream();
     if (ret != NPU_STATUS_SUCCESS) {
@@ -205,6 +211,7 @@ uint64_t NPUEvent::recorded_time() const
 
 void NPUEvent::synchronize() const
 {
+    c10_npu::eager_parallel::Boundary("event.synchronize");
     if (is_created_) {
         bool task_queue_enable = c10_npu::option::OptionsManager::GetTaskQueueEnable();
         if (task_queue_enable) {
@@ -225,6 +232,7 @@ void NPUEvent::synchronize() const
 
 void NPUEvent::reset(const NPUStream& stream) const
 {
+    c10_npu::eager_parallel::Boundary("event.reset");
     if (!c10_npu::acl::IsExistValueWaitAndWrite() && is_created_) {
         TORCH_CHECK(flags_ == ACL_EVENT_EXTERNAL,
                     "API reset() only support ACL_EVENT_EXTERNAL flag event.", PTA_ERROR(ErrCode::INTERNAL));
@@ -236,6 +244,7 @@ void NPUEvent::reset(const NPUStream& stream) const
 // Note: AclIpcGetEventHandle must be called on the same device as the event
 void NPUEvent::ipc_handle(aclrtIpcEventHandle* handle)
 {
+    c10_npu::eager_parallel::Boundary("event.ipc_handle");
     if (!is_created_) {
         // this NPUEvent object was initially constructed from flags but event_
         // is not created yet.

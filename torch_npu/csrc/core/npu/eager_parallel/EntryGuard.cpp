@@ -6,6 +6,15 @@
 namespace c10_npu::eager_parallel {
 namespace {
 std::atomic<EntryDiagnostics*> active_diagnostics{nullptr};
+std::atomic<bool> immediate_selected{false};
+std::atomic_flag control_reserved = ATOMIC_FLAG_INIT;
+struct ControlReservation {
+    ControlReservation() {
+        if (control_reserved.test_and_set(std::memory_order_acquire))
+            throw std::logic_error("concurrent eager-parallel lifecycle call rejected");
+    }
+    ~ControlReservation() { control_reserved.clear(std::memory_order_release); }
+};
 EntryDiagnostics& diagnostics() {
     // Configuration allocates this process-lifetime diagnostic domain. Disabled
     // operator entries never allocate, including first use during module import.
@@ -26,11 +35,13 @@ std::string quoted(const std::string& value) {
     out << '"';return out.str();
 }
 }
+std::string SnapshotImpl();
 bool Enabled() noexcept {
     auto* value=active_diagnostics.load(std::memory_order_acquire);
     return value && value->enabled();
 }
 void Boundary(const char* reason) {
+    if (RuntimeEnabled()) ImmediateBoundary(reason);
     auto* value=active_diagnostics.load(std::memory_order_acquire);
     if(value) value->boundary(reason);
 }
@@ -58,10 +69,25 @@ void EntryGuard::fail(std::exception_ptr error) noexcept {
     finished_=true;
 }
 std::string Configure(bool enabled,const std::string& mode,uint64_t streams,uint64_t capacity,uint64_t bytes) {
+    ControlReservation reservation;
+    if (mode == "e" || mode == "ei") {
+        if (Enabled()) throw std::logic_error("close the native shadow domain first");
+        auto result = ImmediateConfigure(enabled,mode,streams,capacity,bytes);
+        immediate_selected.store(true,std::memory_order_release);
+        return result;
+    }
+    if (RuntimeEnabled()) throw std::logic_error("close the native execution domain first");
     if (mode!="shadow" || streams!=2) throw std::invalid_argument("only original-stream shadow diagnostics is available; device execution is not qualified");
-    diagnostics().configure(enabled,capacity,bytes);return Snapshot();
+    diagnostics().configure(enabled,capacity,bytes);
+    immediate_selected.store(false,std::memory_order_release);
+    return SnapshotImpl();
 }
 std::string Snapshot() {
+    ControlReservation reservation;
+    return SnapshotImpl();
+}
+std::string SnapshotImpl() {
+    if (immediate_selected.load(std::memory_order_acquire)) return ImmediateSnapshot();
     const auto s=diagnostics().snapshot();std::ostringstream out;
     out << "{\"schema\":1,\"backend\":\"shadow\",\"mode\":\"shadow\",\"enabled\":" << (s.enabled?"true":"false")
         << ",\"real_sdk_qualified\":false,\"device_parallel_qualified\":false,\"host_workers\":0"
@@ -93,5 +119,9 @@ std::string Snapshot() {
         << (s.closed && s.active==0?"true":"false") << "}}";
     return out.str();
 }
-std::string DrainClose() { diagnostics().close();return Snapshot(); }
+std::string DrainClose() {
+    ControlReservation reservation;
+    if (immediate_selected.load(std::memory_order_acquire)) return ImmediateDrainClose();
+    diagnostics().close();return SnapshotImpl();
+}
 } // namespace c10_npu::eager_parallel

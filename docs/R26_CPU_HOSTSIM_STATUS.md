@@ -1,5 +1,8 @@
 # R26 CPU/host-sim implementation checkpoint
 
+后续见 [R27 实际执行与 E2E 报告](R27_HOST_E2E.md)：实际 E/EI 已接入，新数值
+host-sim 上通过验证，但12轮配对延迟分别增加43.25%/43.18%。下文是 R26 历史 checkpoint。
+
 This checkpoint implements and tests the SDK-independent dependency protocol,
 joint feature-pipeline simulator, CPU references and native entry diagnostics.
 It does **not** enable or claim production NPU side-stream scheduling. The user

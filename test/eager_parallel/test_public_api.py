@@ -36,6 +36,26 @@ class PublicApiTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'native eager-parallel binding'):
             bridge.configure(enabled=True)
 
+    def test_e_and_ei_reach_native_without_emulating_execution(self):
+        calls = []
+        extension = types.SimpleNamespace(_npu_eager_parallel_configure=lambda *args:
+            calls.append(args) or json.dumps({'schema': 1, 'mode': args[1]}))
+        bridge = self.load_bridge(extension)
+        with torch.inference_mode():
+            for mode in ('e', 'ei'):
+                self.assertEqual(bridge.configure(enabled=True, mode=mode)['mode'], mode)
+        self.assertEqual([row[:3] for row in calls], [(True, 'e', 2), (True, 'ei', 2)])
+
+    def test_execution_mode_requires_inference_before_native_configuration(self):
+        calls = []
+        extension = types.SimpleNamespace(_npu_eager_parallel_configure=lambda *args:
+            calls.append(args) or '{"schema":1}')
+        bridge = self.load_bridge(extension)
+        for mode in ('e', 'ei'):
+            with self.assertRaisesRegex(RuntimeError, 'inference_mode'):
+                bridge.configure(enabled=True, mode=mode)
+        self.assertEqual(calls, [])
+
     def test_unsupported_mode_and_invalid_limits_never_enter_native(self):
         bridge = self.load_bridge(types.SimpleNamespace())
         for kwargs in ({'mode': 'parallel'}, {'streams': 3}, {'capacity': 0}, {'byte_limit': 0}):

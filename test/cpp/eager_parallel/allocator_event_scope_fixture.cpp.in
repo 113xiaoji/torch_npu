@@ -1,0 +1,71 @@
+#include <atomic>
+#include <cassert>
+#include <cstring>
+#include <exception>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <thread>
+
+namespace c10_npu::eager_parallel {
+thread_local unsigned internal_depth=0,qualified_body_depth=0;
+struct Protocol { bool bad=true; void poison(){bad=true;} };
+struct State {
+    std::atomic<bool> enabled{true};
+    Protocol protocol;
+    std::thread::id owner=std::this_thread::get_id();
+    std::shared_ptr<State> quarantine_anchor;
+    std::shared_ptr<int> allocation=std::make_shared<int>(73);
+    unsigned boundaries=0,recoveries=0,drains=0;
+    const char* first_error="first launch error";
+    void check_owner(){if(owner!=std::this_thread::get_id())throw std::runtime_error("foreign admission");}
+    void check_healthy(){if(protocol.bad)throw std::runtime_error(first_error);}
+    void drain(){++drains;}
+    void remember(const char*){}
+    bool recover(){++recoveries;return false;}
+};
+auto current=std::make_shared<State>();
+std::shared_ptr<State> state(){return current;}
+class AllocatorEventScope {
+public:
+    AllocatorEventScope() noexcept;
+    ~AllocatorEventScope() noexcept;
+};
+/*SCOPE_CONSTRUCTOR*/
+/*SCOPE_DESTRUCTOR*/
+/*BOUNDARY*/
+struct FakeEvent {
+    bool fail=false;
+    unsigned calls=0;
+    void record(int) { ImmediateBoundary("event.record");++calls;if(fail)throw std::runtime_error("SDK record error"); }
+    bool query() { ImmediateBoundary("event.query");++calls;if(fail)throw std::runtime_error("SDK query error");return true; }
+};
+/*CALL_SITES*/
+} // namespace
+int main() {
+    using namespace c10_npu::eager_parallel;
+    auto allocation=current->allocation;
+    FakeEvent event;
+    for(auto operation:operations) {
+        bool reached=false;
+        try { operation(&event); reached=true; } catch(...) {}
+        assert(reached); // poisoned admission must not stop allocator housekeeping
+        assert(internal_depth==0);
+        event.fail=true;
+        bool sdk_error=false;
+        try { operation(&event); }
+        catch(const std::runtime_error& error) {sdk_error=std::strstr(error.what(),"SDK ")==error.what();}
+        assert(sdk_error && internal_depth==0); // SDK errors are never swallowed by the scope
+        event.fail=false;
+        std::thread cleanup([&]{ operation(&event);assert(internal_depth==0); });
+        cleanup.join();
+        bool rejected=false;
+        try { ImmediateBoundary("event.record"); }
+        catch(const std::runtime_error& error) {rejected=std::strcmp(error.what(),"first launch error")==0;}
+        assert(rejected); // the same public operation remains fail-closed
+    }
+    assert(event.calls==21 && current->boundaries==0 && current->drains==0 && current->recoveries==0);
+    assert(current->protocol.bad && current->allocation==allocation && *allocation==73);
+    assert(std::strcmp(current->first_error,"first launch error")==0);
+    std::cout<<"PASS actual allocator event scopes: 7 call sites, SDK errors preserved, foreign cleanup safe, admission poisoned\n";
+}

@@ -27,6 +27,7 @@
 #include "torch_npu/csrc/core/npu/NPUCachingAllocator.h"
 #include "torch_npu/csrc/core/npu/EagerPrepare.h"
 #include "torch_npu/csrc/core/npu/EagerPrepareStorage.h"
+#include "torch_npu/csrc/core/npu/eager_parallel/AllocatorEventScope.h"
 #include "torch_npu/csrc/core/npu/NPUAllocatorConfig.h"
 #include "torch_npu/csrc/core/npu/NPUWorkspaceAllocator.h"
 #include "torch_npu/csrc/core/npu/NPURecovery.h"
@@ -3376,7 +3377,10 @@ private:
             NPU_CHECK_ERROR(c10_npu::SetDevice(stream.device_index()));
 
             EventPool::Event event = create_event_internal(stream.device_index());
-            event->record(stream);
+            {
+                c10_npu::eager_parallel::AllocatorEventScope event_scope;
+                event->record(stream);
+            }
             TORCH_NPU_MEMORY_LOGI("Event: record DeviceAllocator is successfully executed, event=%p", event.get());
 
             block->event_count++;
@@ -3423,7 +3427,12 @@ private:
                 EventPool::Event event = std::move(e.first);
                 Block *block = e.second;
 
-                if (!event->query()) {
+                bool isEventCompleted = false;
+                {
+                    c10_npu::eager_parallel::AllocatorEventScope event_scope;
+                    isEventCompleted = event->query();
+                }
+                if (!isEventCompleted) {
                     e.first = std::move(event);
                     break;
                 }

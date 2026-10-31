@@ -1,3 +1,4 @@
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #include <ATen/ATen.h>
 #include <ATen/core/CachingHostAllocator.h>
 
@@ -438,6 +439,7 @@ bool try_to_optimize_copy_with_any_format(at::Tensor& self, const at::Tensor& sr
 
 at::Tensor& NPUNativeFunctions::copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking)
 {
+    c10_npu::eager_parallel::Boundary("tensor.copy");
     if (self.numel() == 0) {
         return self;
     }

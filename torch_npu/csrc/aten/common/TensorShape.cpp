@@ -162,6 +162,7 @@ const at::Tensor& NPUNativeFunctions::as_strided__symint(
     c10::SymIntArrayRef stride,
     c10::optional<c10::SymInt> storage_offset_)
 {
+    c10_npu::eager_parallel::Boundary("tensor.as_strided_");
     auto ks = self.key_set();
     bool is_fake_or_meta = ks.has_all(c10::DispatchKeySet(c10::BackendComponent::MetaBit)) ||
                            ks.has_all(c10::DispatchKeySet(c10::DispatchKey::Python)) ||

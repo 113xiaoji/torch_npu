@@ -1,4 +1,5 @@
 #pragma GCC visibility push(default)
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #include <chrono>
 #include <thread>
 #include <torch/csrc/jit/serialization/pickler.h>
@@ -147,6 +148,7 @@ void NPUGuardImpl::destroyEvent(void *event, const c10::DeviceIndex device_index
 void NPUGuardImpl::record(void **event, const c10::Stream &stream, const c10::DeviceIndex device_index,
                           const c10::EventFlag flag) const
 {
+    c10_npu::eager_parallel::Boundary("event.record");
     TORCH_CHECK(device_index == -1 || device_index == stream.device_index(), "Event device index ", device_index,
                 " does not match recording stream's device index ", stream.device_index(), ".",
                 PTA_ERROR(ErrCode::PARAM));
@@ -174,6 +176,7 @@ void NPUGuardImpl::record(void **event, const c10::Stream &stream, const c10::De
 
 void NPUGuardImpl::block(void *event, const c10::Stream &stream) const
 {
+    c10_npu::eager_parallel::Boundary("event.wait");
     if (!event) {
         return;
     }
@@ -195,6 +198,7 @@ void NPUGuardImpl::block(void *event, const c10::Stream &stream) const
 // May be called from any device
 bool NPUGuardImpl::queryEvent(void *event) const
 {
+    c10_npu::eager_parallel::Boundary("event.query");
     if (!event) {
         return true;
     }
@@ -223,6 +227,7 @@ void NPUGuardImpl::synchronizeStream(const c10::Stream& stream) const
 
 void NPUGuardImpl::synchronizeEvent(void* event) const
 {
+    c10_npu::eager_parallel::Boundary("event.synchronize");
     if (!event) {
         return;
     }

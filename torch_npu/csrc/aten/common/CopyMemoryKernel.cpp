@@ -1,3 +1,4 @@
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #include <ATen/ATen.h>
 
 #include "torch_npu/csrc/core/npu/NPUException.h"
@@ -15,6 +16,7 @@ namespace native {
 
 at::Tensor& NPUNativeFunctions::copy_memory_(at::Tensor& self, const at::Tensor& src, bool non_blocking)
 {
+    c10_npu::eager_parallel::Boundary("tensor.copy_memory");
     c10_npu::NPUGuard guard(src.device());
     AT_ASSERT(torch_npu::utils::is_npu(src), "copy_memory_ only support npu tensor", OPS_ERROR(ErrCode::PARAM));
     AT_ASSERT(

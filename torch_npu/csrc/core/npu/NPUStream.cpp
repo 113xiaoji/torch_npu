@@ -1,3 +1,4 @@
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #include "torch_npu/csrc/core/npu/HostRegionCapture.h"
 #include "torch_npu/csrc/core/npu/EagerPrepare.h"
 #include <array>
@@ -420,6 +421,7 @@ NPUStream NPUStream_fromInternals(const LeakyStreamInternals* ptr)
 
 bool NPUStream::query() const
 {
+    c10_npu::eager_parallel::Boundary("stream.query");
     host_regions::RejectEffect("bool NPUStream::query() const");
     TORCH_CHECK(!isExternalStreamId(this->id()),
         "Cannot query external NPU stream status. "
@@ -436,6 +438,7 @@ bool NPUStream::query() const
 
 void NPUStream::synchronize() const
 {
+    c10_npu::eager_parallel::Boundary("stream.synchronize");
     TORCH_CHECK(!eager_prepare::NativeJobActive(),"eager Prepare native jobs cannot synchronize their own execution stream");
     host_regions::RejectEffect("void NPUStream::synchronize() const");
     TORCH_CHECK(!isExternalStreamId(this->id()),
@@ -747,6 +750,7 @@ void setDefaultStreamsStatus(c10::DeviceIndex device_index, RepoStatus status)
 
 bool npuSynchronizeDevice(bool check_error)
 {
+    c10_npu::eager_parallel::Boundary("device.synchronize");
     host_regions::RejectEffect("bool npuSynchronizeDevice(bool check_error)");
     ASCEND_LOGD("npuSynchronizeDevice start, check_error=%d.", check_error);
     if (c10_npu::option::OptionsManager::GetTaskQueueEnable()) {
@@ -777,6 +781,7 @@ bool npuSynchronizeDevice(bool check_error)
 
 bool npuSynchronizeUsedDevices(bool check_error)
 {
+    c10_npu::eager_parallel::Boundary("device.synchronize_used");
     host_regions::RejectEffect("bool npuSynchronizeUsedDevices(bool check_error)");
     if (c10_npu::option::OptionsManager::GetTaskQueueEnable()) {
         NPUStatus ret = c10_npu::emptyAllNPUStream(check_error);

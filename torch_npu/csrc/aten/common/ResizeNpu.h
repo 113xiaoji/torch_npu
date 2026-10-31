@@ -134,6 +134,7 @@ inline at::TensorImpl* resize_impl_npu_(
     c10::IntArrayRef size,
     c10::optional<c10::IntArrayRef> stride)
 {
+    c10_npu::eager_parallel::Boundary("tensor.resize");
     if (self->sizes() == size && (!stride || self->strides() == stride)) {
         return self;
     }

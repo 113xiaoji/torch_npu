@@ -1,3 +1,4 @@
+#include "torch_npu/csrc/core/npu/eager_parallel/EntryGuard.h"
 #include <ATen/core/dispatch/Dispatcher.h>
 #include <ATen/core/LegacyTypeDispatch.h>
 #include <ATen/native/CPUFallback.h>
@@ -245,6 +246,7 @@ bool has_op_name_warned(const std::string& op_name)
 
 void npu_cpu_fallback(const c10::OperatorHandle& op, torch::jit::Stack* stack)
 {
+    c10_npu::eager_parallel::Boundary("dispatch.cpu_fallback");
     if (!has_op_name_warned(c10::toString(op.schema().operator_name()))) {
         TORCH_NPU_WARN("CAUTION: The operator '",
                        op.schema().operator_name(),

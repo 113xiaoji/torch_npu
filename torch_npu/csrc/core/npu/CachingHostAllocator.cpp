@@ -29,6 +29,7 @@
 
 #include "torch_npu/csrc/core/npu/CachingHostAllocator.h"
 #include "torch_npu/csrc/core/npu/NPUEvent.h"
+#include "torch_npu/csrc/core/npu/eager_parallel/AllocatorEventScope.h"
 
 #include <ATen/core/CachingHostAllocator.h>
 #include <c10/util/flat_hash_map.h>
@@ -346,7 +347,10 @@ private:
             return;
         }
         auto event = create_event_internal(stream.device_index());
-        event->record(stream);
+        {
+            c10_npu::eager_parallel::AllocatorEventScope event_scope;
+            event->record(stream);
+        }
         events->push_back(std::move(event));
     }
 
@@ -357,7 +361,10 @@ private:
             // Query the completion status of the NPU event here. In some runtime scenarios (for example, HBM error),
             // querying the event may throw an exception. In this case, we need to pop the event from the event queue to
             // avoid coredump.
-            isEventCompleted = event->query();
+            {
+                c10_npu::eager_parallel::AllocatorEventScope event_scope;
+                isEventCompleted = event->query();
+            }
         } catch (const std::exception& e) {
             ASCEND_LOGE("query_event() failed, runtime error: %s", e.what());
             isEventCompleted = true;
@@ -961,7 +968,10 @@ private:
             auto& event = processed->first;
             bool isEventCompleted = true;
             try {
-                isEventCompleted = event->query();
+                {
+                    c10_npu::eager_parallel::AllocatorEventScope event_scope;
+                    isEventCompleted = event->query();
+                }
             } catch (...) {
                 ASCEND_LOGE("process_events() query event failed!");
                 // event query failed, pop the event
@@ -991,7 +1001,10 @@ private:
     {
         static auto* event_pool = new EventPool();
         auto event = event_pool->get(stream.device_index());
-        event->record(stream);
+        {
+            c10_npu::eager_parallel::AllocatorEventScope event_scope;
+            event->record(stream);
+        }
         events->push_back(std::move(event));
     }
 
@@ -1002,7 +1015,10 @@ private:
             // Query the completion status of the NPU event here. In some runtime scenarios (for example, HBM error),
             // querying the event may throw an exception. In this case, we need to pop the event from the event queue to
             // avoid coredump.
-            isEventCompleted = event->query();
+            {
+                c10_npu::eager_parallel::AllocatorEventScope event_scope;
+                isEventCompleted = event->query();
+            }
         } catch (const std::exception& e) {
             ASCEND_LOGE("query_event() failed, runtime error: %s", e.what());
             isEventCompleted = true;

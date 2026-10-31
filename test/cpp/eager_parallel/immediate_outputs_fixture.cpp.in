@@ -1,0 +1,128 @@
+#include <array>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <exception>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <utility>
+#include <vector>
+
+struct Tracked {
+    explicit Tracked(unsigned value):id(value) { ++live; }
+    ~Tracked() { --live; }
+    unsigned id;
+    static unsigned live;
+};
+unsigned Tracked::live=0;
+namespace at { using Tensor=std::shared_ptr<Tracked>; }
+namespace c10_npu::eager_parallel {
+enum class Kind { Embedding, Cat, Bmm, Index };
+constexpr std::size_t kMaxOutputs=4;
+int audit_failure=-1;
+bool native_tensor(const at::Tensor& value) { return static_cast<int>(value->id)!=audit_failure; }
+std::uintptr_t key(const at::Tensor& value) { return value->id; }
+struct Protocol {
+    bool bad=false,fail_commit=false;
+    void commit(const std::uintptr_t*,std::size_t) { if(fail_commit) throw std::runtime_error("record fault"); }
+    void poison() { bad=true; }
+};
+struct State {
+    Protocol protocol;
+    std::array<at::Tensor,4> pending_outputs;
+    std::vector<at::Tensor> owners;
+    std::shared_ptr<State> quarantine_anchor;
+    bool recovery_succeeds=false;
+    int retain_failure=-1,use_failure=-1,caller_use_failure=-1;
+    std::vector<std::pair<unsigned,unsigned>> uses;
+    unsigned embedding=0,cat=0,bmm=0,index=0,budget_drains=0,failed=0;
+    std::size_t retained_bytes=0,byte_limit=1024;
+    void retain(const at::Tensor& value) {
+        if(static_cast<int>(value->id)==retain_failure) throw std::runtime_error("owner metadata fault");
+        owners.push_back(value);
+    }
+    void record_use(const at::Tensor& value,unsigned stream) {
+        uses.emplace_back(value->id,stream);
+        if(static_cast<int>(value->id)==use_failure) throw std::runtime_error("allocator stream fault");
+        if(stream==0 && static_cast<int>(value->id)==caller_use_failure) throw std::runtime_error("allocator caller handoff fault");
+    }
+    void check_healthy() { if(protocol.bad) throw std::runtime_error("restore fault"); }
+    void remember(const char*) noexcept {}
+    bool recover() noexcept {
+        if(!recovery_succeeds) return false;
+        owners.clear(); for(auto& output:pending_outputs) output={}; return true;
+    }
+    void drain() { assert(recover()); }
+};
+struct ImmediateGuardImpl {
+    std::shared_ptr<State> state;
+    Kind kind=Kind::Embedding;
+    bool launched=true,finished=false,nested=false,restore_failure=false;
+    unsigned selected=1;
+    std::size_t output_count=0,input_count=0;
+    std::array<at::Tensor,4> outputs;
+    std::array<std::uintptr_t,4> output_keys{},input_keys{};
+    void restore() noexcept { if(restore_failure) state->protocol.poison(); }
+};
+class ImmediateGuard {
+public:
+    explicit ImmediateGuard(std::shared_ptr<State> state):impl_(std::make_unique<ImmediateGuardImpl>()) { impl_->state=std::move(state); }
+    void add_output(const at::Tensor& value);
+    void complete();
+    void fail(std::exception_ptr error) noexcept;
+    std::unique_ptr<ImmediateGuardImpl> impl_;
+};
+/*ADD_OUTPUT*/
+/*COMPLETE*/
+/*FAIL*/
+} // namespace
+
+int main() {
+    using namespace c10_npu::eager_parallel;
+    {
+        auto state=std::make_shared<State>(); state->owners.reserve(4); state->uses.reserve(8);
+        {
+            ImmediateGuard guard(state);
+            for(unsigned i=1;i<=4;++i) guard.add_output(std::make_shared<Tracked>(i));
+            guard.complete();
+            // Returned side allocations must carry both their producer use and
+            // the caller's future asynchronous use before they become visible.
+            assert(state->uses.size()==8);
+            for(unsigned i=0;i<4;++i) {
+                assert(state->uses[2*i]==std::make_pair(i+1,1u));
+                assert(state->uses[2*i+1]==std::make_pair(i+1,0u));
+            }
+        }
+        state->recovery_succeeds=true; assert(state->recover()); assert(Tracked::live==0);
+    }
+    // Execute production add_output/complete/fail bodies with deterministic
+    // injected failures at every output position and a failed completion proof.
+    for(unsigned kind=0;kind<6;++kind) for(unsigned position=1;position<=4;++position) {
+        auto state=std::make_shared<State>(); state->owners.reserve(4); state->uses.reserve(8);
+        {
+            ImmediateGuard guard(state);
+            for(unsigned i=1;i<=4;++i) guard.add_output(std::make_shared<Tracked>(i));
+            assert(Tracked::live==4);
+            if(kind==0) audit_failure=static_cast<int>(position);
+            if(kind==1) state->retain_failure=static_cast<int>(position);
+            if(kind==2) state->use_failure=static_cast<int>(position);
+            if(kind==3) state->protocol.fail_commit=true;
+            if(kind==4) guard.impl_->restore_failure=true;
+            if(kind==5) state->caller_use_failure=static_cast<int>(position);
+            bool threw=false;
+            try { guard.complete(); }
+            catch(...) { threw=true; guard.fail(std::current_exception()); }
+            assert(threw && state->failed==1 && state->quarantine_anchor);
+            for(const auto& output:state->pending_outputs) assert(output);
+            assert(Tracked::live==4);
+        }
+        // Caller result and guard are gone. Every returned allocation remains
+        // owned by quarantine until a later successful completion proof.
+        assert(Tracked::live==4);
+        state->recovery_succeeds=true; assert(state->recover());
+        state->quarantine_anchor.reset(); assert(Tracked::live==0);
+        audit_failure=-1;
+    }
+    std::cout << "PASS actual immediate output caller handoff and capture/failure bodies: 25 scenarios\n";
+}
