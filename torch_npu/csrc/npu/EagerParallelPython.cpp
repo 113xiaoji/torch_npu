@@ -7,12 +7,12 @@ PyObject* THNPModule_eagerParallelConfigure(PyObject*,PyObject* arguments)
 {
     HANDLE_TH_ERRORS
     PyObject *enabled=nullptr,*mode=nullptr;
-    unsigned long long streams=0,capacity=0,bytes=0;
-    if(!PyArg_ParseTuple(arguments,"OOKKK",&enabled,&mode,&streams,&capacity,&bytes)) return nullptr;
+    unsigned long long streams=0,capacity=0,bytes=0,min_embedding_bag_length=0;
+    if(!PyArg_ParseTuple(arguments,"OOKKK|K",&enabled,&mode,&streams,&capacity,&bytes,&min_embedding_bag_length)) return nullptr;
     TORCH_CHECK(PyBool_Check(enabled) && PyUnicode_CheckExact(mode),"native eager-parallel requires bool and plain str");
     const char* name=PyUnicode_AsUTF8(mode);
     if(!name) return nullptr;
-    return THPUtils_packString(c10_npu::eager_parallel::Configure(enabled==Py_True,name,streams,capacity,bytes));
+    return THPUtils_packString(c10_npu::eager_parallel::Configure(enabled==Py_True,name,streams,capacity,bytes,min_embedding_bag_length));
     END_HANDLE_TH_ERRORS
 }
 PyObject* THNPModule_eagerParallelSnapshot(PyObject*,PyObject*)

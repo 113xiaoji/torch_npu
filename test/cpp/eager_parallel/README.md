@@ -51,3 +51,19 @@ Deliberately unresolved event/launch failures enter process-lifetime quarantine.
 storage remains reachable for sanitizers; hiding a leak by releasing an unconfirmed
 allocation would violate the tested protocol. A successful test run does not imply the
 vendor SDK was instrumented by either sanitizer.
+
+
+R31 selective scheduling adds metadata mean-length boundaries (63/64/65,
+include-last-offset, ragged, empty and overflow), storage byte-interval aliases,
+and unique caller-frontier generations to `immediate_protocol_test.cpp`.
+`test_immediate_selective.py` compiles the actual lean caller begin/complete/fail
+bodies with deterministic metadata, body, poisoned-completion and failed-sync
+faults. Its second test compiles the production Invoke template against CPU Torch
+and checks all four results stay alive during recovery, with zero output visits
+on the successful caller path. These tests do not establish NPU kernel numerics.
+
+The isolated Linux `run_immediate_linux_validation.py` runner includes
+`--case selective_caller` for Release/ASan/TSan. Copy both the Python test module
+and `immediate_selective_fixture.cpp.in` into its explicit source tree, alongside
+the existing R27 fixtures. Use a fresh entry probe for the updated
+`immediate_invoke_lifetime_test.cpp`; preexisting probe binaries are insufficient.

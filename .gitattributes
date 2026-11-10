@@ -107,3 +107,8 @@ test/host_regions/eager_prepare_integration/** -text whitespace=trailing-space,s
 
 # Preserve the byte-pinned R29 measured controller.
 benchmarks/eager_parallel_r29/controller.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+
+# Preserve the R31 measured source and MetaSyn fixture bytes on every checkout.
+benchmarks/eager_parallel_r31/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+# Retain the upstream license byte-for-byte, including its final blank line.
+benchmarks/eager_parallel_r31/META_LICENSE -text whitespace=-blank-at-eof

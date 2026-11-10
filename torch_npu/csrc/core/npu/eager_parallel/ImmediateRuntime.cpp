@@ -56,8 +56,8 @@ void check_acl(aclError code, const char* operation)
 }
 class AclBackend final : public ImmediateEventBackend {
 public:
-    explicit AclBackend(std::size_t capacity)
-        : streams{{getDefaultNPUStream(0),getNPUStreamFromPool(0),getNPUStreamFromPool(0),getNPUStreamFromPool(0)}}, events(capacity + 1, nullptr)
+    explicit AclBackend(std::size_t capacity,bool selective=false)
+        : streams{{getDefaultNPUStream(0),getNPUStreamFromPool(0),getNPUStreamFromPool(0),getNPUStreamFromPool(0)}}, events((selective?2*capacity:capacity) + 1, nullptr)
     {
         InternalScope scope;
         for (std::size_t i = 0; i < streams.size(); ++i) {
@@ -128,9 +128,10 @@ struct Owner {
     std::size_t bytes = 0;
 };
 struct State {
-    State(bool interaction, std::size_t capacity, std::size_t limit)
-        : owner(std::this_thread::get_id()), interaction(interaction), capacity(capacity), byte_limit(limit),
-          backend(capacity), protocol(backend,capacity,capacity*kMaxOutputs), owners(capacity*(kMaxInputs+kMaxOutputs)) {}
+    State(bool interaction, std::size_t capacity, std::size_t limit,uint64_t minimum)
+        : owner(std::this_thread::get_id()), interaction(interaction), capacity(capacity), byte_limit(limit), min_embedding_bag_length(minimum),
+          backend(capacity,minimum!=0), protocol(backend,capacity,capacity*kMaxOutputs,minimum!=0),
+          owners(capacity*(kMaxInputs+kMaxOutputs)), output_intervals(minimum?capacity*kMaxOutputs:0) {}
     void check_owner() const {
         if (owner != std::this_thread::get_id()) throw std::runtime_error("immediate E/EI requires one caller; foreign caller rejected before effects");
     }
@@ -144,11 +145,12 @@ struct State {
         InternalScope scope;
         for (std::size_t i=0;i<owner_count;++i) owners[i] = Owner{};
         for (auto& output:pending_outputs) output=at::Tensor{};
-        owner_count=0; retained_bytes=0;
+        for (auto& input:emergency_inputs) input=at::Tensor{};
+        owner_count=0; retained_bytes=0; interval_count=0; emergency_count=0;
     }
-    void drain() {
+    void drain(bool synchronize_caller=false) {
         const bool had_work=protocol.active();
-        protocol.drain(); backend.safe_to_destroy=true; clear_owners(); check_healthy();
+        protocol.drain(synchronize_caller); backend.safe_to_destroy=!protocol.caller_dirty(); clear_owners(); check_healthy();
         if (had_work) ++drains;
     }
     bool recover() noexcept {
@@ -177,12 +179,28 @@ struct State {
         NPUCachingAllocator::recordStream(tensor.storage().data_ptr(),backend.streams.at(stream));
         check_healthy();
     }
+    void cache_output(const at::Tensor& tensor) {
+        if (!min_embedding_bag_length) return;
+        if (interval_count==output_intervals.size()) throw std::runtime_error("immediate output interval capacity exhausted");
+        const auto storage=tensor.storage();
+        output_intervals[interval_count++]=MakeStorageInterval(
+            reinterpret_cast<std::uintptr_t>(storage.data_ptr().get()),storage.nbytes());
+    }
+    void capture_failed_inputs(const at::Tensor* inputs,std::size_t count) noexcept {
+        // Reserved owner slots; handle assignment only, without faulting metadata.
+        for (std::size_t i=0;i<count && owner_count<owners.size();++i)
+            owners[owner_count++].tensor=inputs[i];
+    }
     const std::thread::id owner;
     const bool interaction;
     const std::size_t capacity,byte_limit;
+    const uint64_t min_embedding_bag_length;
     AclBackend backend;
     ImmediateProtocol protocol;
     std::vector<Owner> owners;
+    std::vector<StorageInterval> output_intervals;
+    std::size_t interval_count=0,emergency_count=0;
+    std::array<at::Tensor,3> emergency_inputs;
     // A whole result is captured here without metadata access before output
     // auditing/registration. Failure at output 0 must also retain outputs 1..3.
     std::array<at::Tensor,kMaxOutputs> pending_outputs;
@@ -191,6 +209,7 @@ struct State {
     std::atomic<bool> enabled{true};
     bool closed=false,quarantined=false;
     std::shared_ptr<State> quarantine_anchor;
+    std::uint64_t caller_embedding_small=0,caller_interaction=0,small_dependency_drains=0,policy_uncertain_fallback=0;
     std::uint64_t embedding=0,cat=0,bmm=0,index=0,fallback=0,aliases=0,nested=0,drains=0,budget_drains=0,failed=0,boundaries=0;
 };
 std::shared_ptr<State> current;
@@ -245,7 +264,7 @@ struct ImmediateGuardImpl {
         : state(std::move(s)),kind(classify(schema,state->interaction)) {}
     std::shared_ptr<State> state;
     Kind kind;
-    bool nested=false,begun=false,launched=false,finished=false,switched=false,body_scope=false,disqualified=false;
+    bool nested=false,begun=false,launched=false,caller_body=false,finished=false,switched=false,body_scope=false,disqualified=false;
     unsigned selected=0;
     std::size_t input_count=0,output_count=0;
     std::array<at::Tensor,kMaxInputs> inputs;
@@ -262,6 +281,92 @@ struct ImmediateGuardImpl {
         }
     }
 };
+
+bool ImmediateCallerGuard::begin(const char* schema,const at::Tensor& weight,
+    const at::Tensor& indices,const at::Tensor& offsets,bool include_last_offset)
+{
+    auto s=state();
+    if (!s || !s->enabled.load(std::memory_order_acquire) || !s->min_embedding_bag_length ||
+        classify(schema,false)!=Kind::Embedding) return false;
+    s->check_owner(); s->check_healthy();
+    if (internal_depth) {
+        s->remember("immediate backend callback attempted native reentry"); s->protocol.poison();
+        throw std::runtime_error(s->first_error.data());
+    }
+    if (entry_depth) return false;
+    state_=s; inputs_={weight,indices,offsets}; ++entry_depth; entered_=true;
+    check_environment();
+    if (!weight.defined() || !indices.defined() || !offsets.defined()) {
+        disqualified_=true; ++s->policy_uncertain_fallback; leave(); return false;
+    }
+    const auto length=ClassifyEmbeddingLength(weight.dim(),indices.dim(),offsets.dim(),
+        indices.numel(),offsets.numel(),include_last_offset,s->min_embedding_bag_length);
+    if (length==EmbeddingLengthClass::Large) { leave(); return false; }
+    bool valid=length==EmbeddingLengthClass::Small && !at::GradMode::is_enabled();
+    std::array<StorageInterval,3> ranges{};
+    for (std::size_t i=0;valid && i<inputs_.size();++i) {
+        const auto& t=inputs_[i];
+        valid=native_tensor(t) && (i==0 ? t.scalar_type()==at::kFloat :
+            ((t.scalar_type()==at::kLong || t.scalar_type()==at::kInt) && t.is_contiguous()));
+        if (valid) {
+            const auto storage=t.storage();
+            ranges[i]=MakeStorageInterval(reinterpret_cast<std::uintptr_t>(storage.data_ptr().get()),storage.nbytes());
+            valid=ranges[i].valid;
+        }
+    }
+    if (!valid) {
+        disqualified_=true; ++s->policy_uncertain_fallback; leave(); return false;
+    }
+    bool dependent=false;
+    for (const auto range:ranges) for (std::size_t i=0;i<s->interval_count;++i)
+        if (StorageIntervalsOverlap(range,s->output_intervals[i])) dependent=true;
+    if (dependent) { s->drain(); ++s->small_dependency_drains; }
+    // Mark before submission: even a throwing body may have enqueued caller work.
+    s->protocol.mark_caller_dirty(); s->backend.safe_to_destroy=false;
+    ++qualified_body_depth; body_scope_=true;
+    return true;
+}
+void ImmediateCallerGuard::leave() noexcept
+{
+    if (body_scope_) { --qualified_body_depth; body_scope_=false; }
+    if (entered_) { --entry_depth; entered_=false; }
+    InternalScope scope;
+    for (auto& input:inputs_) input=at::Tensor{};
+    state_.reset();
+}
+ImmediateCallerGuard::~ImmediateCallerGuard() noexcept
+{
+    if (state_ && !finished_) fail();
+    leave();
+}
+void ImmediateCallerGuard::complete()
+{
+    if (!state_ || finished_) return;
+    auto s=std::static_pointer_cast<State>(state_);
+    s->check_healthy(); // swallowed backend reentry remains a durable failure
+    ++s->caller_embedding_small;
+    finished_=true;
+    leave();
+}
+void ImmediateCallerGuard::add_failed_output(const at::Tensor& value) noexcept
+{
+    if (state_ && output_count_<kMaxOutputs)
+        std::static_pointer_cast<State>(state_)->pending_outputs[output_count_++]=value;
+}
+void ImmediateCallerGuard::fail(std::exception_ptr error) noexcept
+{
+    if (!state_ || finished_) return;
+    auto s=std::static_pointer_cast<State>(state_);
+    finished_=true;
+    for (std::size_t i=0;i<inputs_.size();++i) s->emergency_inputs[i]=inputs_[i];
+    s->emergency_count=inputs_.size();
+    ++s->failed;
+    try { if (error) std::rethrow_exception(error); s->remember("immediate caller entry ended without completion"); }
+    catch (const std::exception& e) { s->remember(e.what()); }
+    catch (...) { s->remember("non-standard immediate caller entry failure"); }
+    s->protocol.poison();
+    if (!s->recover()) s->quarantine_anchor=s;
+}
 
 bool RuntimeEnabled() noexcept { return runtime_enabled.load(std::memory_order_acquire); }
 ImmediateGuard::ImmediateGuard(const char* schema,const char* route)
@@ -326,6 +431,12 @@ void ImmediateGuard::begin()
         g.input_keys[i]=key(t);
     }
     if (!eligible) { s.drain(); ++s.fallback; return; }
+    if (s.min_embedding_bag_length && g.kind!=Kind::Embedding && !s.protocol.active()) {
+        // With no pending side producer, Interaction belongs to the caller.
+        s.protocol.mark_caller_dirty(); s.backend.safe_to_destroy=false;
+        g.caller_body=true; ++qualified_body_depth; g.body_scope=true;
+        ++s.caller_interaction; return;
+    }
     std::size_t incoming=0;
     for (std::size_t i=0;i<g.input_count;++i) {
         const auto n=g.inputs[i].storage().nbytes();
@@ -346,7 +457,7 @@ void ImmediateGuard::begin()
 }
 void ImmediateGuard::add_output(const at::Tensor& value)
 {
-    if (!impl_ || !impl_->launched) return;
+    if (!impl_ || (!impl_->launched && !impl_->caller_body)) return;
     auto& g=*impl_;
     if (g.output_count==kMaxOutputs) throw std::runtime_error("immediate output handle contract exceeded");
     // Exact admitted schemas return at most four tensors. This path only copies
@@ -369,7 +480,7 @@ void ImmediateGuard::complete()
             const auto output_key=key(value);
             for (std::size_t j=0;j<g.input_count;++j)
                 if (output_key && output_key==g.input_keys[j]) throw std::runtime_error("immediate out-of-place output unexpectedly aliases an input");
-            g.output_keys[i]=output_key; s.record_use(value,g.selected);
+            g.output_keys[i]=output_key; s.cache_output(value); s.record_use(value,g.selected);
             // The returned allocation may next be consumed asynchronously by
             // baseline work on the caller stream after this group is drained.
             s.record_use(value,0);
@@ -386,6 +497,8 @@ void ImmediateGuard::complete()
         // No second call can enter with this over-budget live set.
         if (s.retained_bytes>s.byte_limit) { s.drain(); ++s.budget_drains; }
     }
+    if (g.caller_body) g.restore();
+    s.check_healthy(); // includes non-launched caller paths
     g.finished=true;
 }
 void ImmediateGuard::fail(std::exception_ptr error) noexcept
@@ -394,6 +507,7 @@ void ImmediateGuard::fail(std::exception_ptr error) noexcept
     auto& g=*impl_; auto& s=*g.state;
     g.restore(); g.finished=true;
     if (g.nested) return; // the outer owner captures the original exception
+    if (g.caller_body) s.capture_failed_inputs(g.inputs.data(),g.input_count);
     for (std::size_t i=0;i<g.output_count;++i) s.pending_outputs[i]=g.outputs[i];
     ++s.failed;
     try { if (error) std::rethrow_exception(error); s.remember("immediate entry ended without completion"); }
@@ -413,10 +527,10 @@ void ImmediateBoundary(const char* reason)
         s->remember(error.what()); s->protocol.poison(); if (!s->recover()) s->quarantine_anchor=s; throw;
     }
 }
-std::string ImmediateConfigure(bool enabled,const std::string& mode,uint64_t streams,uint64_t capacity,uint64_t bytes)
+std::string ImmediateConfigure(bool enabled,const std::string& mode,uint64_t streams,uint64_t capacity,uint64_t bytes,uint64_t min_embedding_bag_length)
 {
     if (mode!="e" && mode!="ei") throw std::invalid_argument("immediate mode must be e or ei");
-    if (streams!=2 || capacity==0 || capacity>1024 || bytes==0 || bytes>512u*1024u*1024u)
+    if (streams!=2 || capacity==0 || capacity>1024 || min_embedding_bag_length>static_cast<uint64_t>(std::numeric_limits<int64_t>::max()) || bytes==0 || bytes>512u*1024u*1024u)
         throw std::invalid_argument("invalid immediate runtime bounds");
     auto old=state();
     if (old) {
@@ -434,7 +548,7 @@ std::string ImmediateConfigure(bool enabled,const std::string& mode,uint64_t str
     }
     check_environment();
     InternalScope scope;
-    auto next=std::make_shared<State>(mode=="ei",static_cast<std::size_t>(capacity),static_cast<std::size_t>(bytes));
+    auto next=std::make_shared<State>(mode=="ei",static_cast<std::size_t>(capacity),static_cast<std::size_t>(bytes),min_embedding_bag_length);
     // An unclosed active runtime must retain owners even during library/process
     // destruction. Explicit successful close breaks this allocation-free anchor.
     next->quarantine_anchor=next;
@@ -456,7 +570,7 @@ std::string ImmediateDrainClose()
         if (s->protocol.poisoned()) {
             if (!s->recover()) { s->quarantine_anchor=s; throw std::runtime_error(s->first_error.data()); }
         } else {
-            try { s->drain(); }
+            try { s->drain(true); }
             catch (const std::exception& error) {
                 s->remember(error.what()); s->protocol.poison(); if (!s->recover()) s->quarantine_anchor=s; throw;
             }
@@ -482,8 +596,14 @@ std::string ImmediateSnapshot()
         << ",\"enabled\":" << (s->enabled.load()?"true":"false")
         << ",\"actual_stream_scheduling\":true,\"real_sdk_qualified\":false,\"device_parallel_qualified\":false,\"host_workers\":0"
         << ",\"task_queue_required\":0,\"capacity\":" << s->capacity << ",\"byte_limit\":" << s->byte_limit
+        << ",\"min_embedding_bag_length\":" << s->min_embedding_bag_length
+        << ",\"embedding_length_policy\":\"metadata_mean_indices_per_bag\""
+        << ",\"caller_embedding_small\":" << s->caller_embedding_small << ",\"caller_interaction\":" << s->caller_interaction
+        << ",\"small_dependency_drains\":" << s->small_dependency_drains << ",\"policy_uncertain_fallback\":" << s->policy_uncertain_fallback
+        << ",\"caller_frontier_dirty\":" << (s->protocol.caller_dirty()?"true":"false")
+        << ",\"caller_frontier_records\":" << s->protocol.frontier_records() << ",\"caller_frontier_waits\":" << s->protocol.frontier_waits()
         << ",\"active_calls\":" << s->protocol.calls() << ",\"retained_bytes\":" << s->retained_bytes << ",\"peak_retained_bytes\":" << s->peak_bytes
-        << ",\"retained_owners\":" << s->owner_count << ",\"scheduled_embedding\":" << s->embedding << ",\"scheduled_cat\":" << s->cat
+        << ",\"retained_owners\":" << (s->owner_count+s->emergency_count) << ",\"scheduled_embedding\":" << s->embedding << ",\"scheduled_cat\":" << s->cat
         << ",\"owned_event_handles\":" << s->backend.live_events()
         << ",\"scheduled_bmm\":" << s->bmm << ",\"scheduled_index\":" << s->index << ",\"fallback\":" << s->fallback
         << ",\"aliases\":" << s->aliases << ",\"nested_entries\":" << s->nested << ",\"drains\":" << s->drains
@@ -493,9 +613,9 @@ std::string ImmediateSnapshot()
         << ",\"quarantined\":" << (s->quarantined?"true":"false")
         << ",\"stream_ids\":[" << s->backend.streams[0].id() << ',' << s->backend.streams[1].id() << ',' << s->backend.streams[2].id() << ',' << s->backend.streams[3].id()
         << "],\"closure\":{\"admission_closed\":" << (s->closed?"true":"false")
-        << ",\"no_owned_device_work\":" << (!s->protocol.active() && !s->owner_count?"true":"false")
-        << ",\"device_synchronized\":" << (s->closed && !s->protocol.active()?"true":"false")
-        << ",\"passed\":" << (s->closed && !s->protocol.active() && !s->owner_count && !s->backend.live_events() && !s->protocol.poisoned()?"true":"false") << "}}";
+        << ",\"no_owned_device_work\":" << (!s->protocol.active() && !s->protocol.caller_dirty() && !s->owner_count && !s->emergency_count?"true":"false")
+        << ",\"device_synchronized\":" << (s->closed && !s->protocol.active() && !s->protocol.caller_dirty()?"true":"false")
+        << ",\"passed\":" << (s->closed && !s->protocol.active() && !s->protocol.caller_dirty() && !s->owner_count && !s->emergency_count && !s->backend.live_events() && !s->protocol.poisoned()?"true":"false") << "}}";
     return out.str();
 }
 } // namespace c10_npu::eager_parallel

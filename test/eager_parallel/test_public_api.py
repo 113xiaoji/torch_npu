@@ -29,7 +29,26 @@ class PublicApiTests(unittest.TestCase):
         result = self.load_bridge(extension).configure()
         self.assertFalse(result['enabled'])
         self.assertFalse(result['qualified'])
-        self.assertEqual(calls, [(False, 'shadow', 2, 64, 536870912)])
+        self.assertEqual(calls, [(False, 'shadow', 2, 64, 536870912, 0)])
+
+    def test_selective_policy_is_forwarded_and_scope_preserves_it(self):
+        calls = []
+        bridge = self.load_bridge(types.SimpleNamespace(
+            _npu_eager_parallel_configure=lambda *args: calls.append(args) or '{"schema":1}',
+            _npu_eager_parallel_drain_close=lambda: '{"schema":1}'))
+        self.assertIn('min_embedding_bag_length', __import__('inspect').signature(bridge.configure).parameters,
+                      'native selective policy is missing')
+        with torch.inference_mode(), bridge.scope(mode='ei', min_embedding_bag_length=64):
+            pass
+        self.assertEqual(calls, [(True, 'ei', 2, 64, 536870912, 64)])
+        for value in (True, 1.5, '64'):
+            with self.assertRaises(TypeError):
+                bridge.configure(min_embedding_bag_length=value)
+        for value in (-1, 2**63):
+            with self.assertRaises(ValueError):
+                bridge.configure(mode='e', min_embedding_bag_length=value)
+        with self.assertRaises(ValueError):
+            bridge.configure(mode='shadow', min_embedding_bag_length=64)
 
     def test_missing_actual_binding_is_reported_not_emulated(self):
         bridge = self.load_bridge(types.SimpleNamespace())

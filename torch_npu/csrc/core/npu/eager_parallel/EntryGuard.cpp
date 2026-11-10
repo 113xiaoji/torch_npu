@@ -68,16 +68,17 @@ void EntryGuard::fail(std::exception_ptr error) noexcept {
       catch(...) { diagnostics().fail(token_,"non-standard native entry failure"); }
     finished_=true;
 }
-std::string Configure(bool enabled,const std::string& mode,uint64_t streams,uint64_t capacity,uint64_t bytes) {
+std::string Configure(bool enabled,const std::string& mode,uint64_t streams,uint64_t capacity,uint64_t bytes,uint64_t min_embedding_bag_length) {
     ControlReservation reservation;
     if (mode == "e" || mode == "ei") {
         if (Enabled()) throw std::logic_error("close the native shadow domain first");
-        auto result = ImmediateConfigure(enabled,mode,streams,capacity,bytes);
+        auto result = ImmediateConfigure(enabled,mode,streams,capacity,bytes,min_embedding_bag_length);
         immediate_selected.store(true,std::memory_order_release);
         return result;
     }
     if (RuntimeEnabled()) throw std::logic_error("close the native execution domain first");
     if (mode!="shadow" || streams!=2) throw std::invalid_argument("only original-stream shadow diagnostics is available; device execution is not qualified");
+    if (min_embedding_bag_length) throw std::invalid_argument("selective Embedding requires e or ei mode");
     diagnostics().configure(enabled,capacity,bytes);
     immediate_selected.store(false,std::memory_order_release);
     return SnapshotImpl();

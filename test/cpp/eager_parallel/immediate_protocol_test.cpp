@@ -110,5 +110,60 @@ int main() {
         assert(rejected && p.active() && p.calls()==1 && p.poisoned());
         b.fail_wait=false; assert(p.recover());
     }
+
+
+    {
+        using C=EmbeddingLengthClass;
+        for (int64_t length: {63,64,65}) {
+            assert(ClassifyEmbeddingLength(2,1,1,128*length,128,false,64)==(length<64?C::Small:C::Large));
+            assert(ClassifyEmbeddingLength(2,1,1,128*length,129,true,64)==(length<64?C::Small:C::Large));
+        }
+        assert(ClassifyEmbeddingLength(2,1,1,8191,128,false,64)==C::Small); // ragged mean
+        assert(ClassifyEmbeddingLength(2,1,1,0,1,false,64)==C::Small);
+        assert(ClassifyEmbeddingLength(2,1,1,0,0,false,64)==C::Uncertain);
+        assert(ClassifyEmbeddingLength(2,1,1,0,1,true,64)==C::Uncertain);
+        assert(ClassifyEmbeddingLength(2,2,1,64,1,false,64)==C::Uncertain);
+        assert(ClassifyEmbeddingLength(2,1,1,-1,1,false,64)==C::Uncertain);
+        assert(ClassifyEmbeddingLength(2,1,1,INT64_MAX,INT64_MAX,false,64)==C::Small); // no product overflow
+        assert(ClassifyEmbeddingLength(2,1,1,INT64_MAX,1,false,64)==C::Large);
+        assert(StorageIntervalsOverlap({100,32,true},{120,32,true}));
+        assert(!StorageIntervalsOverlap({100,20,true},{120,32,true}));
+        assert(StorageIntervalsOverlap({0,0,false},{120,32,true}));
+        assert(!MakeStorageInterval(UINTPTR_MAX-2,4).valid);
+    }
+    {
+        FakeBackend b; ImmediateProtocol p(b,4,16,true);
+        std::uintptr_t a=10,c=11;
+        assert(p.begin(true,nullptr,0)==1); p.commit(&a,1);
+        p.mark_caller_dirty(); // independent original-caller small body
+        assert(p.begin(false,&a,1)==3); p.commit(&c,1);
+        assert(contains(b,"r2:0") && contains(b,"w3:2") && contains(b,"w3:1"));
+        p.mark_caller_dirty();
+        assert(p.begin(true,&c,1)==2); p.commit(&a,1);
+        assert(contains(b,"r4:0") && contains(b,"w2:4") && contains(b,"w2:3"));
+        assert(p.frontier_records()==3 && p.frontier_waits()==3);
+        p.mark_caller_dirty();
+        assert(p.begin(true,nullptr,0)==1); p.commit(&a,1);
+        assert(contains(b,"r6:0") && contains(b,"w1:6") && contains(b,"r7:1"));
+        assert(!p.can_begin());
+        p.drain();
+        b.log.clear();
+        p.mark_caller_dirty(); p.drain(); // all-small normal fences retain caller ordering
+        assert(b.log.empty() && p.caller_dirty());
+        p.drain(true); assert(contains(b,"s0") && !p.caller_dirty());
+        b.log.clear();
+        p.mark_caller_dirty();
+        assert(p.begin(true,nullptr,0)==1); p.commit(&a,1);
+        assert(contains(b,"r0:0") && contains(b,"r1:1"));
+        p.drain();
+    }
+    {
+        FakeBackend b; ImmediateProtocol p(b,1,4,true);
+        p.mark_caller_dirty(); b.fail_sync=true;
+        bool failed=false; try {p.drain(true);} catch(...) {failed=true;}
+        assert(failed && p.poisoned() && p.caller_dirty());
+        b.fail_sync=false; assert(p.recover() && !p.caller_dirty());
+        assert(contains(b,"s0") && contains(b,"s1") && contains(b,"s2") && contains(b,"s3"));
+    }
     std::cout << "PASS R27 immediate protocol\n";
 }

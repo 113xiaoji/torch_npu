@@ -1,0 +1,155 @@
+#include "torch_npu/csrc/core/npu/eager_parallel/ImmediateProtocol.h"
+#include <array>
+#include <atomic>
+#include <cassert>
+#include <cstring>
+#include <exception>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <vector>
+namespace at {
+enum Scalar { kFloat,kLong,kInt };
+inline bool grad=false;
+struct GradMode { static bool is_enabled() {return grad;} };
+struct Tracked { static unsigned live; Tracked(){++live;} ~Tracked(){--live;} };
+unsigned Tracked::live=0;
+struct Tensor {
+    std::shared_ptr<Tracked> handle;
+    int64_t rank=1,count=2;
+    std::uintptr_t address=500;
+    std::size_t bytes=32;
+    Scalar dtype=kLong;
+    bool eligible=true,metadata_fault=false;
+    bool defined() const { return static_cast<bool>(handle); }
+    int64_t dim() const {if(metadata_fault) throw std::runtime_error("metadata fault"); return rank;}
+    int64_t numel() const {return count;}
+    Scalar scalar_type() const {return dtype;}
+    bool is_contiguous() const {return true;}
+    struct Ptr {std::uintptr_t address; void* get() const {return reinterpret_cast<void*>(address);} };
+    struct Storage {std::uintptr_t address;std::size_t bytes;Ptr data_ptr() const {return {address};} std::size_t nbytes() const {return bytes;} };
+    Storage storage() const {return {address,bytes};}
+};
+Tensor make(std::uintptr_t address,int64_t rank=1,int64_t count=2,Scalar dtype=kLong) {
+    Tensor t;t.handle=std::make_shared<Tracked>();t.address=address;t.rank=rank;t.count=count;t.dtype=dtype;return t;
+}
+}
+namespace c10_npu::eager_parallel {
+unsigned internal_depth=0,entry_depth=0,qualified_body_depth=0;
+struct InternalScope {InternalScope(){++internal_depth;}~InternalScope(){--internal_depth;} };
+enum class Kind {Unknown,Embedding};
+Kind classify(const char* schema,bool) {return std::strcmp(schema,"aten::_embedding_bag")==0?Kind::Embedding:Kind::Unknown;}
+bool native_tensor(const at::Tensor& t) {return t.defined() && t.eligible;}
+void check_environment() {}
+constexpr std::size_t kMaxOutputs=4;
+struct Backend:ImmediateEventBackend {
+    std::vector<std::string> log;
+    bool safe_to_destroy=true,fail_sync=false;
+    void record(std::size_t e,unsigned s) override {log.push_back("r"+std::to_string(e)+":"+std::to_string(s));}
+    void wait(unsigned s,std::size_t e) override {log.push_back("w"+std::to_string(s)+":"+std::to_string(e));}
+    void synchronize(unsigned s) override {log.push_back("s"+std::to_string(s));if(fail_sync) throw std::runtime_error("sync fault");}
+};
+struct State {
+    std::atomic<bool> enabled{true};
+    uint64_t min_embedding_bag_length=64;
+    Backend backend;
+    ImmediateProtocol protocol{backend,4,16,true};
+    std::vector<StorageInterval> output_intervals;
+    std::size_t interval_count=0,emergency_count=0;
+    std::array<at::Tensor,3> emergency_inputs;
+    std::array<at::Tensor,4> pending_outputs;
+    std::shared_ptr<State> quarantine_anchor;
+    std::array<char,512> first_error{};
+    unsigned failed=0,caller_embedding_small=0,policy_uncertain_fallback=0,small_dependency_drains=0,drains=0;
+    bool foreign=false;
+    void check_owner() {if(foreign)throw std::runtime_error("foreign caller");}
+    void check_healthy() {if(protocol.poisoned())throw std::runtime_error("poisoned caller");}
+    void remember(const char* s) noexcept {if(!first_error[0]) for(std::size_t i=0;i<511 && s[i];++i)first_error[i]=s[i];}
+    void drain() {protocol.drain();output_intervals.clear();interval_count=0;++drains;}
+    bool recover() noexcept {
+        if(!protocol.recover())return false;
+        for(auto& t:emergency_inputs)t={};
+        for(auto& t:pending_outputs)t={};
+        emergency_count=0;
+        return true;
+    }
+};
+std::shared_ptr<State> current;
+std::shared_ptr<State> state() {return current;}
+class ImmediateCallerGuard {
+public:
+    ~ImmediateCallerGuard() noexcept;
+    bool begin(const char*,const at::Tensor&,const at::Tensor&,const at::Tensor&,bool);
+    bool disqualified() const {return disqualified_;}
+    void complete();
+    void add_failed_output(const at::Tensor&) noexcept;
+    void fail(std::exception_ptr error={}) noexcept;
+private:
+    void leave() noexcept;
+    std::shared_ptr<void> state_;
+    std::array<at::Tensor,3> inputs_;
+    std::size_t output_count_=0;
+    bool entered_=false,body_scope_=false,finished_=false,disqualified_=false;
+};
+/*METHODS*/
+}
+int main() {
+    using namespace c10_npu::eager_parallel;
+    auto w=at::make(500,2,48,at::kFloat),i=at::make(600),o=at::make(700);
+    for(unsigned alias=0;alias<4;++alias) {
+        current=std::make_shared<State>();auto s=current;
+        std::uintptr_t key=100;s->protocol.begin(true,nullptr,0);s->protocol.commit(&key,1);
+        s->output_intervals={{100,32,true}};s->interval_count=1;
+        auto wa=w,ia=i,oa=o;
+        if(alias==1)wa.address=110; // distinct/interior Storage sharing raw bytes
+        if(alias==2)ia.address=110;
+        if(alias==3)oa.address=110;
+        { ImmediateCallerGuard g;assert(g.begin("aten::_embedding_bag",wa,ia,oa,false));
+          assert(entry_depth==1 && qualified_body_depth==1);g.complete(); }
+        assert(entry_depth==0 && qualified_body_depth==0);
+        assert(s->small_dependency_drains==(alias?1u:0u));
+        assert(s->protocol.active()==(alias==0));
+        assert(s->protocol.caller_dirty() && s->caller_embedding_small==1);
+        if(!alias) {s->protocol.begin(false,&key,1);s->protocol.commit(&key,1);
+            assert(s->backend.log[3]=="r2:0" && s->backend.log[4]=="w3:2");}
+        s->protocol.drain(true);
+    }
+    for(unsigned invalid=0;invalid<5;++invalid) {
+        current=std::make_shared<State>();auto s=current;
+        auto wa=w,ia=i,oa=o;
+        if(invalid==0)ia.count=128; // mean64 is large
+        if(invalid==1)oa.count=0;
+        if(invalid==2)wa.eligible=false;
+        if(invalid==3)wa.address=UINTPTR_MAX-1;
+        if(invalid==4)wa={};
+        {ImmediateCallerGuard g;assert(!g.begin("aten::_embedding_bag",wa,ia,oa,false));
+         assert(g.disqualified()==(invalid!=0));}
+        assert(s->failed==0 && entry_depth==0 && qualified_body_depth==0);
+    }
+    for(unsigned fault=0;fault<3;++fault) {
+        current=std::make_shared<State>();auto s=current;s->backend.fail_sync=true;
+        auto wa=w,ia=i,oa=o;
+        if(fault==0)wa.metadata_fault=true;
+        const auto before=at::Tracked::live;
+        {ImmediateCallerGuard g;
+         try {
+            assert(g.begin("aten::_embedding_bag",wa,ia,oa,false));
+            if(fault==1)throw std::runtime_error("original body failure");
+            s->protocol.poison(); // swallowed reentry, complete must reject
+            try {g.complete();assert(false);} catch(...) {
+                for(unsigned n=0;n<4;++n)g.add_failed_output(at::make(800+n*100));
+                throw;
+            }
+         } catch(...) {g.fail(std::current_exception());}
+        }
+        assert(s->failed==1 && s->emergency_count==3 && s->quarantine_anchor);
+        assert(entry_depth==0 && qualified_body_depth==0);
+        assert(s->first_error[0]);
+        assert(at::Tracked::live==before+(fault==2?4u:0u));
+        s->backend.fail_sync=false;assert(s->recover());s->quarantine_anchor.reset();
+        assert(at::Tracked::live==before);
+    }
+    current.reset();w={};i={};o={};assert(at::Tracked::live==0);
+    std::cout<<"PASS actual lean caller begin/complete/fail: 12 scenarios\n";
+}

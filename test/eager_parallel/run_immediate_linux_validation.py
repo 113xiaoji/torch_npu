@@ -43,7 +43,7 @@ def main():
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--frozen', type=Path, required=True)
     parser.add_argument('--entry-probe', type=Path)
-    parser.add_argument('--case', action='append', choices=('protocol','output_lifetime','scalar_contract','destructor','allocator_event_scope'))
+    parser.add_argument('--case', action='append', choices=('protocol','output_lifetime','scalar_contract','destructor','allocator_event_scope','selective_caller'))
     args = parser.parse_args()
     root = args.root.resolve()
     source = root / 'source'
@@ -119,12 +119,18 @@ int main() {
     spec.loader.exec_module(fixture_module)
     allocator_source=generated/'allocator_event_scope.cpp'
     allocator_source.write_text(fixture_module.generated_fixture())
+    selective_spec=importlib.util.spec_from_file_location('r31_selective_fixture',source/'test/eager_parallel/test_immediate_selective.py')
+    selective_module=importlib.util.module_from_spec(selective_spec)
+    selective_spec.loader.exec_module(selective_module)
+    selective_source=generated/'immediate_selective.cpp'
+    selective_source.write_text(selective_module.generated_fixture())
     cases = {
         'protocol': source / 'test/cpp/eager_parallel/immediate_protocol_test.cpp',
         'output_lifetime': output_source,
         'scalar_contract': scalar_source,
         'destructor': destructor_source,
         'allocator_event_scope': allocator_source,
+        'selective_caller': selective_source,
     }
     if args.case:
         cases = {name: path for name, path in cases.items() if name in args.case}

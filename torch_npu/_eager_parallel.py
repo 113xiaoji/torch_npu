@@ -23,22 +23,33 @@ def _call(name, *args):
     return result
 
 
-def configure(*, enabled=False, mode='shadow', streams=2, capacity=64, byte_limit=536870912):
-    """Configure native shadow, Embedding (e), or Embedding+Interaction (ei)."""
+def configure(*, enabled=False, mode='shadow', streams=2, capacity=64, byte_limit=536870912, min_embedding_bag_length=0):
+    """Configure native shadow, Embedding (e), or Embedding+Interaction (ei).
+
+    ``min_embedding_bag_length=0`` retains full scheduling. A positive threshold
+    schedules Embedding on side streams only when its metadata mean length
+    (indices.numel() / number of bags) reaches the threshold. Ragged bags use
+    that mean; no offset data is read. Short independent calls run on the caller.
+    """
     if type(enabled) is not bool:
         raise TypeError('enabled must be bool')
     if type(mode) is not str:
         raise TypeError('mode must be str')
     if mode not in ('shadow', 'e', 'ei'):
         raise ValueError('mode must be shadow, e, or ei')
-    for name, value in (('streams', streams), ('capacity', capacity), ('byte_limit', byte_limit)):
+    for name, value in (('streams', streams), ('capacity', capacity), ('byte_limit', byte_limit),
+                        ('min_embedding_bag_length', min_embedding_bag_length)):
         if type(value) is not int:
             raise TypeError(name + ' must be int')
     if streams != 2 or not 1 <= capacity <= 1024 or not 1 <= byte_limit <= 536870912:
         raise ValueError('configuration exceeds admitted stream/capacity/byte bounds')
+    if not 0 <= min_embedding_bag_length <= 2**63 - 1:
+        raise ValueError('min_embedding_bag_length exceeds admitted integer bounds')
+    if mode == 'shadow' and min_embedding_bag_length:
+        raise ValueError('min_embedding_bag_length requires e or ei mode')
     if enabled and mode != 'shadow' and not _torch.is_inference_mode_enabled():
         raise RuntimeError('eager-parallel execution requires caller-owned torch.inference_mode()')
-    return _call('configure', enabled, mode, streams, capacity, byte_limit)
+    return _call('configure', enabled, mode, streams, capacity, byte_limit, min_embedding_bag_length)
 
 
 def snapshot():
@@ -52,7 +63,7 @@ def drain_close():
 
 
 @contextmanager
-def scope(*, mode='shadow', streams=2, capacity=64, byte_limit=536870912):
+def scope(*, mode='shadow', streams=2, capacity=64, byte_limit=536870912, min_embedding_bag_length=0):
     """Run a native domain inside caller-owned ``torch.inference_mode``.
 
     Original model code and kernels are retained; e/ei select internal streams.
@@ -60,7 +71,8 @@ def scope(*, mode='shadow', streams=2, capacity=64, byte_limit=536870912):
     """
     if not _torch.is_inference_mode_enabled():
         raise RuntimeError('eager-parallel scope requires caller-owned torch.inference_mode()')
-    state = configure(enabled=True, mode=mode, streams=streams, capacity=capacity, byte_limit=byte_limit)
+    state = configure(enabled=True, mode=mode, streams=streams, capacity=capacity, byte_limit=byte_limit,
+                      min_embedding_bag_length=min_embedding_bag_length)
     try:
         yield state
     except BaseException as error:

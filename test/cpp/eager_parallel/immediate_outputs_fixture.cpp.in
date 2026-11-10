@@ -47,6 +47,8 @@ struct State {
         if(static_cast<int>(value->id)==use_failure) throw std::runtime_error("allocator stream fault");
         if(stream==0 && static_cast<int>(value->id)==caller_use_failure) throw std::runtime_error("allocator caller handoff fault");
     }
+    void cache_output(const at::Tensor&) {}
+    void capture_failed_inputs(const at::Tensor*,std::size_t) noexcept {}
     void check_healthy() { if(protocol.bad) throw std::runtime_error("restore fault"); }
     void remember(const char*) noexcept {}
     bool recover() noexcept {
@@ -58,10 +60,10 @@ struct State {
 struct ImmediateGuardImpl {
     std::shared_ptr<State> state;
     Kind kind=Kind::Embedding;
-    bool launched=true,finished=false,nested=false,restore_failure=false;
+    bool launched=true,caller_body=false,finished=false,nested=false,restore_failure=false;
     unsigned selected=1;
     std::size_t output_count=0,input_count=0;
-    std::array<at::Tensor,4> outputs;
+    std::array<at::Tensor,4> outputs,inputs;
     std::array<std::uintptr_t,4> output_keys{},input_keys{};
     void restore() noexcept { if(restore_failure) state->protocol.poison(); }
 };
