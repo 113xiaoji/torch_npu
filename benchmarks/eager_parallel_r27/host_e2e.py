@@ -163,6 +163,15 @@ def paired_summary(rows, rounds):
     return result
 
 
+def load_workload(reference, upstream, config):
+    require(type(config.get('validate_stages', False)) is bool, 'validate_stages must be boolean')
+    if config.get('validate_stages', False):
+        require(all(callable(getattr(reference, name, None)) for name in ('capture_stages', 'validate_stages')),
+                'optional stage callbacks are required')
+    kwargs = dict(bag_length=config['bag_length']) if 'bag_length' in config else {}
+    return reference.load_original_model(upstream, **kwargs)
+
+
 def run(config, report):
     require(sys.platform == 'linux' and sys.version_info[:3] == (3, 14, 6), 'pinned Linux FT Python required')
     require(os.environ.get('PYTHON_GIL') is None and not sys._is_gil_enabled(), 'natural free threading required')
@@ -202,10 +211,11 @@ def run(config, report):
     torch.set_num_threads(1)
     torch.set_num_interop_threads(1)
     reference = load(config['reference'], 'r27_reference')
-    model, inputs, provenance = reference.load_original_model(config['original_source'])
+    model, inputs, provenance = load_workload(reference, config['original_source'], config)
     report['provenance'] = provenance
     with torch.inference_mode():
         expected = model(*inputs).clone()
+        expected_stages = reference.capture_stages(model, inputs) if config.get('validate_stages', False) else None
         model = model.to('npu:0')
         inputs = (inputs[0].to('npu:0'), [v.to('npu:0') for v in inputs[1]],
                   [v.to('npu:0') for v in inputs[2]])
@@ -244,6 +254,10 @@ def run(config, report):
             require(report['numeric_final']['passed'], 'final timed output differs from CPU reference')
             if report['kind'] == 'cold':
                 report['correctness'].append(report['numeric_final'])
+            if expected_stages is not None:
+                report['stage_validation'] = reference.validate_stages(model, inputs, expected_stages,
+                                                                        torch.npu.synchronize)
+                require(report['stage_validation']['passed'], 'original intermediate stages differ from CPU reference')
         report['closed'] = snapshot()
     for name in ('before', 'after', 'closed'):
         check_runtime(report[name]['runtime'])

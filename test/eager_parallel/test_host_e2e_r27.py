@@ -1,7 +1,9 @@
 """Gate actual scheduling and numerical evidence, not a renamed shadow run."""
 import importlib.util
+import inspect
 from pathlib import Path
 import unittest
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -21,6 +23,39 @@ class Gates(unittest.TestCase):
         new['operations']['aclnnIndex']['executed'] -= 1
         with self.assertRaisesRegex(ValueError, 'aclnnIndex'):
             self.module.sdk_delta(old, new, 3)
+
+    def test_optional_bag_length_keeps_legacy_loader_call_unchanged(self):
+        self.assertTrue(hasattr(self.module, 'load_workload'), 'optional workload loader dispatch is missing')
+        calls = []
+        def original(upstream, **kwargs):
+            calls.append((upstream, kwargs))
+            return ('model', 'inputs', 'provenance')
+        reference = SimpleNamespace(load_original_model=original)
+        self.assertEqual(self.module.load_workload(reference, 'upstream', {}), ('model', 'inputs', 'provenance'))
+        self.assertEqual(calls, [('upstream', {})])
+        self.module.load_workload(reference, 'upstream', dict(bag_length=16))
+        self.assertEqual(calls[-1], ('upstream', dict(bag_length=16)))
+        with self.assertRaisesRegex(ValueError, 'stage callbacks'):
+            self.module.load_workload(reference, 'upstream', dict(validate_stages=True))
+        reference.capture_stages = lambda *args: None
+        reference.validate_stages = lambda *args: None
+        self.module.load_workload(reference, 'upstream', dict(bag_length=8, validate_stages=True))
+        with self.assertRaisesRegex(ValueError, 'boolean'):
+            self.module.load_workload(reference, 'upstream', dict(validate_stages=1))
+
+    def test_optional_stage_checks_preserve_first_cold_forward_and_timed_gates(self):
+        source = inspect.getsource(self.module.run)
+        capture = source.index('reference.capture_stages(')
+        transfer = source.index("model.to('npu:0')")
+        measure = source.index('common.measure_forward_window(')
+        final_output = source.index("require(report['numeric_final']['passed']")
+        validate = source.index('reference.validate_stages(')
+        closed = source.index("report['closed'] = snapshot()")
+        self.assertLess(capture, transfer)
+        self.assertLess(transfer, measure)
+        self.assertLess(measure, final_output)
+        self.assertLess(final_output, validate)
+        self.assertLess(validate, closed)
 
     def test_noop_or_incomplete_runtime_is_rejected(self):
         good = dict(backend_kind='HOST_SIM_R27_CPU', submitted=8, completed=8, errors=0,
