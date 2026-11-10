@@ -104,3 +104,6 @@ test/eager_prepare_cpu/** -text whitespace=trailing-space,space-before-tab,cr-at
 test/eager_prepare_cpu_native/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
 test/host_regions/test_eager_prepare_integration.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
 test/host_regions/eager_prepare_integration/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+
+# Preserve the byte-pinned R29 measured controller.
+benchmarks/eager_parallel_r29/controller.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
