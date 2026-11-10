@@ -2,7 +2,8 @@
 
 实现了模型代码之外的原生选择性调度：达到阈值的EmbeddingBag走已有producer流，
 独立的小调用执行原来的caller流body。默认阈值0保持原E/EI行为；本实验固定为64。
-当前尚未得到自适应路径的正式端到端性能结果，不能声称已经获得收益。
+本轮CPU host-sim验证已完成：选择性E/EI相对全量并行延迟降低约19%，但相对off仍慢
+10.87%/11.37%。[完整结果及原始证据](R31_SELECTIVE_META_HOSTSIM.md)。
 
 ## 调度与依赖
 
@@ -53,13 +54,11 @@ Linux已实际编译并执行18项原生测试：Release、ASan、TSan各6项，
 它们覆盖协议、别名、容量/事件代际、输出生命周期、异常隔离和跨线程清理。
 生产源码8文件在验证前后与编译输入一致。这些证据不构成真实CANN/NPU并发认证。
 
-计划在同一新candidate上比较off、全量E、全量EI、选择性E、选择性EI。五组cold先通过，
-再做10轮Williams顺序，每组50预热/3000计时，共150000个正式计时forward。
-将保留逐轮median/p95、CPU时间、实际路由、事件/队列工作量、数值及进程回收回执。
-
-当前204内网SSH在cold过程中断开，随后204/55连接均超时。已观察到cold的off和全量E通过；
-其余cold的远端状态尚未回收，正式perf没有启动。恢复连接后须先核查旧controller和
-`cold-001/complete.json`或`error.json`，再使用独立于SSH输出通道的文件日志supervisor继续。
+在同一新candidate上完成off、全量E、全量EI、选择性E、选择性EI对照。五组cold先通过，
+随后10轮Williams顺序，每组50预热/3000计时，共150000个正式计时forward。
+保留了逐轮median/p95、CPU时间、实际路由、事件/队列工作量、数值及进程回收回执。
+先前SSH中断后已回收完整cold结果，确认原controller退出、boot和全部pins一致；正式计时
+由独立于SSH输出通道的文件日志supervisor执行，50个进程全部通过。
 
 代码位于`benchmarks/eager_parallel_r31/`，真实数据、构建和回执均保留在204的
-`/home/zyz/r31-selective-meta-20261110`。结果尚待完成，当前不作加速结论。
+`/home/zyz/r31-selective-meta-20261110`。当前结论限于该投影的CPU host-sim，不作真实NPU外推。

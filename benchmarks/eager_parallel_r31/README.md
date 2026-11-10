@@ -83,8 +83,9 @@ model identities, loaded libraries, affinity and natural free threading. Extra
 numerical checks and startup/input preparation remain outside forward-to-sync
 timing. This is CPU numerical host-simulation; real NPU qualification is pending.
 
-**Current checkpoint:** implementation and native protocol/lifetime validation
-passed, but selective host-sim qualification and performance are not complete.
-The first cold off/E receipts passed before SSH to204 disconnected. Performance
-has not been launched. Inspect remote state before restarting any controller.
+**Completed:** all five cold and50 performance processes passed. Independent
+raw audits agree: AE reduces latency19.01% versus full E and AEI19.31% versus
+full EI, but remains10.87%/11.37% slower than off; neither selective arm won a
+round against off. All intermediate/final maximum absolute errors are zero.
+See [the complete result](../../docs/R31_SELECTIVE_META_HOSTSIM.md).
 All remote artifacts belong to `/home/zyz/r31-selective-meta-20261110`.
