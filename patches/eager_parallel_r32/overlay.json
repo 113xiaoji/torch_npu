@@ -1,0 +1,9 @@
+{
+  "upstream_sha256": "fb5b7f48d5a1f2ac85f7c10faab9410171a6d809c62a329af9b5915ef9648a6f",
+  "replacement_sha256": "cf6e5d224bd030b0974dfb62e82a940e68884e3f0f7422b88179715b333b3975",
+  "scope": "SUM empty-total indices: seed output with native zeros before original CANN call; preserve validation, auxiliary outputs and original stream scheduling; both operator entries",
+  "schema": 1,
+  "base_commit": "312921458e7d396c54a1e92e90385d7d5f02dede",
+  "path": "op_plugin/ops/opapi/EmbeddingBagNpuOpApi.cpp",
+  "normalization": "LF"
+}
