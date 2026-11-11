@@ -1,0 +1,1567 @@
+{
+  "schema": 1,
+  "baseline_commit": "ebaeef918f509bb7d77f44b1e402cb760b39dc76",
+  "model_unchanged": true,
+  "input_sha256": "c4507e2138c2a5ee730e3c8b3e279b65ee2464d6a6fe4cbe3c514adc3c795ec1",
+  "native_sha256": "90196668f98f55945a8910979ac8ae5e0619f6bfd68d257b0f803bacbb43a11e",
+  "physical_device": 14,
+  "method": "Host: select middle window(s) sorted by E2E mean and retain the entire additive partition; include all windows/calibration. Device: independent100frame Level0 cohort.",
+  "arms": {
+    "off": {
+      "host_ns": {
+        "host_prepare_submit_ns": 2024347.3726666667,
+        "event_ns": 0.0,
+        "internal_sync_ns": 49714.613333333335,
+        "final_sync_ns": 50294.44466666667,
+        "e2e_ns": 2124356.4306666665,
+        "host_other_ns": 1453456.4993333335,
+        "sdk_launch_ns": 557005.22,
+        "sdk_workspace_ns": 0.0,
+        "sdk_descriptor_ns": 0.0,
+        "stream_api_ns": 13885.653333333334,
+        "poll_sleep_ns": 0.0,
+        "copy_sync_ns": 39334.613333333335,
+        "partition_sum_ns": 2124356.4306666665
+      },
+      "host_selected_windows": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/01-off-calibrate-q0",
+          "round": 1
+        }
+      ],
+      "all_host_windows": [
+        {
+          "host_prepare_submit_ns": 2030966.652,
+          "event_ns": 0.0,
+          "internal_sync_ns": 48875.17333333333,
+          "final_sync_ns": 50607.186,
+          "e2e_ns": 2130449.0113333333,
+          "host_other_ns": 1459612.7986666667,
+          "sdk_launch_ns": 557463.4533333334,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 13890.4,
+          "poll_sleep_ns": 0.0,
+          "copy_sync_ns": 38480.71333333333,
+          "partition_sum_ns": 2130449.0113333333,
+          "categories_ns": {
+            "forward": {
+              "event": 0.0,
+              "sync": 10394.46,
+              "copy_sync": 38480.71333333333,
+              "copy_async": 0.0,
+              "stream": 13890.4,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 557463.4533333334,
+              "poll_sleep": 0.0
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 9866.5,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/01-off-calibrate-q0",
+          "round": 0
+        },
+        {
+          "host_prepare_submit_ns": 2024347.3726666667,
+          "event_ns": 0.0,
+          "internal_sync_ns": 49714.613333333335,
+          "final_sync_ns": 50294.44466666667,
+          "e2e_ns": 2124356.4306666665,
+          "host_other_ns": 1453456.4993333335,
+          "sdk_launch_ns": 557005.22,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 13885.653333333334,
+          "poll_sleep_ns": 0.0,
+          "copy_sync_ns": 39334.613333333335,
+          "partition_sum_ns": 2124356.4306666665,
+          "categories_ns": {
+            "forward": {
+              "event": 0.0,
+              "sync": 10380.0,
+              "copy_sync": 39334.613333333335,
+              "copy_async": 0.0,
+              "stream": 13885.653333333334,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 557005.22,
+              "poll_sleep": 0.0
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 9873.14,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/01-off-calibrate-q0",
+          "round": 1
+        },
+        {
+          "host_prepare_submit_ns": 2020097.692,
+          "event_ns": 0.0,
+          "internal_sync_ns": 49935.21333333333,
+          "final_sync_ns": 49996.246666666666,
+          "e2e_ns": 2120029.152,
+          "host_other_ns": 1448849.0386666667,
+          "sdk_launch_ns": 557381.04,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 13867.613333333333,
+          "poll_sleep_ns": 0.0,
+          "copy_sync_ns": 39374.58666666667,
+          "partition_sum_ns": 2120029.1520000002,
+          "categories_ns": {
+            "forward": {
+              "event": 0.0,
+              "sync": 10560.626666666667,
+              "copy_sync": 39374.58666666667,
+              "copy_async": 0.0,
+              "stream": 13867.613333333333,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 557381.04,
+              "poll_sleep": 0.0
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 10133.02,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/01-off-calibrate-q0",
+          "round": 2
+        }
+      ],
+      "api_counts": {
+        "aclrtRecordEvent": 0.0,
+        "aclrtQueryEventStatus": 0.0,
+        "aclnnEmbeddingBagGetWorkspaceSize": 0.0,
+        "aclCreateTensor": 0.0,
+        "aclrtStreamWaitEvent": 0.0,
+        "aclrtStreamQuery": 0.0,
+        "nanosleep": 0.0
+      },
+      "api_ns": {
+        "aclrtRecordEvent": 0.0,
+        "aclrtQueryEventStatus": 0.0,
+        "aclnnEmbeddingBagGetWorkspaceSize": 0.0,
+        "aclCreateTensor": 0.0,
+        "aclrtStreamWaitEvent": 0.0,
+        "aclrtStreamQuery": 0.0,
+        "nanosleep": 0.0
+      },
+      "record_callers": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/01-off-calibrate-q0",
+          "round": 0,
+          "total": 0.0,
+          "allocator": 0.0,
+          "scheduler": 0.0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/01-off-calibrate-q0",
+          "round": 1,
+          "total": 0.0,
+          "allocator": 0.0,
+          "scheduler": 0.0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/01-off-calibrate-q0",
+          "round": 2,
+          "total": 0.0,
+          "allocator": 0.0,
+          "scheduler": 0.0
+        }
+      ],
+      "calibration": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/01-off-calibrate-q0",
+          "round": 0,
+          "active_ns": 2130449.0113333333,
+          "disabled_ns": 2129115.1793333334,
+          "change_pct": 0.06264724487181628
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/01-off-calibrate-q0",
+          "round": 1,
+          "active_ns": 2124356.4306666665,
+          "disabled_ns": 2101529.919333333,
+          "change_pct": 1.0861854082274691
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/01-off-calibrate-q0",
+          "round": 2,
+          "active_ns": 2120029.152,
+          "disabled_ns": 2119289.8193333335,
+          "change_pct": 0.03488586883784173
+        }
+      ],
+      "calibration_median_pct": 0.06264724487181628,
+      "bare": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/00-off-split-q0",
+          "timing": {
+            "forward_ns": {
+              "mean_ns": 2110488.9953333335,
+              "median_ns": 2104225.5
+            },
+            "final_sync_ns": {
+              "mean_ns": 45447.82866666667,
+              "median_ns": 45212.0
+            },
+            "e2e_ns": {
+              "mean_ns": 2155936.824,
+              "median_ns": 2149612.5
+            }
+          }
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/repeat-003/01-off-split-q0",
+          "timing": {
+            "forward_ns": {
+              "mean_ns": 2048553.1446666666,
+              "median_ns": 2045678.5
+            },
+            "final_sync_ns": {
+              "mean_ns": 43540.046,
+              "median_ns": 43352.0
+            },
+            "e2e_ns": {
+              "mean_ns": 2092093.1906666667,
+              "median_ns": 2089000.0
+            }
+          }
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/repeat-003/04-off-split-q0",
+          "timing": {
+            "forward_ns": {
+              "mean_ns": 2175289.032666667,
+              "median_ns": 2169948.5
+            },
+            "final_sync_ns": {
+              "mean_ns": 48795.786,
+              "median_ns": 48902.0
+            },
+            "e2e_ns": {
+              "mean_ns": 2224084.8186666667,
+              "median_ns": 2219111.0
+            }
+          }
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/repeat-003/05-off-split-q0",
+          "timing": {
+            "forward_ns": {
+              "mean_ns": 2194300.6386666666,
+              "median_ns": 2117421.5
+            },
+            "final_sync_ns": {
+              "mean_ns": 48405.08066666667,
+              "median_ns": 47637.0
+            },
+            "e2e_ns": {
+              "mean_ns": 2242705.7193333334,
+              "median_ns": 2165028.5
+            }
+          }
+        }
+      ],
+      "device_ns": {
+        "kernel_sum_ns": 1275756.62,
+        "kernel_union_ns": 1275756.62,
+        "kernel_overlap_ns": 0,
+        "kernel_forward_ns_lower": 1272516.55,
+        "kernel_forward_ns_upper": 1275756.62,
+        "kernel_final_sync_ns_lower": 0,
+        "kernel_final_sync_ns_upper": 3240.07,
+        "wall_ns": 2355001.43,
+        "compute_busy_share": 0.5420410991824187,
+        "first_kernel_delay_ns_lower": 9886.24,
+        "last_kernel_to_forward_return_ns_lower": -36037.82,
+        "realtime_perf_difference_ns": 755.03
+      },
+      "device_family_sum_ns": {
+        "mlp": 30940.81,
+        "embedding_cast": 100140.54,
+        "embedding": 1032985.98,
+        "zero": 1073.79,
+        "interaction": 110615.5
+      },
+      "device_clock_offset_bounds_ns": {
+        "lower": -28443,
+        "upper": 85316,
+        "definition": "device timestamp + offset is host epoch; causal bounds, not a fitted offset"
+      },
+      "device_profiled_e2e_ns": 2354246.4,
+      "device_control_before_ns": 2154476,
+      "device_control_after_ns": 2186890.87
+    },
+    "e": {
+      "host_ns": {
+        "host_prepare_submit_ns": 2885315.6013333336,
+        "event_ns": 803439.3999999999,
+        "internal_sync_ns": 87904.59333333332,
+        "final_sync_ns": 67951.748,
+        "e2e_ns": 3844611.3426666665,
+        "host_other_ns": 2271314.394666667,
+        "sdk_launch_ns": 591420.2133333333,
+        "sdk_workspace_ns": 0.0,
+        "sdk_descriptor_ns": 0.0,
+        "stream_api_ns": 22580.993333333332,
+        "poll_sleep_ns": 21293.493333333332,
+        "copy_sync_ns": 52367.06,
+        "partition_sum_ns": 3844611.342666667
+      },
+      "host_selected_windows": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/03-e-calibrate-q0",
+          "round": 0
+        }
+      ],
+      "all_host_windows": [
+        {
+          "host_prepare_submit_ns": 2885315.6013333336,
+          "event_ns": 803439.3999999999,
+          "internal_sync_ns": 87904.59333333332,
+          "final_sync_ns": 67951.748,
+          "e2e_ns": 3844611.3426666665,
+          "host_other_ns": 2271314.394666667,
+          "sdk_launch_ns": 591420.2133333333,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 22580.993333333332,
+          "poll_sleep_ns": 21293.493333333332,
+          "copy_sync_ns": 52367.06,
+          "partition_sum_ns": 3844611.342666667,
+          "categories_ns": {
+            "forward": {
+              "event": 803439.3999999999,
+              "sync": 14244.04,
+              "copy_sync": 52367.06,
+              "copy_async": 0.0,
+              "stream": 22580.993333333332,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 591420.2133333333,
+              "poll_sleep": 21293.493333333332
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 20645.96,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/03-e-calibrate-q0",
+          "round": 0
+        },
+        {
+          "host_prepare_submit_ns": 2894810.082,
+          "event_ns": 796748.7666666667,
+          "internal_sync_ns": 106603.0,
+          "final_sync_ns": 70573.864,
+          "e2e_ns": 3868735.7126666666,
+          "host_other_ns": 2279044.7286666664,
+          "sdk_launch_ns": 592820.1466666667,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 22945.206666666665,
+          "poll_sleep_ns": 31881.726666666666,
+          "copy_sync_ns": 59523.886666666665,
+          "partition_sum_ns": 3868735.7126666666,
+          "categories_ns": {
+            "forward": {
+              "event": 796748.7666666667,
+              "sync": 15197.386666666665,
+              "copy_sync": 59523.886666666665,
+              "copy_async": 0.0,
+              "stream": 22945.206666666665,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 592820.1466666667,
+              "poll_sleep": 31881.726666666666
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 21075.226666666666,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 1450.4066666666668
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/03-e-calibrate-q0",
+          "round": 1
+        },
+        {
+          "host_prepare_submit_ns": 2797549.487333333,
+          "event_ns": 772196.2333333333,
+          "internal_sync_ns": 73759.21333333335,
+          "final_sync_ns": 63708.21666666667,
+          "e2e_ns": 3707213.1506666667,
+          "host_other_ns": 2198780.854,
+          "sdk_launch_ns": 576961.86,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 21806.773333333334,
+          "poll_sleep_ns": 20108.36,
+          "copy_sync_ns": 39841.32666666667,
+          "partition_sum_ns": 3707213.1506666667,
+          "categories_ns": {
+            "forward": {
+              "event": 772196.2333333333,
+              "sync": 13809.526666666668,
+              "copy_sync": 39841.32666666667,
+              "copy_async": 0.0,
+              "stream": 21806.773333333334,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 576961.86,
+              "poll_sleep": 20108.36
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 19702.053333333333,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/03-e-calibrate-q0",
+          "round": 2
+        }
+      ],
+      "api_counts": {
+        "aclrtRecordEvent": 183.0,
+        "aclrtQueryEventStatus": 156.01066666666668,
+        "aclnnEmbeddingBagGetWorkspaceSize": 0.0,
+        "aclCreateTensor": 0.0,
+        "aclrtStreamWaitEvent": 4.0,
+        "aclrtStreamQuery": 1.198,
+        "nanosleep": 0.198
+      },
+      "api_ns": {
+        "aclrtRecordEvent": 713422.2066666667,
+        "aclrtQueryEventStatus": 71645.16666666667,
+        "aclnnEmbeddingBagGetWorkspaceSize": 0.0,
+        "aclCreateTensor": 0.0,
+        "aclrtStreamWaitEvent": 18372.02666666667,
+        "aclrtStreamQuery": 3495.2266666666665,
+        "nanosleep": 21293.493333333332
+      },
+      "record_callers": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/03-e-calibrate-q0",
+          "round": 0,
+          "total": 183.0,
+          "allocator": 156.0,
+          "scheduler": 27.0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/03-e-calibrate-q0",
+          "round": 1,
+          "total": 183.0,
+          "allocator": 156.0,
+          "scheduler": 27.0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/03-e-calibrate-q0",
+          "round": 2,
+          "total": 183.0,
+          "allocator": 156.0,
+          "scheduler": 27.0
+        }
+      ],
+      "calibration": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/03-e-calibrate-q0",
+          "round": 0,
+          "active_ns": 3844611.3426666665,
+          "disabled_ns": 3832715.1133333333,
+          "change_pct": 0.31038647490255755
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/03-e-calibrate-q0",
+          "round": 1,
+          "active_ns": 3868735.7126666666,
+          "disabled_ns": 3849330.0593333333,
+          "change_pct": 0.5041306677841639
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/03-e-calibrate-q0",
+          "round": 2,
+          "active_ns": 3707213.1506666667,
+          "disabled_ns": 3722210.3813333334,
+          "change_pct": -0.40291195634392096
+        }
+      ],
+      "calibration_median_pct": 0.31038647490255755,
+      "bare": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/02-e-split-q0",
+          "timing": {
+            "forward_ns": {
+              "mean_ns": 3745116.634,
+              "median_ns": 3725946.0
+            },
+            "final_sync_ns": {
+              "mean_ns": 62879.111333333334,
+              "median_ns": 60837.5
+            },
+            "e2e_ns": {
+              "mean_ns": 3807995.7453333335,
+              "median_ns": 3789079.0
+            }
+          }
+        }
+      ],
+      "device_ns": {
+        "kernel_sum_ns": 1349120.12,
+        "kernel_union_ns": 1234116.71,
+        "kernel_overlap_ns": 115003.41,
+        "kernel_forward_ns_lower": 1231747.76,
+        "kernel_forward_ns_upper": 1234116.71,
+        "kernel_final_sync_ns_lower": 0,
+        "kernel_final_sync_ns_upper": 2368.95,
+        "wall_ns": 4411250.74,
+        "compute_busy_share": 0.2800362468532371,
+        "first_kernel_delay_ns_lower": 12168.48,
+        "last_kernel_to_forward_return_ns_lower": -30595.18,
+        "realtime_perf_difference_ns": 764.83
+      },
+      "device_family_sum_ns": {
+        "mlp": 30998.2,
+        "embedding_cast": 120235.41,
+        "embedding": 1087456.08,
+        "zero": 1049.8,
+        "interaction": 109380.63
+      },
+      "device_clock_offset_bounds_ns": {
+        "lower": 320154,
+        "upper": 828262,
+        "definition": "device timestamp + offset is host epoch; causal bounds, not a fitted offset"
+      },
+      "device_profiled_e2e_ns": 4410485.91,
+      "device_control_before_ns": 3949462.24,
+      "device_control_after_ns": 3912497.87
+    },
+    "ei": {
+      "host_ns": {
+        "host_prepare_submit_ns": 2991832.165666667,
+        "event_ns": 981136.7966666666,
+        "internal_sync_ns": 101464.51,
+        "final_sync_ns": 66960.568,
+        "e2e_ns": 4141394.0403333334,
+        "host_other_ns": 2385616.662333333,
+        "sdk_launch_ns": 582032.3733333334,
+        "sdk_workspace_ns": 0.0,
+        "sdk_descriptor_ns": 0.0,
+        "stream_api_ns": 24183.13,
+        "poll_sleep_ns": 15089.033333333333,
+        "copy_sync_ns": 42551.07666666666,
+        "partition_sum_ns": 4141394.0403333334
+      },
+      "host_selected_windows": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/repeat-003/00-ei-calibrate-q0",
+          "round": 0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/05-ei-calibrate-q0",
+          "round": 2
+        }
+      ],
+      "all_host_windows": [
+        {
+          "host_prepare_submit_ns": 3080703.405333333,
+          "event_ns": 1009365.12,
+          "internal_sync_ns": 82389.75333333333,
+          "final_sync_ns": 202940.10133333332,
+          "e2e_ns": 4375398.38,
+          "host_other_ns": 2463916.0919999997,
+          "sdk_launch_ns": 590822.4466666668,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 25964.86666666667,
+          "poll_sleep_ns": 9312.686666666666,
+          "copy_sync_ns": 42647.37333333334,
+          "partition_sum_ns": 4375398.38,
+          "categories_ns": {
+            "forward": {
+              "event": 1009365.12,
+              "sync": 30429.693333333333,
+              "copy_sync": 42647.37333333334,
+              "copy_async": 0.0,
+              "stream": 25964.86666666667,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 590822.4466666668,
+              "poll_sleep": 9312.686666666666
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 25327.793333333335,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 127860.18
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/05-ei-calibrate-q0",
+          "round": 0
+        },
+        {
+          "host_prepare_submit_ns": 3048826.5913333334,
+          "event_ns": 964123.5933333333,
+          "internal_sync_ns": 909904.7933333335,
+          "final_sync_ns": 662880.986,
+          "e2e_ns": 5585735.964,
+          "host_other_ns": 2436694.238,
+          "sdk_launch_ns": 585894.0266666666,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 26238.326666666668,
+          "poll_sleep_ns": 13564.246666666666,
+          "copy_sync_ns": 42972.693333333336,
+          "partition_sum_ns": 5585735.964,
+          "categories_ns": {
+            "forward": {
+              "event": 964123.5933333333,
+              "sync": 853367.8533333334,
+              "copy_sync": 42972.693333333336,
+              "copy_async": 0.0,
+              "stream": 26238.326666666668,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 585894.0266666666,
+              "poll_sleep": 13564.246666666666
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 37783.27333333333,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 579070.4666666667
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/05-ei-calibrate-q0",
+          "round": 1
+        },
+        {
+          "host_prepare_submit_ns": 3065886.0886666668,
+          "event_ns": 977650.4066666667,
+          "internal_sync_ns": 129252.64666666667,
+          "final_sync_ns": 67880.416,
+          "e2e_ns": 4240669.558,
+          "host_other_ns": 2456999.762,
+          "sdk_launch_ns": 583778.2133333334,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 25108.113333333335,
+          "poll_sleep_ns": 11571.18,
+          "copy_sync_ns": 44305.73333333333,
+          "partition_sum_ns": 4240669.558,
+          "categories_ns": {
+            "forward": {
+              "event": 977650.4066666667,
+              "sync": 73375.73333333334,
+              "copy_sync": 44305.73333333333,
+              "copy_async": 0.0,
+              "stream": 25108.113333333335,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 583778.2133333334,
+              "poll_sleep": 11571.18
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 17968.64,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/05-ei-calibrate-q0",
+          "round": 2
+        },
+        {
+          "host_prepare_submit_ns": 2917778.2426666664,
+          "event_ns": 984623.1866666666,
+          "internal_sync_ns": 73676.37333333332,
+          "final_sync_ns": 66040.72,
+          "e2e_ns": 4042118.5226666667,
+          "host_other_ns": 2314233.562666666,
+          "sdk_launch_ns": 580286.5333333334,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 23258.146666666667,
+          "poll_sleep_ns": 18606.886666666665,
+          "copy_sync_ns": 40796.42,
+          "partition_sum_ns": 4042118.5226666667,
+          "categories_ns": {
+            "forward": {
+              "event": 984623.1866666666,
+              "sync": 14273.066666666666,
+              "copy_sync": 40796.42,
+              "copy_async": 0.0,
+              "stream": 23258.146666666667,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 580286.5333333334,
+              "poll_sleep": 18606.886666666665
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 18309.72,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 319.38
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/repeat-003/00-ei-calibrate-q0",
+          "round": 0
+        },
+        {
+          "host_prepare_submit_ns": 2904311.5593333333,
+          "event_ns": 927790.1533333333,
+          "internal_sync_ns": 68458.11333333334,
+          "final_sync_ns": 64220.172666666665,
+          "e2e_ns": 3964779.9986666664,
+          "host_other_ns": 2302556.479333333,
+          "sdk_launch_ns": 578542.9733333333,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 23212.106666666667,
+          "poll_sleep_ns": 15108.4,
+          "copy_sync_ns": 39792.48,
+          "partition_sum_ns": 3964779.9986666664,
+          "categories_ns": {
+            "forward": {
+              "event": 927790.1533333333,
+              "sync": 13557.233333333334,
+              "copy_sync": 39792.48,
+              "copy_async": 0.0,
+              "stream": 23212.106666666667,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 578542.9733333333,
+              "poll_sleep": 15108.4
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 16864.666666666668,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/repeat-003/00-ei-calibrate-q0",
+          "round": 1
+        },
+        {
+          "host_prepare_submit_ns": 2913468.2893333333,
+          "event_ns": 989698.5466666667,
+          "internal_sync_ns": 69048.14666666667,
+          "final_sync_ns": 67172.462,
+          "e2e_ns": 4039387.4446666664,
+          "host_other_ns": 2311997.3826666665,
+          "sdk_launch_ns": 578059.0599999999,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 23411.846666666665,
+          "poll_sleep_ns": 14448.666666666666,
+          "copy_sync_ns": 40386.346666666665,
+          "partition_sum_ns": 4039387.4446666664,
+          "categories_ns": {
+            "forward": {
+              "event": 989698.5466666667,
+              "sync": 14213.133333333333,
+              "copy_sync": 40386.346666666665,
+              "copy_async": 0.0,
+              "stream": 23411.846666666665,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 578059.0599999999,
+              "poll_sleep": 14448.666666666666
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 19696.113333333335,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/repeat-003/00-ei-calibrate-q0",
+          "round": 2
+        }
+      ],
+      "api_counts": {
+        "aclrtRecordEvent": 222.0,
+        "aclrtQueryEventStatus": 191.19633333333334,
+        "aclnnEmbeddingBagGetWorkspaceSize": 0.0,
+        "aclCreateTensor": 0.0,
+        "aclrtStreamWaitEvent": 8.0,
+        "aclrtStreamQuery": 1.142,
+        "nanosleep": 0.14200000000000002
+      },
+      "api_ns": {
+        "aclrtRecordEvent": 871961.5833333333,
+        "aclrtQueryEventStatus": 83243.76333333334,
+        "aclnnEmbeddingBagGetWorkspaceSize": 0.0,
+        "aclCreateTensor": 0.0,
+        "aclrtStreamWaitEvent": 25931.449999999997,
+        "aclrtStreamQuery": 3104.55,
+        "nanosleep": 15089.033333333333
+      },
+      "record_callers": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/05-ei-calibrate-q0",
+          "round": 0,
+          "total": 222.0,
+          "allocator": 191.0,
+          "scheduler": 31.0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/05-ei-calibrate-q0",
+          "round": 1,
+          "total": 222.0,
+          "allocator": 191.0,
+          "scheduler": 31.0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/05-ei-calibrate-q0",
+          "round": 2,
+          "total": 222.0,
+          "allocator": 191.0,
+          "scheduler": 31.0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/repeat-003/00-ei-calibrate-q0",
+          "round": 0,
+          "total": 222.0,
+          "allocator": 191.0,
+          "scheduler": 31.0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/repeat-003/00-ei-calibrate-q0",
+          "round": 1,
+          "total": 222.0,
+          "allocator": 191.0,
+          "scheduler": 31.0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/repeat-003/00-ei-calibrate-q0",
+          "round": 2,
+          "total": 222.0,
+          "allocator": 191.0,
+          "scheduler": 31.0
+        }
+      ],
+      "calibration": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/05-ei-calibrate-q0",
+          "round": 0,
+          "active_ns": 4375398.38,
+          "disabled_ns": 4174971.7513333336,
+          "change_pct": 4.800670294419529
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/05-ei-calibrate-q0",
+          "round": 1,
+          "active_ns": 5585735.964,
+          "disabled_ns": 4030326.72,
+          "change_pct": 38.592634097912516
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/05-ei-calibrate-q0",
+          "round": 2,
+          "active_ns": 4240669.558,
+          "disabled_ns": 4196191.102666667,
+          "change_pct": 1.0599721091126613
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/repeat-003/00-ei-calibrate-q0",
+          "round": 0,
+          "active_ns": 4042118.5226666667,
+          "disabled_ns": 4071056.0973333335,
+          "change_pct": -0.7108124765370261
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/repeat-003/00-ei-calibrate-q0",
+          "round": 1,
+          "active_ns": 3964779.9986666664,
+          "disabled_ns": 3974602.8826666665,
+          "change_pct": -0.24714126895136745
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/repeat-003/00-ei-calibrate-q0",
+          "round": 2,
+          "active_ns": 4039387.4446666664,
+          "disabled_ns": 3985636.002,
+          "change_pct": 1.3486289927051587
+        }
+      ],
+      "calibration_median_pct": 1.20430055090891,
+      "bare": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/04-ei-split-q0",
+          "timing": {
+            "forward_ns": {
+              "mean_ns": 3848439.81,
+              "median_ns": 3842651.0
+            },
+            "final_sync_ns": {
+              "mean_ns": 56920.548,
+              "median_ns": 56593.0
+            },
+            "e2e_ns": {
+              "mean_ns": 3905360.358,
+              "median_ns": 3899188.0
+            }
+          }
+        }
+      ],
+      "device_ns": {
+        "kernel_sum_ns": 1368333.35,
+        "kernel_union_ns": 1256839.76,
+        "kernel_overlap_ns": 111493.59,
+        "kernel_forward_ns_lower": 1254259.72,
+        "kernel_forward_ns_upper": 1256839.76,
+        "kernel_final_sync_ns_lower": 0,
+        "kernel_final_sync_ns_upper": 2580.04,
+        "wall_ns": 4778518.8,
+        "compute_busy_share": 0.2630866674767379,
+        "first_kernel_delay_ns_lower": 12230.88,
+        "last_kernel_to_forward_return_ns_lower": -25537.98,
+        "realtime_perf_difference_ns": 725.81
+      },
+      "device_family_sum_ns": {
+        "mlp": 40222.34,
+        "embedding_cast": 119478.49,
+        "embedding": 1094387.92,
+        "zero": 1099.76,
+        "interaction": 113144.84
+      },
+      "device_clock_offset_bounds_ns": {
+        "lower": -110996,
+        "upper": 576740,
+        "definition": "device timestamp + offset is host epoch; causal bounds, not a fitted offset"
+      },
+      "device_profiled_e2e_ns": 4777792.99,
+      "device_control_before_ns": 4220210.1,
+      "device_control_after_ns": 4187259.6
+    },
+    "ae": {
+      "host_ns": {
+        "host_prepare_submit_ns": 2412869.9906666665,
+        "event_ns": 104531.07333333333,
+        "internal_sync_ns": 78748.54000000001,
+        "final_sync_ns": 61218.16933333333,
+        "e2e_ns": 2657367.7733333334,
+        "host_other_ns": 1826623.4973333334,
+        "sdk_launch_ns": 570939.5533333333,
+        "sdk_workspace_ns": 0.0,
+        "sdk_descriptor_ns": 0.0,
+        "stream_api_ns": 15306.94,
+        "poll_sleep_ns": 26580.406666666666,
+        "copy_sync_ns": 38376.0,
+        "partition_sum_ns": 2657367.773333333
+      },
+      "host_selected_windows": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/07-ae-calibrate-q0",
+          "round": 2
+        }
+      ],
+      "all_host_windows": [
+        {
+          "host_prepare_submit_ns": 2419261.8279999997,
+          "event_ns": 103367.56666666667,
+          "internal_sync_ns": 75850.58,
+          "final_sync_ns": 62011.53466666667,
+          "e2e_ns": 2660491.5093333335,
+          "host_other_ns": 1832847.9146666664,
+          "sdk_launch_ns": 571038.4266666666,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 15375.486666666666,
+          "poll_sleep_ns": 21941.193333333333,
+          "copy_sync_ns": 40304.85333333333,
+          "partition_sum_ns": 2660491.5093333335,
+          "categories_ns": {
+            "forward": {
+              "event": 103367.56666666667,
+              "sync": 13604.533333333333,
+              "copy_sync": 40304.85333333333,
+              "copy_async": 0.0,
+              "stream": 15375.486666666666,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 571038.4266666666,
+              "poll_sleep": 21941.193333333333
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 19813.5,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/07-ae-calibrate-q0",
+          "round": 0
+        },
+        {
+          "host_prepare_submit_ns": 2401902.359333333,
+          "event_ns": 102496.14,
+          "internal_sync_ns": 79164.52666666667,
+          "final_sync_ns": 60632.43,
+          "e2e_ns": 2644195.456,
+          "host_other_ns": 1816290.2926666664,
+          "sdk_launch_ns": 570300.4866666667,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 15311.58,
+          "poll_sleep_ns": 26765.606666666667,
+          "copy_sync_ns": 38840.4,
+          "partition_sum_ns": 2644195.4560000002,
+          "categories_ns": {
+            "forward": {
+              "event": 102496.14,
+              "sync": 13558.52,
+              "copy_sync": 38840.4,
+              "copy_async": 0.0,
+              "stream": 15311.58,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 570300.4866666667,
+              "poll_sleep": 26765.606666666667
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 19377.44,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/07-ae-calibrate-q0",
+          "round": 1
+        },
+        {
+          "host_prepare_submit_ns": 2412869.9906666665,
+          "event_ns": 104531.07333333333,
+          "internal_sync_ns": 78748.54000000001,
+          "final_sync_ns": 61218.16933333333,
+          "e2e_ns": 2657367.7733333334,
+          "host_other_ns": 1826623.4973333334,
+          "sdk_launch_ns": 570939.5533333333,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 15306.94,
+          "poll_sleep_ns": 26580.406666666666,
+          "copy_sync_ns": 38376.0,
+          "partition_sum_ns": 2657367.773333333,
+          "categories_ns": {
+            "forward": {
+              "event": 104531.07333333333,
+              "sync": 13792.133333333333,
+              "copy_sync": 38376.0,
+              "copy_async": 0.0,
+              "stream": 15306.94,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 570939.5533333333,
+              "poll_sleep": 26580.406666666666
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 19853.66,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/07-ae-calibrate-q0",
+          "round": 2
+        }
+      ],
+      "api_counts": {
+        "aclrtRecordEvent": 16.0,
+        "aclrtQueryEventStatus": 12.402,
+        "aclnnEmbeddingBagGetWorkspaceSize": 0.0,
+        "aclCreateTensor": 0.0,
+        "aclrtStreamWaitEvent": 4.0,
+        "aclrtStreamQuery": 1.2486666666666666,
+        "nanosleep": 0.24866666666666667
+      },
+      "api_ns": {
+        "aclrtRecordEvent": 80861.51333333334,
+        "aclrtQueryEventStatus": 11152.766666666666,
+        "aclnnEmbeddingBagGetWorkspaceSize": 0.0,
+        "aclCreateTensor": 0.0,
+        "aclrtStreamWaitEvent": 12516.793333333333,
+        "aclrtStreamQuery": 3256.18,
+        "nanosleep": 26580.406666666666
+      },
+      "record_callers": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/07-ae-calibrate-q0",
+          "round": 0,
+          "total": 16.0,
+          "allocator": 12.0,
+          "scheduler": 4.0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/07-ae-calibrate-q0",
+          "round": 1,
+          "total": 16.0,
+          "allocator": 12.0,
+          "scheduler": 4.0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/07-ae-calibrate-q0",
+          "round": 2,
+          "total": 16.0,
+          "allocator": 12.0,
+          "scheduler": 4.0
+        }
+      ],
+      "calibration": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/07-ae-calibrate-q0",
+          "round": 0,
+          "active_ns": 2660491.5093333335,
+          "disabled_ns": 2672498.984,
+          "change_pct": -0.4492976326110676
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/07-ae-calibrate-q0",
+          "round": 1,
+          "active_ns": 2644195.456,
+          "disabled_ns": 2656005.033333333,
+          "change_pct": -0.4446368581806581
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/07-ae-calibrate-q0",
+          "round": 2,
+          "active_ns": 2657367.7733333334,
+          "disabled_ns": 2624661.9433333334,
+          "change_pct": 1.246096857657153
+        }
+      ],
+      "calibration_median_pct": -0.4446368581806581,
+      "bare": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/06-ae-split-q0",
+          "timing": {
+            "forward_ns": {
+              "mean_ns": 2652380.174,
+              "median_ns": 2640121.0
+            },
+            "final_sync_ns": {
+              "mean_ns": 61595.618,
+              "median_ns": 61263.0
+            },
+            "e2e_ns": {
+              "mean_ns": 2713975.792,
+              "median_ns": 2701452.0
+            }
+          }
+        }
+      ],
+      "device_ns": {
+        "kernel_sum_ns": 1299982.25,
+        "kernel_union_ns": 1197458.24,
+        "kernel_overlap_ns": 102524.01,
+        "kernel_forward_ns_lower": 1194302.9,
+        "kernel_forward_ns_upper": 1197458.24,
+        "kernel_final_sync_ns_lower": 0,
+        "kernel_final_sync_ns_upper": 3155.34,
+        "wall_ns": 3019314.03,
+        "compute_busy_share": 0.4017423389016417,
+        "first_kernel_delay_ns_lower": 11572.14,
+        "last_kernel_to_forward_return_ns_lower": -42656.19,
+        "realtime_perf_difference_ns": 660.54
+      },
+      "device_family_sum_ns": {
+        "mlp": 30351.64,
+        "embedding_cast": 109218.78,
+        "embedding": 1048897.63,
+        "zero": 1086.77,
+        "interaction": 110427.43
+      },
+      "device_clock_offset_bounds_ns": {
+        "lower": -42206,
+        "upper": 132823,
+        "definition": "device timestamp + offset is host epoch; causal bounds, not a fitted offset"
+      },
+      "device_profiled_e2e_ns": 3018653.49,
+      "device_control_before_ns": 2669336.71,
+      "device_control_after_ns": 2656775.65
+    },
+    "aei": {
+      "host_ns": {
+        "host_prepare_submit_ns": 2449588.211333333,
+        "event_ns": 267957.11333333334,
+        "internal_sync_ns": 64212.66,
+        "final_sync_ns": 62181.98,
+        "e2e_ns": 2843939.9646666665,
+        "host_other_ns": 1867085.7646666663,
+        "sdk_launch_ns": 563989.4333333333,
+        "sdk_workspace_ns": 0.0,
+        "sdk_descriptor_ns": 0.0,
+        "stream_api_ns": 18513.013333333332,
+        "poll_sleep_ns": 9758.6,
+        "copy_sync_ns": 40743.90666666667,
+        "partition_sum_ns": 2843939.9646666665
+      },
+      "host_selected_windows": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/09-aei-calibrate-q0",
+          "round": 0
+        }
+      ],
+      "all_host_windows": [
+        {
+          "host_prepare_submit_ns": 2449588.211333333,
+          "event_ns": 267957.11333333334,
+          "internal_sync_ns": 64212.66,
+          "final_sync_ns": 62181.98,
+          "e2e_ns": 2843939.9646666665,
+          "host_other_ns": 1867085.7646666663,
+          "sdk_launch_ns": 563989.4333333333,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 18513.013333333332,
+          "poll_sleep_ns": 9758.6,
+          "copy_sync_ns": 40743.90666666667,
+          "partition_sum_ns": 2843939.9646666665,
+          "categories_ns": {
+            "forward": {
+              "event": 267957.11333333334,
+              "sync": 13710.153333333332,
+              "copy_sync": 40743.90666666667,
+              "copy_async": 0.0,
+              "stream": 18513.013333333332,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 563989.4333333333,
+              "poll_sleep": 9758.6
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 19133.88,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/09-aei-calibrate-q0",
+          "round": 0
+        },
+        {
+          "host_prepare_submit_ns": 2491144.883333333,
+          "event_ns": 269936.72,
+          "internal_sync_ns": 67585.42666666667,
+          "final_sync_ns": 66470.602,
+          "e2e_ns": 2895137.632,
+          "host_other_ns": 1891988.956666666,
+          "sdk_launch_ns": 580689.1133333334,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 18466.81333333333,
+          "poll_sleep_ns": 13136.593333333334,
+          "copy_sync_ns": 40929.64,
+          "partition_sum_ns": 2895137.6319999993,
+          "categories_ns": {
+            "forward": {
+              "event": 269936.72,
+              "sync": 13519.193333333333,
+              "copy_sync": 40929.64,
+              "copy_async": 0.0,
+              "stream": 18466.81333333333,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 580689.1133333334,
+              "poll_sleep": 13136.593333333334
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 19761.68666666667,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/09-aei-calibrate-q0",
+          "round": 1
+        },
+        {
+          "host_prepare_submit_ns": 2432266.3853333336,
+          "event_ns": 264872.48000000004,
+          "internal_sync_ns": 76882.32,
+          "final_sync_ns": 60272.83933333333,
+          "e2e_ns": 2834294.0246666665,
+          "host_other_ns": 1848071.898666667,
+          "sdk_launch_ns": 565827.4466666665,
+          "sdk_workspace_ns": 0.0,
+          "sdk_descriptor_ns": 0.0,
+          "stream_api_ns": 18367.04,
+          "poll_sleep_ns": 23262.286666666667,
+          "copy_sync_ns": 39914.03333333333,
+          "partition_sum_ns": 2834294.024666667,
+          "categories_ns": {
+            "forward": {
+              "event": 264872.48000000004,
+              "sync": 13706.0,
+              "copy_sync": 39914.03333333333,
+              "copy_async": 0.0,
+              "stream": 18367.04,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 565827.4466666665,
+              "poll_sleep": 23262.286666666667
+            },
+            "final_sync": {
+              "event": 0.0,
+              "sync": 18557.986666666668,
+              "copy_sync": 0.0,
+              "copy_async": 0.0,
+              "stream": 0.0,
+              "descriptor": 0.0,
+              "workspace": 0.0,
+              "launch": 0.0,
+              "poll_sleep": 0.0
+            }
+          },
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/09-aei-calibrate-q0",
+          "round": 2
+        }
+      ],
+      "api_counts": {
+        "aclrtRecordEvent": 56.0,
+        "aclrtQueryEventStatus": 47.346,
+        "aclnnEmbeddingBagGetWorkspaceSize": 0.0,
+        "aclCreateTensor": 0.0,
+        "aclrtStreamWaitEvent": 8.0,
+        "aclrtStreamQuery": 1.092,
+        "nanosleep": 0.092
+      },
+      "api_ns": {
+        "aclrtRecordEvent": 221783.52666666667,
+        "aclrtQueryEventStatus": 23583.653333333332,
+        "aclnnEmbeddingBagGetWorkspaceSize": 0.0,
+        "aclCreateTensor": 0.0,
+        "aclrtStreamWaitEvent": 22589.933333333334,
+        "aclrtStreamQuery": 2939.5133333333333,
+        "nanosleep": 9758.6
+      },
+      "record_callers": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/09-aei-calibrate-q0",
+          "round": 0,
+          "total": 56.0,
+          "allocator": 47.0,
+          "scheduler": 9.0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/09-aei-calibrate-q0",
+          "round": 1,
+          "total": 56.0,
+          "allocator": 47.0,
+          "scheduler": 9.0
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/09-aei-calibrate-q0",
+          "round": 2,
+          "total": 56.0,
+          "allocator": 47.0,
+          "scheduler": 9.0
+        }
+      ],
+      "calibration": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/09-aei-calibrate-q0",
+          "round": 0,
+          "active_ns": 2843939.9646666665,
+          "disabled_ns": 2839071.053333333,
+          "change_pct": 0.17149663540885207
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/09-aei-calibrate-q0",
+          "round": 1,
+          "active_ns": 2895137.632,
+          "disabled_ns": 2876259.2526666666,
+          "change_pct": 0.6563517984629064
+        },
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/09-aei-calibrate-q0",
+          "round": 2,
+          "active_ns": 2834294.0246666665,
+          "disabled_ns": 2839570.2673333334,
+          "change_pct": -0.185811308399908
+        }
+      ],
+      "calibration_median_pct": 0.17149663540885207,
+      "bare": [
+        {
+          "case": "/home/zyz/r33-a3-phase-20261111/campaign-002/08-aei-split-q0",
+          "timing": {
+            "forward_ns": {
+              "mean_ns": 2813231.1326666665,
+              "median_ns": 2794640.5
+            },
+            "final_sync_ns": {
+              "mean_ns": 57396.34066666666,
+              "median_ns": 57652.0
+            },
+            "e2e_ns": {
+              "mean_ns": 2870627.473333333,
+              "median_ns": 2852368.0
+            }
+          }
+        }
+      ],
+      "device_ns": {
+        "kernel_sum_ns": 1311057,
+        "kernel_union_ns": 1201741.82,
+        "kernel_overlap_ns": 109315.18,
+        "kernel_forward_ns_lower": 1197008.01,
+        "kernel_forward_ns_upper": 1201741.82,
+        "kernel_final_sync_ns_lower": 0,
+        "kernel_final_sync_ns_upper": 4733.81,
+        "wall_ns": 3166235.12,
+        "compute_busy_share": 0.3797365437203999,
+        "first_kernel_delay_ns_lower": 8182.23,
+        "last_kernel_to_forward_return_ns_lower": -40143.62,
+        "realtime_perf_difference_ns": 630.75
+      },
+      "device_family_sum_ns": {
+        "mlp": 40611.3,
+        "embedding_cast": 109814.92,
+        "embedding": 1049182.88,
+        "zero": 1112.56,
+        "interaction": 110335.34
+      },
+      "device_clock_offset_bounds_ns": {
+        "lower": -71122,
+        "upper": 287833,
+        "definition": "device timestamp + offset is host epoch; causal bounds, not a fitted offset"
+      },
+      "device_profiled_e2e_ns": 3165604.37,
+      "device_control_before_ns": 2866912.25,
+      "device_control_after_ns": 2855583.95
+    }
+  },
+  "task_queue_comparison": {
+    "pairs": [
+      {
+        "pair": 0,
+        "queue0_ns": 2092093.1906666667,
+        "queue1_ns": 1717616.3426666667,
+        "change_pct": -17.89962558411029
+      },
+      {
+        "pair": 1,
+        "queue0_ns": 2224084.8186666667,
+        "queue1_ns": 1705980.0506666666,
+        "change_pct": -23.295189268483142
+      },
+      {
+        "pair": 2,
+        "queue0_ns": 2242705.7193333334,
+        "queue1_ns": 1739353.9406666667,
+        "change_pct": -22.443951265094785
+      }
+    ],
+    "median_latency_change_pct": -22.443951265094785,
+    "faster_pairs": 3
+  },
+  "timed_forward_samples": 81500,
+  "model_worker_processes": 25,
+  "evidence": {
+    "bytes": 72321493,
+    "sha256": "7567601e598518a96ee4cea9d7f3d6756b1adcf9a180d656b89a8f0a3a79d46e",
+    "payloads": 561
+  }
+}
