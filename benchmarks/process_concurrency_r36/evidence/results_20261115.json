@@ -1,0 +1,1600 @@
+{
+  "schema": 1,
+  "status": {
+    "status": "complete",
+    "completed": 27,
+    "total": 27
+  },
+  "validated_performance_requests": 81000,
+  "repeated_npu_rounds": 3,
+  "rows": [
+    {
+      "label": "000-cpu-ft-p1-r0",
+      "runtime": "ft",
+      "device": "cpu",
+      "world": 1,
+      "round": 0,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 571.8207712056164,
+      "p50_ms": 1.741755,
+      "p99_ms": 1.817338,
+      "max_abs_error": 0.0,
+      "setup_pss_mib": 393.880859375,
+      "setup_rss_mib": 394.16796875,
+      "start_lag_max_ms": 0.059732,
+      "finish_skew_ms": 0.0,
+      "runtime_identity": {
+        "python": "3.14.6",
+        "torch": "2.13.0+cpu",
+        "torch_git": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+        "numpy": "2.4.4",
+        "build_disabled": 1,
+        "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+        "runtime_kind": "sameft-gilon",
+        "gil_before": true
+      },
+      "npu_allocated_mib": 0.0,
+      "npu_reserved_mib": 0.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.7398632546666668,
+      "completion_mean_ms": 0.004772657666666667,
+      "caller_cpu_mean_ms": 1.7411144566666668
+    },
+    {
+      "label": "001-cpu-ft-p2-r0",
+      "runtime": "ft",
+      "device": "cpu",
+      "world": 2,
+      "round": 0,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1101.9962790794425,
+      "p50_ms": 1.805917,
+      "p99_ms": 1.86158,
+      "max_abs_error": 0.0,
+      "setup_pss_mib": 674.6796875,
+      "setup_rss_mib": 788.328125,
+      "start_lag_max_ms": 0.070543,
+      "finish_skew_ms": 2.193555,
+      "runtime_identity": {
+        "python": "3.14.6",
+        "torch": "2.13.0+cpu",
+        "torch_git": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+        "numpy": "2.4.4",
+        "build_disabled": 1,
+        "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+        "runtime_kind": "sameft-gilon",
+        "gil_before": true
+      },
+      "npu_allocated_mib": 0.0,
+      "npu_reserved_mib": 0.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.8041918623333333,
+      "completion_mean_ms": 0.004972147333333334,
+      "caller_cpu_mean_ms": 1.8058045166666665
+    },
+    {
+      "label": "002-cpu-ft-p4-r0",
+      "runtime": "ft",
+      "device": "cpu",
+      "world": 4,
+      "round": 0,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 2187.5085565764384,
+      "p50_ms": 1.820368,
+      "p99_ms": 1.874601,
+      "max_abs_error": 0.0,
+      "setup_pss_mib": 1236.439453125,
+      "setup_rss_mib": 1567.5,
+      "start_lag_max_ms": 0.084534,
+      "finish_skew_ms": 0.772513,
+      "runtime_identity": {
+        "python": "3.14.6",
+        "torch": "2.13.0+cpu",
+        "torch_git": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+        "numpy": "2.4.4",
+        "build_disabled": 1,
+        "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+        "runtime_kind": "sameft-gilon",
+        "gil_before": true
+      },
+      "npu_allocated_mib": 0.0,
+      "npu_reserved_mib": 0.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.8180422563333334,
+      "completion_mean_ms": 0.0050382023333333335,
+      "caller_cpu_mean_ms": 1.8177161566666666
+    },
+    {
+      "label": "003-cpu-standard-p1-r0",
+      "runtime": "standard",
+      "device": "cpu",
+      "world": 1,
+      "round": 0,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 598.4953645788887,
+      "p50_ms": 1.63861,
+      "p99_ms": 1.732564,
+      "max_abs_error": 0.0,
+      "setup_pss_mib": 375.2763671875,
+      "setup_rss_mib": 385.75390625,
+      "start_lag_max_ms": 0.069053,
+      "finish_skew_ms": 0.0,
+      "runtime_identity": {
+        "python": "3.12.13",
+        "torch": "2.10.0+cpu",
+        "torch_git": "449b1768410104d3ed79d3bcfe4ba1d65c7f22c0",
+        "numpy": "2.2.6",
+        "build_disabled": null,
+        "python_sha256": "5d137e6378d886d6ee0390e126011e9e8af81290032e3fefa13a81f72651fda0",
+        "runtime_kind": "standard-gil",
+        "gil_before": true
+      },
+      "npu_allocated_mib": 0.0,
+      "npu_reserved_mib": 0.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.6621392806666666,
+      "completion_mean_ms": 0.005020055000000001,
+      "caller_cpu_mean_ms": 1.6639578733333333
+    },
+    {
+      "label": "004-cpu-standard-p2-r0",
+      "runtime": "standard",
+      "device": "cpu",
+      "world": 2,
+      "round": 0,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1147.1536431670386,
+      "p50_ms": 1.690933,
+      "p99_ms": 1.748395,
+      "max_abs_error": 0.0,
+      "setup_pss_mib": 615.142578125,
+      "setup_rss_mib": 757.94921875,
+      "start_lag_max_ms": 0.059282,
+      "finish_skew_ms": 68.600373,
+      "runtime_identity": {
+        "python": "3.12.13",
+        "torch": "2.10.0+cpu",
+        "torch_git": "449b1768410104d3ed79d3bcfe4ba1d65c7f22c0",
+        "numpy": "2.2.6",
+        "build_disabled": null,
+        "python_sha256": "5d137e6378d886d6ee0390e126011e9e8af81290032e3fefa13a81f72651fda0",
+        "runtime_kind": "standard-gil",
+        "gil_before": true
+      },
+      "npu_allocated_mib": 0.0,
+      "npu_reserved_mib": 0.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.7123002303333335,
+      "completion_mean_ms": 0.004815004,
+      "caller_cpu_mean_ms": 1.7137029533333334
+    },
+    {
+      "label": "005-cpu-standard-p4-r0",
+      "runtime": "standard",
+      "device": "cpu",
+      "world": 4,
+      "round": 0,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 2304.782390501903,
+      "p50_ms": 1.706253,
+      "p99_ms": 1.772156,
+      "max_abs_error": 0.0,
+      "setup_pss_mib": 1095.875,
+      "setup_rss_mib": 1527.05859375,
+      "start_lag_max_ms": 0.060892,
+      "finish_skew_ms": 28.650964,
+      "runtime_identity": {
+        "python": "3.12.13",
+        "torch": "2.10.0+cpu",
+        "torch_git": "449b1768410104d3ed79d3bcfe4ba1d65c7f22c0",
+        "numpy": "2.2.6",
+        "build_disabled": null,
+        "python_sha256": "5d137e6378d886d6ee0390e126011e9e8af81290032e3fefa13a81f72651fda0",
+        "runtime_kind": "standard-gil",
+        "gil_before": true
+      },
+      "npu_allocated_mib": 0.0,
+      "npu_reserved_mib": 0.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.7044138683333334,
+      "completion_mean_ms": 0.005020288333333333,
+      "caller_cpu_mean_ms": 1.70439056
+    },
+    {
+      "label": "006-npu-ft-p1-r0",
+      "runtime": "ft",
+      "device": "npu",
+      "world": 1,
+      "round": 0,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 558.6926506903578,
+      "p50_ms": 1.780236,
+      "p99_ms": 1.836159,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 1604.091796875,
+      "setup_rss_mib": 1942.125,
+      "start_lag_max_ms": 0.064492,
+      "finish_skew_ms": 0.0,
+      "runtime_identity": {
+        "python": "3.14.6",
+        "torch": "2.13.0+cpu",
+        "torch_git": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+        "numpy": "2.4.4",
+        "build_disabled": 1,
+        "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+        "runtime_kind": "sameft-gilon",
+        "gil_before": true,
+        "torch_npu": "2.13.0+git46936d1"
+      },
+      "npu_allocated_mib": 5.27685546875,
+      "npu_reserved_mib": 26.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.7093105153333332,
+      "completion_mean_ms": 0.07640701533333333,
+      "caller_cpu_mean_ms": 1.7690259799999999
+    },
+    {
+      "label": "007-npu-ft-p2-r0",
+      "runtime": "ft",
+      "device": "npu",
+      "world": 2,
+      "round": 0,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1008.6547615086888,
+      "p50_ms": 1.969584,
+      "p99_ms": 2.110211,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 3056.658203125,
+      "setup_rss_mib": 3852.58984375,
+      "start_lag_max_ms": 0.064649,
+      "finish_skew_ms": 10.530623,
+      "runtime_identity": {
+        "python": "3.14.6",
+        "torch": "2.13.0+cpu",
+        "torch_git": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+        "numpy": "2.4.4",
+        "build_disabled": 1,
+        "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+        "runtime_kind": "sameft-gilon",
+        "gil_before": true,
+        "torch_npu": "2.13.0+git46936d1"
+      },
+      "npu_allocated_mib": 10.5537109375,
+      "npu_reserved_mib": 52.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.8926013566666666,
+      "completion_mean_ms": 0.08230469766666666,
+      "caller_cpu_mean_ms": 1.9237152233333334
+    },
+    {
+      "label": "008-npu-ft-p4-r0",
+      "runtime": "ft",
+      "device": "npu",
+      "world": 4,
+      "round": 0,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1691.9292419219216,
+      "p50_ms": 2.141042,
+      "p99_ms": 9.264679,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 5965.3525390625,
+      "setup_rss_mib": 7715.11328125,
+      "start_lag_max_ms": 0.060949,
+      "finish_skew_ms": 34.118828,
+      "runtime_identity": {
+        "python": "3.14.6",
+        "torch": "2.13.0+cpu",
+        "torch_git": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+        "numpy": "2.4.4",
+        "build_disabled": 1,
+        "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+        "runtime_kind": "sameft-gilon",
+        "gil_before": true,
+        "torch_npu": "2.13.0+git46936d1"
+      },
+      "npu_allocated_mib": 21.107421875,
+      "npu_reserved_mib": 104.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 2.0654621696666666,
+      "completion_mean_ms": 0.272049131,
+      "caller_cpu_mean_ms": 2.1147774
+    },
+    {
+      "label": "009-npu-standard-p1-r0",
+      "runtime": "standard",
+      "device": "npu",
+      "world": 1,
+      "round": 0,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 595.695483349695,
+      "p50_ms": 1.668802,
+      "p99_ms": 1.746365,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 1594.056640625,
+      "setup_rss_mib": 1952.0859375,
+      "start_lag_max_ms": 0.059049,
+      "finish_skew_ms": 0.0,
+      "runtime_identity": {
+        "python": "3.12.13",
+        "torch": "2.10.0+cpu",
+        "torch_git": "449b1768410104d3ed79d3bcfe4ba1d65c7f22c0",
+        "numpy": "2.2.6",
+        "build_disabled": null,
+        "python_sha256": "5d137e6378d886d6ee0390e126011e9e8af81290032e3fefa13a81f72651fda0",
+        "runtime_kind": "standard-gil",
+        "gil_before": true,
+        "torch_npu": "2.10.0.post6"
+      },
+      "npu_allocated_mib": 5.27685546875,
+      "npu_reserved_mib": 26.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.620087254,
+      "completion_mean_ms": 0.05561330566666667,
+      "caller_cpu_mean_ms": 1.6466391066666668
+    },
+    {
+      "label": "010-npu-standard-p2-r0",
+      "runtime": "standard",
+      "device": "npu",
+      "world": 2,
+      "round": 0,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1064.057235882742,
+      "p50_ms": 1.874521,
+      "p99_ms": 1.995456,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 2957.5,
+      "setup_rss_mib": 3849.19140625,
+      "start_lag_max_ms": 0.074769,
+      "finish_skew_ms": 1.108997,
+      "runtime_identity": {
+        "python": "3.12.13",
+        "torch": "2.10.0+cpu",
+        "torch_git": "449b1768410104d3ed79d3bcfe4ba1d65c7f22c0",
+        "numpy": "2.2.6",
+        "build_disabled": null,
+        "python_sha256": "5d137e6378d886d6ee0390e126011e9e8af81290032e3fefa13a81f72651fda0",
+        "runtime_kind": "standard-gil",
+        "gil_before": true,
+        "torch_npu": "2.10.0.post6"
+      },
+      "npu_allocated_mib": 10.5537109375,
+      "npu_reserved_mib": 52.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.8157122766666667,
+      "completion_mean_ms": 0.06038127933333333,
+      "caller_cpu_mean_ms": 1.6806134033333333
+    },
+    {
+      "label": "011-npu-standard-p4-r0",
+      "runtime": "standard",
+      "device": "npu",
+      "world": 4,
+      "round": 0,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1648.3393002977912,
+      "p50_ms": 2.09333,
+      "p99_ms": 15.447365,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 5681.2421875,
+      "setup_rss_mib": 7695.2890625,
+      "start_lag_max_ms": 0.067609,
+      "finish_skew_ms": 36.000339,
+      "runtime_identity": {
+        "python": "3.12.13",
+        "torch": "2.10.0+cpu",
+        "torch_git": "449b1768410104d3ed79d3bcfe4ba1d65c7f22c0",
+        "numpy": "2.2.6",
+        "build_disabled": null,
+        "python_sha256": "5d137e6378d886d6ee0390e126011e9e8af81290032e3fefa13a81f72651fda0",
+        "runtime_kind": "standard-gil",
+        "gil_before": true,
+        "torch_npu": "2.10.0.post6"
+      },
+      "npu_allocated_mib": 21.107421875,
+      "npu_reserved_mib": 104.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 2.031156762333333,
+      "completion_mean_ms": 0.36495668666666664,
+      "caller_cpu_mean_ms": 2.085240166666667
+    },
+    {
+      "label": "012-npu-ftthreads-p4-r0",
+      "runtime": "ftthreads",
+      "device": "npu",
+      "world": 4,
+      "round": 0,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1294.4813003095385,
+      "p50_ms": 3.084862,
+      "p99_ms": 3.27124,
+      "max_abs_error": 8.940696716308594e-08,
+      "source": "R35-frozen-adapter",
+      "forward_mean_ms": 2.982614883,
+      "completion_mean_ms": 0.100091154,
+      "caller_cpu_mean_ms": 2.4844783733333333
+    },
+    {
+      "label": "013-npu-ft-p1-r1",
+      "runtime": "ft",
+      "device": "npu",
+      "world": 1,
+      "round": 1,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 570.3257740858447,
+      "p50_ms": 1.748046,
+      "p99_ms": 1.787216,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 1600.3837890625,
+      "setup_rss_mib": 1946.08984375,
+      "start_lag_max_ms": 0.059591,
+      "finish_skew_ms": 0.0,
+      "runtime_identity": {
+        "python": "3.14.6",
+        "torch": "2.13.0+cpu",
+        "torch_git": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+        "numpy": "2.4.4",
+        "build_disabled": 1,
+        "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+        "runtime_kind": "sameft-gilon",
+        "gil_before": true,
+        "torch_npu": "2.13.0+git46936d1"
+      },
+      "npu_allocated_mib": 5.27685546875,
+      "npu_reserved_mib": 26.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.6782264883333333,
+      "completion_mean_ms": 0.071098539,
+      "caller_cpu_mean_ms": 1.73470769
+    },
+    {
+      "label": "014-npu-standard-p4-r1",
+      "runtime": "standard",
+      "device": "npu",
+      "world": 4,
+      "round": 1,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1655.4471878857369,
+      "p50_ms": 2.08876,
+      "p99_ms": 14.437441,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 5685.2353515625,
+      "setup_rss_mib": 7703.94140625,
+      "start_lag_max_ms": 0.063781,
+      "finish_skew_ms": 34.002963,
+      "runtime_identity": {
+        "python": "3.12.13",
+        "torch": "2.10.0+cpu",
+        "torch_git": "449b1768410104d3ed79d3bcfe4ba1d65c7f22c0",
+        "numpy": "2.2.6",
+        "build_disabled": null,
+        "python_sha256": "5d137e6378d886d6ee0390e126011e9e8af81290032e3fefa13a81f72651fda0",
+        "runtime_kind": "standard-gil",
+        "gil_before": true,
+        "torch_npu": "2.10.0.post6"
+      },
+      "npu_allocated_mib": 21.107421875,
+      "npu_reserved_mib": 104.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 2.0249909253333334,
+      "completion_mean_ms": 0.36235786666666664,
+      "caller_cpu_mean_ms": 2.04564324
+    },
+    {
+      "label": "015-npu-standard-p2-r1",
+      "runtime": "standard",
+      "device": "npu",
+      "world": 2,
+      "round": 1,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1056.5568209971818,
+      "p50_ms": 1.888992,
+      "p99_ms": 2.000886,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 2957.5849609375,
+      "setup_rss_mib": 3848.23828125,
+      "start_lag_max_ms": 0.061691,
+      "finish_skew_ms": 3.24158,
+      "runtime_identity": {
+        "python": "3.12.13",
+        "torch": "2.10.0+cpu",
+        "torch_git": "449b1768410104d3ed79d3bcfe4ba1d65c7f22c0",
+        "numpy": "2.2.6",
+        "build_disabled": null,
+        "python_sha256": "5d137e6378d886d6ee0390e126011e9e8af81290032e3fefa13a81f72651fda0",
+        "runtime_kind": "standard-gil",
+        "gil_before": true,
+        "torch_npu": "2.10.0.post6"
+      },
+      "npu_allocated_mib": 10.5537109375,
+      "npu_reserved_mib": 52.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.8264687936666666,
+      "completion_mean_ms": 0.062179407,
+      "caller_cpu_mean_ms": 1.6962419933333335
+    },
+    {
+      "label": "016-npu-standard-p1-r1",
+      "runtime": "standard",
+      "device": "npu",
+      "world": 1,
+      "round": 1,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 592.9403387198328,
+      "p50_ms": 1.677833,
+      "p99_ms": 1.758275,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 1593.89453125,
+      "setup_rss_mib": 1951.953125,
+      "start_lag_max_ms": 0.059451,
+      "finish_skew_ms": 0.0,
+      "runtime_identity": {
+        "python": "3.12.13",
+        "torch": "2.10.0+cpu",
+        "torch_git": "449b1768410104d3ed79d3bcfe4ba1d65c7f22c0",
+        "numpy": "2.2.6",
+        "build_disabled": null,
+        "python_sha256": "5d137e6378d886d6ee0390e126011e9e8af81290032e3fefa13a81f72651fda0",
+        "runtime_kind": "standard-gil",
+        "gil_before": true,
+        "torch_npu": "2.10.0.post6"
+      },
+      "npu_allocated_mib": 5.27685546875,
+      "npu_reserved_mib": 26.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.625842031,
+      "completion_mean_ms": 0.05752333466666667,
+      "caller_cpu_mean_ms": 1.6576879033333334
+    },
+    {
+      "label": "017-npu-ft-p4-r1",
+      "runtime": "ft",
+      "device": "npu",
+      "world": 4,
+      "round": 1,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1702.5523316702472,
+      "p50_ms": 2.144362,
+      "p99_ms": 7.247802,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 5968.150390625,
+      "setup_rss_mib": 7696.4453125,
+      "start_lag_max_ms": 0.059357,
+      "finish_skew_ms": 49.397695,
+      "runtime_identity": {
+        "python": "3.14.6",
+        "torch": "2.13.0+cpu",
+        "torch_git": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+        "numpy": "2.4.4",
+        "build_disabled": 1,
+        "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+        "runtime_kind": "sameft-gilon",
+        "gil_before": true,
+        "torch_npu": "2.13.0+git46936d1"
+      },
+      "npu_allocated_mib": 21.107421875,
+      "npu_reserved_mib": 104.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 2.067708916,
+      "completion_mean_ms": 0.24596933933333334,
+      "caller_cpu_mean_ms": 2.0891657666666665
+    },
+    {
+      "label": "018-npu-ft-p2-r1",
+      "runtime": "ft",
+      "device": "npu",
+      "world": 2,
+      "round": 1,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1018.42304855583,
+      "p50_ms": 1.961974,
+      "p99_ms": 2.062688,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 3056.0087890625,
+      "setup_rss_mib": 3852.953125,
+      "start_lag_max_ms": 0.060928,
+      "finish_skew_ms": 0.890899,
+      "runtime_identity": {
+        "python": "3.14.6",
+        "torch": "2.13.0+cpu",
+        "torch_git": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+        "numpy": "2.4.4",
+        "build_disabled": 1,
+        "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+        "runtime_kind": "sameft-gilon",
+        "gil_before": true,
+        "torch_npu": "2.13.0+git46936d1"
+      },
+      "npu_allocated_mib": 10.5537109375,
+      "npu_reserved_mib": 52.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.8825895430000001,
+      "completion_mean_ms": 0.07651741633333332,
+      "caller_cpu_mean_ms": 1.8888557033333333
+    },
+    {
+      "label": "019-npu-ftthreads-p4-r1",
+      "runtime": "ftthreads",
+      "device": "npu",
+      "world": 4,
+      "round": 1,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1292.113594581675,
+      "p50_ms": 3.084643,
+      "p99_ms": 3.332253,
+      "max_abs_error": 8.940696716308594e-08,
+      "source": "R35-frozen-adapter",
+      "forward_mean_ms": 2.9816292756666667,
+      "completion_mean_ms": 0.10306354433333334,
+      "caller_cpu_mean_ms": 2.49224788
+    },
+    {
+      "label": "020-npu-ft-p4-r2",
+      "runtime": "ft",
+      "device": "npu",
+      "world": 4,
+      "round": 2,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1705.9633301032682,
+      "p50_ms": 2.149132,
+      "p99_ms": 6.722069,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 5962.494140625,
+      "setup_rss_mib": 7707.81640625,
+      "start_lag_max_ms": 0.065908,
+      "finish_skew_ms": 36.124234,
+      "runtime_identity": {
+        "python": "3.14.6",
+        "torch": "2.13.0+cpu",
+        "torch_git": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+        "numpy": "2.4.4",
+        "build_disabled": 1,
+        "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+        "runtime_kind": "sameft-gilon",
+        "gil_before": true,
+        "torch_npu": "2.13.0+git46936d1"
+      },
+      "npu_allocated_mib": 21.107421875,
+      "npu_reserved_mib": 104.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 2.0704477083333335,
+      "completion_mean_ms": 0.23859100233333333,
+      "caller_cpu_mean_ms": 2.0822293233333333
+    },
+    {
+      "label": "021-npu-standard-p1-r2",
+      "runtime": "standard",
+      "device": "npu",
+      "world": 1,
+      "round": 2,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 591.4371720318852,
+      "p50_ms": 1.683313,
+      "p99_ms": 1.751605,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 1594.0693359375,
+      "setup_rss_mib": 1952.125,
+      "start_lag_max_ms": 0.060219,
+      "finish_skew_ms": 0.0,
+      "runtime_identity": {
+        "python": "3.12.13",
+        "torch": "2.10.0+cpu",
+        "torch_git": "449b1768410104d3ed79d3bcfe4ba1d65c7f22c0",
+        "numpy": "2.2.6",
+        "build_disabled": null,
+        "python_sha256": "5d137e6378d886d6ee0390e126011e9e8af81290032e3fefa13a81f72651fda0",
+        "runtime_kind": "standard-gil",
+        "gil_before": true,
+        "torch_npu": "2.10.0.post6"
+      },
+      "npu_allocated_mib": 5.27685546875,
+      "npu_reserved_mib": 26.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.627350917,
+      "completion_mean_ms": 0.06004332666666667,
+      "caller_cpu_mean_ms": 1.6634407566666667
+    },
+    {
+      "label": "022-npu-standard-p2-r2",
+      "runtime": "standard",
+      "device": "npu",
+      "world": 2,
+      "round": 2,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1052.4433149329664,
+      "p50_ms": 1.886842,
+      "p99_ms": 2.015987,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 2961.3154296875,
+      "setup_rss_mib": 3856.9921875,
+      "start_lag_max_ms": 0.061119,
+      "finish_skew_ms": 6.181516,
+      "runtime_identity": {
+        "python": "3.12.13",
+        "torch": "2.10.0+cpu",
+        "torch_git": "449b1768410104d3ed79d3bcfe4ba1d65c7f22c0",
+        "numpy": "2.2.6",
+        "build_disabled": null,
+        "python_sha256": "5d137e6378d886d6ee0390e126011e9e8af81290032e3fefa13a81f72651fda0",
+        "runtime_kind": "standard-gil",
+        "gil_before": true,
+        "torch_npu": "2.10.0.post6"
+      },
+      "npu_allocated_mib": 10.5537109375,
+      "npu_reserved_mib": 52.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.8282747353333333,
+      "completion_mean_ms": 0.066829816,
+      "caller_cpu_mean_ms": 1.68843568
+    },
+    {
+      "label": "023-npu-standard-p4-r2",
+      "runtime": "standard",
+      "device": "npu",
+      "world": 4,
+      "round": 2,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1640.4622696032054,
+      "p50_ms": 2.09645,
+      "p99_ms": 15.140261,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 5680.9501953125,
+      "setup_rss_mib": 7708.9765625,
+      "start_lag_max_ms": 0.070499,
+      "finish_skew_ms": 68.540979,
+      "runtime_identity": {
+        "python": "3.12.13",
+        "torch": "2.10.0+cpu",
+        "torch_git": "449b1768410104d3ed79d3bcfe4ba1d65c7f22c0",
+        "numpy": "2.2.6",
+        "build_disabled": null,
+        "python_sha256": "5d137e6378d886d6ee0390e126011e9e8af81290032e3fefa13a81f72651fda0",
+        "runtime_kind": "standard-gil",
+        "gil_before": true,
+        "torch_npu": "2.10.0.post6"
+      },
+      "npu_allocated_mib": 21.107421875,
+      "npu_reserved_mib": 104.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 2.025904999333333,
+      "completion_mean_ms": 0.36670494,
+      "caller_cpu_mean_ms": 2.0818058633333334
+    },
+    {
+      "label": "024-npu-ft-p1-r2",
+      "runtime": "ft",
+      "device": "npu",
+      "world": 1,
+      "round": 2,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 562.5828097282922,
+      "p50_ms": 1.770836,
+      "p99_ms": 1.812448,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 1596.298828125,
+      "setup_rss_mib": 1942.02734375,
+      "start_lag_max_ms": 0.061269,
+      "finish_skew_ms": 0.0,
+      "runtime_identity": {
+        "python": "3.14.6",
+        "torch": "2.13.0+cpu",
+        "torch_git": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+        "numpy": "2.4.4",
+        "build_disabled": 1,
+        "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+        "runtime_kind": "sameft-gilon",
+        "gil_before": true,
+        "torch_npu": "2.13.0+git46936d1"
+      },
+      "npu_allocated_mib": 5.27685546875,
+      "npu_reserved_mib": 26.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.7003447336666666,
+      "completion_mean_ms": 0.07314061599999999,
+      "caller_cpu_mean_ms": 1.7575676
+    },
+    {
+      "label": "025-npu-ft-p2-r2",
+      "runtime": "ft",
+      "device": "npu",
+      "world": 2,
+      "round": 2,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1013.7245733670102,
+      "p50_ms": 1.963465,
+      "p99_ms": 2.082469,
+      "max_abs_error": 8.940696716308594e-08,
+      "setup_pss_mib": 3049.7333984375,
+      "setup_rss_mib": 3846.30859375,
+      "start_lag_max_ms": 0.060939,
+      "finish_skew_ms": 0.862557,
+      "runtime_identity": {
+        "python": "3.14.6",
+        "torch": "2.13.0+cpu",
+        "torch_git": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+        "numpy": "2.4.4",
+        "build_disabled": 1,
+        "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+        "runtime_kind": "sameft-gilon",
+        "gil_before": true,
+        "torch_npu": "2.13.0+git46936d1"
+      },
+      "npu_allocated_mib": 10.5537109375,
+      "npu_reserved_mib": 52.0,
+      "source_hashes": {
+        "worker.py": "84854ab6b33839cd2b5d21bc5f0330439df8e05942214df34066b8f96d9ff7f0",
+        "controller.py": "4244f0ed3ffad48aa6dad3d3299b2b1c52e49333482caa27bf1230116f139b1d",
+        "contracts.py": "e7e0a47c1324d237157ef4f3db6539b37ea7d19ca9445d306322ccfe217b5307"
+      },
+      "forward_mean_ms": 1.8885870576666666,
+      "completion_mean_ms": 0.07958894033333333,
+      "caller_cpu_mean_ms": 1.9197590033333334
+    },
+    {
+      "label": "026-npu-ftthreads-p4-r2",
+      "runtime": "ftthreads",
+      "device": "npu",
+      "world": 4,
+      "round": 2,
+      "total": 3000,
+      "warmup": 24,
+      "tps": 1276.8628839566275,
+      "p50_ms": 3.125245,
+      "p99_ms": 3.350974,
+      "max_abs_error": 8.940696716308594e-08,
+      "source": "R35-frozen-adapter",
+      "forward_mean_ms": 3.020321271333333,
+      "completion_mean_ms": 0.10324073433333332,
+      "caller_cpu_mean_ms": 2.4713819
+    }
+  ],
+  "summary": [
+    {
+      "device": "cpu",
+      "runtime": "ft",
+      "world": 1,
+      "rounds": 1,
+      "tps": {
+        "median": 571.8207712056164,
+        "min": 571.8207712056164,
+        "max": 571.8207712056164
+      },
+      "p50_ms": {
+        "median": 1.741755,
+        "min": 1.741755,
+        "max": 1.741755
+      },
+      "p99_ms": {
+        "median": 1.817338,
+        "min": 1.817338,
+        "max": 1.817338
+      },
+      "setup_pss_mib": {
+        "median": 393.880859375,
+        "min": 393.880859375,
+        "max": 393.880859375
+      },
+      "setup_rss_mib": {
+        "median": 394.16796875,
+        "min": 394.16796875,
+        "max": 394.16796875
+      },
+      "forward_mean_ms": {
+        "median": 1.7398632546666668,
+        "min": 1.7398632546666668,
+        "max": 1.7398632546666668
+      },
+      "completion_mean_ms": {
+        "median": 0.004772657666666667,
+        "min": 0.004772657666666667,
+        "max": 0.004772657666666667
+      },
+      "caller_cpu_mean_ms": {
+        "median": 1.7411144566666668,
+        "min": 1.7411144566666668,
+        "max": 1.7411144566666668
+      }
+    },
+    {
+      "device": "cpu",
+      "runtime": "ft",
+      "world": 2,
+      "rounds": 1,
+      "tps": {
+        "median": 1101.9962790794425,
+        "min": 1101.9962790794425,
+        "max": 1101.9962790794425
+      },
+      "p50_ms": {
+        "median": 1.805917,
+        "min": 1.805917,
+        "max": 1.805917
+      },
+      "p99_ms": {
+        "median": 1.86158,
+        "min": 1.86158,
+        "max": 1.86158
+      },
+      "setup_pss_mib": {
+        "median": 674.6796875,
+        "min": 674.6796875,
+        "max": 674.6796875
+      },
+      "setup_rss_mib": {
+        "median": 788.328125,
+        "min": 788.328125,
+        "max": 788.328125
+      },
+      "forward_mean_ms": {
+        "median": 1.8041918623333333,
+        "min": 1.8041918623333333,
+        "max": 1.8041918623333333
+      },
+      "completion_mean_ms": {
+        "median": 0.004972147333333334,
+        "min": 0.004972147333333334,
+        "max": 0.004972147333333334
+      },
+      "caller_cpu_mean_ms": {
+        "median": 1.8058045166666665,
+        "min": 1.8058045166666665,
+        "max": 1.8058045166666665
+      }
+    },
+    {
+      "device": "cpu",
+      "runtime": "ft",
+      "world": 4,
+      "rounds": 1,
+      "tps": {
+        "median": 2187.5085565764384,
+        "min": 2187.5085565764384,
+        "max": 2187.5085565764384
+      },
+      "p50_ms": {
+        "median": 1.820368,
+        "min": 1.820368,
+        "max": 1.820368
+      },
+      "p99_ms": {
+        "median": 1.874601,
+        "min": 1.874601,
+        "max": 1.874601
+      },
+      "setup_pss_mib": {
+        "median": 1236.439453125,
+        "min": 1236.439453125,
+        "max": 1236.439453125
+      },
+      "setup_rss_mib": {
+        "median": 1567.5,
+        "min": 1567.5,
+        "max": 1567.5
+      },
+      "forward_mean_ms": {
+        "median": 1.8180422563333334,
+        "min": 1.8180422563333334,
+        "max": 1.8180422563333334
+      },
+      "completion_mean_ms": {
+        "median": 0.0050382023333333335,
+        "min": 0.0050382023333333335,
+        "max": 0.0050382023333333335
+      },
+      "caller_cpu_mean_ms": {
+        "median": 1.8177161566666666,
+        "min": 1.8177161566666666,
+        "max": 1.8177161566666666
+      }
+    },
+    {
+      "device": "cpu",
+      "runtime": "standard",
+      "world": 1,
+      "rounds": 1,
+      "tps": {
+        "median": 598.4953645788887,
+        "min": 598.4953645788887,
+        "max": 598.4953645788887
+      },
+      "p50_ms": {
+        "median": 1.63861,
+        "min": 1.63861,
+        "max": 1.63861
+      },
+      "p99_ms": {
+        "median": 1.732564,
+        "min": 1.732564,
+        "max": 1.732564
+      },
+      "setup_pss_mib": {
+        "median": 375.2763671875,
+        "min": 375.2763671875,
+        "max": 375.2763671875
+      },
+      "setup_rss_mib": {
+        "median": 385.75390625,
+        "min": 385.75390625,
+        "max": 385.75390625
+      },
+      "forward_mean_ms": {
+        "median": 1.6621392806666666,
+        "min": 1.6621392806666666,
+        "max": 1.6621392806666666
+      },
+      "completion_mean_ms": {
+        "median": 0.005020055000000001,
+        "min": 0.005020055000000001,
+        "max": 0.005020055000000001
+      },
+      "caller_cpu_mean_ms": {
+        "median": 1.6639578733333333,
+        "min": 1.6639578733333333,
+        "max": 1.6639578733333333
+      }
+    },
+    {
+      "device": "cpu",
+      "runtime": "standard",
+      "world": 2,
+      "rounds": 1,
+      "tps": {
+        "median": 1147.1536431670386,
+        "min": 1147.1536431670386,
+        "max": 1147.1536431670386
+      },
+      "p50_ms": {
+        "median": 1.690933,
+        "min": 1.690933,
+        "max": 1.690933
+      },
+      "p99_ms": {
+        "median": 1.748395,
+        "min": 1.748395,
+        "max": 1.748395
+      },
+      "setup_pss_mib": {
+        "median": 615.142578125,
+        "min": 615.142578125,
+        "max": 615.142578125
+      },
+      "setup_rss_mib": {
+        "median": 757.94921875,
+        "min": 757.94921875,
+        "max": 757.94921875
+      },
+      "forward_mean_ms": {
+        "median": 1.7123002303333335,
+        "min": 1.7123002303333335,
+        "max": 1.7123002303333335
+      },
+      "completion_mean_ms": {
+        "median": 0.004815004,
+        "min": 0.004815004,
+        "max": 0.004815004
+      },
+      "caller_cpu_mean_ms": {
+        "median": 1.7137029533333334,
+        "min": 1.7137029533333334,
+        "max": 1.7137029533333334
+      }
+    },
+    {
+      "device": "cpu",
+      "runtime": "standard",
+      "world": 4,
+      "rounds": 1,
+      "tps": {
+        "median": 2304.782390501903,
+        "min": 2304.782390501903,
+        "max": 2304.782390501903
+      },
+      "p50_ms": {
+        "median": 1.706253,
+        "min": 1.706253,
+        "max": 1.706253
+      },
+      "p99_ms": {
+        "median": 1.772156,
+        "min": 1.772156,
+        "max": 1.772156
+      },
+      "setup_pss_mib": {
+        "median": 1095.875,
+        "min": 1095.875,
+        "max": 1095.875
+      },
+      "setup_rss_mib": {
+        "median": 1527.05859375,
+        "min": 1527.05859375,
+        "max": 1527.05859375
+      },
+      "forward_mean_ms": {
+        "median": 1.7044138683333334,
+        "min": 1.7044138683333334,
+        "max": 1.7044138683333334
+      },
+      "completion_mean_ms": {
+        "median": 0.005020288333333333,
+        "min": 0.005020288333333333,
+        "max": 0.005020288333333333
+      },
+      "caller_cpu_mean_ms": {
+        "median": 1.70439056,
+        "min": 1.70439056,
+        "max": 1.70439056
+      }
+    },
+    {
+      "device": "npu",
+      "runtime": "ft",
+      "world": 1,
+      "rounds": 3,
+      "tps": {
+        "median": 562.5828097282922,
+        "min": 558.6926506903578,
+        "max": 570.3257740858447
+      },
+      "p50_ms": {
+        "median": 1.770836,
+        "min": 1.748046,
+        "max": 1.780236
+      },
+      "p99_ms": {
+        "median": 1.812448,
+        "min": 1.787216,
+        "max": 1.836159
+      },
+      "setup_pss_mib": {
+        "median": 1600.3837890625,
+        "min": 1596.298828125,
+        "max": 1604.091796875
+      },
+      "setup_rss_mib": {
+        "median": 1942.125,
+        "min": 1942.02734375,
+        "max": 1946.08984375
+      },
+      "forward_mean_ms": {
+        "median": 1.7003447336666666,
+        "min": 1.6782264883333333,
+        "max": 1.7093105153333332
+      },
+      "completion_mean_ms": {
+        "median": 0.07314061599999999,
+        "min": 0.071098539,
+        "max": 0.07640701533333333
+      },
+      "caller_cpu_mean_ms": {
+        "median": 1.7575676,
+        "min": 1.73470769,
+        "max": 1.7690259799999999
+      }
+    },
+    {
+      "device": "npu",
+      "runtime": "ft",
+      "world": 2,
+      "rounds": 3,
+      "tps": {
+        "median": 1013.7245733670102,
+        "min": 1008.6547615086888,
+        "max": 1018.42304855583
+      },
+      "p50_ms": {
+        "median": 1.963465,
+        "min": 1.961974,
+        "max": 1.969584
+      },
+      "p99_ms": {
+        "median": 2.082469,
+        "min": 2.062688,
+        "max": 2.110211
+      },
+      "setup_pss_mib": {
+        "median": 3056.0087890625,
+        "min": 3049.7333984375,
+        "max": 3056.658203125
+      },
+      "setup_rss_mib": {
+        "median": 3852.58984375,
+        "min": 3846.30859375,
+        "max": 3852.953125
+      },
+      "forward_mean_ms": {
+        "median": 1.8885870576666666,
+        "min": 1.8825895430000001,
+        "max": 1.8926013566666666
+      },
+      "completion_mean_ms": {
+        "median": 0.07958894033333333,
+        "min": 0.07651741633333332,
+        "max": 0.08230469766666666
+      },
+      "caller_cpu_mean_ms": {
+        "median": 1.9197590033333334,
+        "min": 1.8888557033333333,
+        "max": 1.9237152233333334
+      }
+    },
+    {
+      "device": "npu",
+      "runtime": "ft",
+      "world": 4,
+      "rounds": 3,
+      "tps": {
+        "median": 1702.5523316702472,
+        "min": 1691.9292419219216,
+        "max": 1705.9633301032682
+      },
+      "p50_ms": {
+        "median": 2.144362,
+        "min": 2.141042,
+        "max": 2.149132
+      },
+      "p99_ms": {
+        "median": 7.247802,
+        "min": 6.722069,
+        "max": 9.264679
+      },
+      "setup_pss_mib": {
+        "median": 5965.3525390625,
+        "min": 5962.494140625,
+        "max": 5968.150390625
+      },
+      "setup_rss_mib": {
+        "median": 7707.81640625,
+        "min": 7696.4453125,
+        "max": 7715.11328125
+      },
+      "forward_mean_ms": {
+        "median": 2.067708916,
+        "min": 2.0654621696666666,
+        "max": 2.0704477083333335
+      },
+      "completion_mean_ms": {
+        "median": 0.24596933933333334,
+        "min": 0.23859100233333333,
+        "max": 0.272049131
+      },
+      "caller_cpu_mean_ms": {
+        "median": 2.0891657666666665,
+        "min": 2.0822293233333333,
+        "max": 2.1147774
+      }
+    },
+    {
+      "device": "npu",
+      "runtime": "standard",
+      "world": 1,
+      "rounds": 3,
+      "tps": {
+        "median": 592.9403387198328,
+        "min": 591.4371720318852,
+        "max": 595.695483349695
+      },
+      "p50_ms": {
+        "median": 1.677833,
+        "min": 1.668802,
+        "max": 1.683313
+      },
+      "p99_ms": {
+        "median": 1.751605,
+        "min": 1.746365,
+        "max": 1.758275
+      },
+      "setup_pss_mib": {
+        "median": 1594.056640625,
+        "min": 1593.89453125,
+        "max": 1594.0693359375
+      },
+      "setup_rss_mib": {
+        "median": 1952.0859375,
+        "min": 1951.953125,
+        "max": 1952.125
+      },
+      "forward_mean_ms": {
+        "median": 1.625842031,
+        "min": 1.620087254,
+        "max": 1.627350917
+      },
+      "completion_mean_ms": {
+        "median": 0.05752333466666667,
+        "min": 0.05561330566666667,
+        "max": 0.06004332666666667
+      },
+      "caller_cpu_mean_ms": {
+        "median": 1.6576879033333334,
+        "min": 1.6466391066666668,
+        "max": 1.6634407566666667
+      }
+    },
+    {
+      "device": "npu",
+      "runtime": "standard",
+      "world": 2,
+      "rounds": 3,
+      "tps": {
+        "median": 1056.5568209971818,
+        "min": 1052.4433149329664,
+        "max": 1064.057235882742
+      },
+      "p50_ms": {
+        "median": 1.886842,
+        "min": 1.874521,
+        "max": 1.888992
+      },
+      "p99_ms": {
+        "median": 2.000886,
+        "min": 1.995456,
+        "max": 2.015987
+      },
+      "setup_pss_mib": {
+        "median": 2957.5849609375,
+        "min": 2957.5,
+        "max": 2961.3154296875
+      },
+      "setup_rss_mib": {
+        "median": 3849.19140625,
+        "min": 3848.23828125,
+        "max": 3856.9921875
+      },
+      "forward_mean_ms": {
+        "median": 1.8264687936666666,
+        "min": 1.8157122766666667,
+        "max": 1.8282747353333333
+      },
+      "completion_mean_ms": {
+        "median": 0.062179407,
+        "min": 0.06038127933333333,
+        "max": 0.066829816
+      },
+      "caller_cpu_mean_ms": {
+        "median": 1.68843568,
+        "min": 1.6806134033333333,
+        "max": 1.6962419933333335
+      }
+    },
+    {
+      "device": "npu",
+      "runtime": "standard",
+      "world": 4,
+      "rounds": 3,
+      "tps": {
+        "median": 1648.3393002977912,
+        "min": 1640.4622696032054,
+        "max": 1655.4471878857369
+      },
+      "p50_ms": {
+        "median": 2.09333,
+        "min": 2.08876,
+        "max": 2.09645
+      },
+      "p99_ms": {
+        "median": 15.140261,
+        "min": 14.437441,
+        "max": 15.447365
+      },
+      "setup_pss_mib": {
+        "median": 5681.2421875,
+        "min": 5680.9501953125,
+        "max": 5685.2353515625
+      },
+      "setup_rss_mib": {
+        "median": 7703.94140625,
+        "min": 7695.2890625,
+        "max": 7708.9765625
+      },
+      "forward_mean_ms": {
+        "median": 2.025904999333333,
+        "min": 2.0249909253333334,
+        "max": 2.031156762333333
+      },
+      "completion_mean_ms": {
+        "median": 0.36495668666666664,
+        "min": 0.36235786666666664,
+        "max": 0.36670494
+      },
+      "caller_cpu_mean_ms": {
+        "median": 2.0818058633333334,
+        "min": 2.04564324,
+        "max": 2.085240166666667
+      }
+    },
+    {
+      "device": "npu",
+      "runtime": "ftthreads",
+      "world": 4,
+      "rounds": 3,
+      "tps": {
+        "median": 1292.113594581675,
+        "min": 1276.8628839566275,
+        "max": 1294.4813003095385
+      },
+      "p50_ms": {
+        "median": 3.084862,
+        "min": 3.084643,
+        "max": 3.125245
+      },
+      "p99_ms": {
+        "median": 3.332253,
+        "min": 3.27124,
+        "max": 3.350974
+      },
+      "forward_mean_ms": {
+        "median": 2.982614883,
+        "min": 2.9816292756666667,
+        "max": 3.020321271333333
+      },
+      "completion_mean_ms": {
+        "median": 0.10306354433333334,
+        "min": 0.100091154,
+        "max": 0.10324073433333332
+      },
+      "caller_cpu_mean_ms": {
+        "median": 2.4844783733333333,
+        "min": 2.4713819,
+        "max": 2.49224788
+      }
+    }
+  ],
+  "artifact": {
+    "bytes": 4494351,
+    "payloads": 470,
+    "sha256": "ea8e822e9907823983e62bc761014dc79874967b42115c8fc643e7fd90a0a8d3"
+  },
+  "post_run_stage_validation": {
+    "passed": true,
+    "inputs": 8,
+    "embedding_checks": 208,
+    "interaction_checks": 8,
+    "output_checks": 8,
+    "state_after": "6d0485a04fac556bf636f7df7541d2bf6bf4c3cb7b4641149c1f73fc7532cd19",
+    "standard_empty_fix_sha256": "762fa14fb495ccff8cfd30a338f75c616aa99ab76f51a14b25b17b27c4646c30"
+  },
+  "resource_observations": {
+    "samples": 210,
+    "alerts": 0,
+    "sample_errors": 0,
+    "own_idle_npu_container_stopped": true,
+    "continuous_exclusivity_proven": false
+  },
+  "tail_analysis_npu_four_callers": {
+    "ft": {
+      "requests": 9000,
+      "response_over_5ms": 149,
+      "completion_dominant_tail": 144,
+      "forward_over_5ms": 2
+    },
+    "standard": {
+      "requests": 9000,
+      "response_over_5ms": 231,
+      "completion_dominant_tail": 227,
+      "forward_over_5ms": 0
+    },
+    "ftthreads": {
+      "requests": 9000,
+      "response_over_5ms": 6,
+      "completion_dominant_tail": 0,
+      "forward_over_5ms": 6
+    }
+  }
+}

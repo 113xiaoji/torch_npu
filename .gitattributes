@@ -122,3 +122,7 @@ torch_npu/csrc/core/npu/LockFreeMpscIngress.h -text whitespace=trailing-space,sp
 # Preserve the R35 measured client/adapter source closure across checkouts.
 benchmarks/forward_concurrency_r35/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
 test/forward_concurrency_r35/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+
+# Preserve the R36 measured process runner bytes across checkouts.
+benchmarks/process_concurrency_r36/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+test/process_concurrency_r36/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
