@@ -16,6 +16,10 @@ struct Configuration {
     std::vector<std::string> allowed_ops;
 };
 C10_NPU_API bool Enabled() noexcept;
+C10_NPU_API bool RealSdkContractAvailable(const char* operation) noexcept;
+// True only for the exact eager-only 9.1.0 profile. Its typed capture gate must
+// restrict EmbeddingBag to the independently qualified fixed DLRM shapes.
+C10_NPU_API bool RealSdkFixedDlrmProfile() noexcept;
 // The experimental simulator never broadens the real SDK lifecycle contract.
 #ifdef TORCH_NPU_EAGER_PREPARE_HOST_SIM
 C10_NPU_API bool SdkContractAvailable(const char* operation) noexcept;

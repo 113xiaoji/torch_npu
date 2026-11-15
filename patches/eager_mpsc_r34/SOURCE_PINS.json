@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "purpose": "eager-only CANN9.1.0 exact profile; retains legacy R22/920 inline definitions",
+  "sources": {
+    "r25_common_cpp_sha256": "51cab5e5914fb05cb1c03d795067b097c01c2e5a35cf4d967315a5b93bff2ed1",
+    "actual_r32_common_h_sha256": "306fe9ed42c4acaf921ee26f14a6ba399b64ce97f58577fd1ff525cae2376c95",
+    "actual_r32_common_base_h_sha256": "120cf8bfc022ee5170f4fd752a9099410fbb84f6765df5c3b3c819556c91504a",
+    "actual_r32_eager_h_sha256": "0379a5a90ad24a4a661023ebd408b72d2028cf5e8d8ab065129e5497c05be849"
+  },
+  "files": [
+    {
+      "path": "patches/eager_mpsc_r34/op-plugin/op_plugin/utils/op_api_common.cpp",
+      "bytes": 88905,
+      "sha256": "a6fad90e2dd32ab6a3c78f2b1a9f2ef3add6de6c0bc8dcef3f7766a581c6c597"
+    },
+    {
+      "path": "patches/eager_mpsc_r34/op-plugin/op_plugin/utils/op_api_common.h",
+      "bytes": 66693,
+      "sha256": "caa4c90607b0db50645e43fe411f16c49e534760d0d607426a0e6cde62bffe02"
+    },
+    {
+      "path": "patches/eager_mpsc_r34/op-plugin/op_plugin/utils/op_api_common_base.h",
+      "bytes": 32140,
+      "sha256": "120cf8bfc022ee5170f4fd752a9099410fbb84f6765df5c3b3c819556c91504a"
+    },
+    {
+      "path": "patches/eager_mpsc_r34/op-plugin/op_plugin/utils/op_api_eager_prepare_r24.h",
+      "bytes": 18360,
+      "sha256": "3ae77dce1554eb27a98c84de58a3c268f36c7ddf375f2d7b3216d59726d0011d"
+    },
+    {
+      "path": "patches/eager_mpsc_r34/op-plugin/op_plugin/utils/op_api_eager_sdk_profile_r34.h",
+      "bytes": 3748,
+      "sha256": "92a9b09b30fd8f257b2b7852654eb7bd74958ca399455db110e12ebefad5a53f"
+    },
+    {
+      "path": "torch_npu/csrc/core/npu/EagerPrepare.h",
+      "bytes": 2365,
+      "sha256": "786814aea34535ce2d334f4a947ae2db2917608cf69328a1f948295d29c4d3da"
+    }
+  ],
+  "uniform_receipt": "sdk-qualification-v1-complete-003.json",
+  "uniform_probe_sha256": "d28b760602bc03da013ee7a1af082c5c14349845e746971ef08ee9280163e80d",
+  "ragged_receipt": "sdk-probe-v1-ragged-meta26-004.json",
+  "ragged_probe_sha256": "6b37b8502bb72af1b400f70893130b903f5108eacf0cf8b2126078e5b1833e5a",
+  "counts": [
+    7,
+    55,
+    117,
+    128,
+    235,
+    256,
+    283,
+    388,
+    408,
+    566,
+    637,
+    648,
+    1024,
+    1238,
+    1310,
+    1686,
+    1750,
+    1800,
+    2164,
+    3701,
+    4892,
+    5536,
+    8192,
+    9832,
+    13085,
+    16384,
+    32768
+  ],
+  "global_lock_free": false
+}

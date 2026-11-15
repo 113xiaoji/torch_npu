@@ -23,13 +23,17 @@ ConvertedParams original_sync(int value) {
 }
 namespace c10_npu::eager_prepare {
 bool Enabled() { return enabled; }
-bool Admit(const char*,bool,const char*,bool arguments_admitted) {
+bool Admit(const char*,bool qualified,const char*,bool arguments_admitted) {
+    assert(qualified);
     assert(!arguments_admitted); ++fences;
     if (fence_failure) throw std::runtime_error("unique-sync-fence-error");
     return false;
 }
 }
-namespace hdb_opapi { bool EagerSdkQualified(const char*) { return true; } }
+namespace hdb_opapi {
+bool EagerSdkQualified(const char*) { return true; }
+bool EagerSdkQualifiedR34(const char*) { return true; }
+}
 #define HDB_ORIGINAL_EXEC_NPU_CMD_SYNC(api, ...) original_sync(__VA_ARGS__)
 /*MACRO*/
 int main() {

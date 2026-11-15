@@ -81,6 +81,19 @@ class PublicBridgeTests(unittest.TestCase):
 
 
 class NativeOwnedJobTests(unittest.TestCase):
+    def test_r34_sync_fallback_keeps_eager_only_provider_qualification(self):
+        text = (ROOT / 'patches/eager_mpsc_r34/op-plugin/op_plugin/utils/op_api_common.h').read_text(encoding='utf-8')
+        start = text.index('#define EXEC_NPU_CMD_SYNC(')
+        macro = text[start:text.index('\n\n', start)]
+        template = (ROOT / 'test/host_regions/eager_prepare_integration/sync_expression_fixture.cpp.in').read_text(encoding='utf-8')
+        # On the exact 9.1 profile R22 stays unavailable, while eager is qualified.
+        template = template.replace('bool EagerSdkQualified(const char*) { return true; }',
+                                    'bool EagerSdkQualified(const char*) { return false; }')
+        with tempfile.TemporaryDirectory(prefix='r34-native-sync-qualification-') as folder:
+            source = Path(folder) / 'sync_expression.cpp'
+            source.write_text(template.replace('/*MACRO*/', macro), encoding='utf-8')
+            self.compile_run(source)
+
     def test_actual_sync_macro_preserves_converted_parameter_expression(self):
         text = (ROOT / 'patches/eager_prepare_r24/op-plugin/op_plugin/utils/op_api_common.h').read_text(encoding='utf-8')
         start = text.index('#define EXEC_NPU_CMD_SYNC(')

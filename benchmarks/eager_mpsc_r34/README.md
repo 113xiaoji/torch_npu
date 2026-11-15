@@ -1,7 +1,8 @@
 # R34 real A3 eager Prepare ingress comparison
 
 Current actual results and unfinished gates: [A3_VALIDATION.md](A3_VALIDATION.md).
-The candidate is compiled and CPU-tested; CANN9.1 remains unqualified and model
+The candidate is compiled and CPU-tested; exact CANN9.1 v1 SDK qualification
+passed for the reviewed uniform and original ragged inputs. Actual queue/model
 E2E is pending an uncontended device. There is no R34 speedup claim.
 
 The primary experiment calls the byte-pinned original DLRM with the R31 MetaSyn26

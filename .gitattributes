@@ -112,3 +112,9 @@ benchmarks/eager_parallel_r29/controller.py -text whitespace=trailing-space,spac
 benchmarks/eager_parallel_r31/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
 # Retain the upstream license byte-for-byte, including its final blank line.
 benchmarks/eager_parallel_r31/META_LICENSE -text whitespace=-blank-at-eof
+
+# Preserve the R34 compiled and qualification source bytes across checkouts.
+patches/eager_mpsc_r34/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+benchmarks/eager_mpsc_r34/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+test/eager_mpsc_r34/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+torch_npu/csrc/core/npu/LockFreeMpscIngress.h -text whitespace=trailing-space,space-before-tab,cr-at-eol

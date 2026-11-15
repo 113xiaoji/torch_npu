@@ -441,7 +441,13 @@ std::string Configure(Configuration config) {
         s.cold_close.Reset();
         s.caller_thread=std::this_thread::get_id(); s.caller_tid=native_tid();
         s.sdk_stop=false;
-        for (const auto& name:config.allowed_ops) s.operators[name].qualified=SdkContractAvailable(name.c_str());
+        for (const auto& name:config.allowed_ops) {
+#ifdef TORCH_NPU_EAGER_PREPARE_HOST_SIM
+            s.operators[name].qualified=SdkContractAvailable(name.c_str());
+#else
+            s.operators[name].qualified=RealSdkContractAvailable(name.c_str());
+#endif
+        }
         s.enabled.store(true,std::memory_order_release);
         enabled_flag.store(true,std::memory_order_release);
         trace_flag.store(config.diagnostic_trace,std::memory_order_release);

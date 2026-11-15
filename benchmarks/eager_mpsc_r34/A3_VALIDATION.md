@@ -4,7 +4,9 @@
 The optional bounded MPSC ingress and dedicated FIFO publisher are implemented;
 the runtime still uses core/state mutexes, the original PTA FIFO and allocators.
 The original mutex ingress remains the default and the comparison uses one
-candidate binary. CANN9.1 qualification remains closed; no SDK gate was bypassed.
+candidate binary. Exact CANN9.1 v1 qualification is complete for the reviewed
+fixed shapes and inputs. The Eager-only profile verifies every required
+symbol's mapped binary size/SHA; R22 and the older9.2 capability stay unchanged.
 
 ## Observed evidence
 
@@ -15,10 +17,13 @@ candidate binary. CANN9.1 qualification remains closed; no SDK gate was bypassed
 | A3 GCC11 AddressSanitizer + UBSan | 78 passed, exit0 | CPU only; intentional quarantine leaks excluded from leak detection |
 | A3 Python3.14t, explicit GIL-on lifecycle fixture | 14 integration tests passed | CPU only; separate from natural GIL-off performance runtime |
 | Offline campaign contracts | 12 tests passed | No device execution |
-| A3 native build and import | Linked candidate; import succeeded with natural GIL=false | No new model forward |
-| Independent uncached CANN probe | 24 numerical cases across L1/2/8/64/128/256; max absolute error0; six cancellation cases | One Prepare thread, distinct Execute thread; bypasses queue solely for SDK qualification |
-| Independent four-worker CANN probe | Actual query intervals overlapped4; first shape execute/cancel correct | SDK qualification only |
-| Cache replay | First shape miss then fresh-address hit4/4 correct | Partial; complete shape/cancellation coverage pending |
+| A3 native build | Three replacement translation units compiled and linked | Preserved R32 empty-SUM object source and original route |
+| Natural GIL-off CPU runtime check | Exact9.1 EmbeddingBag capability=true; Relu=false; fixed profile=true | NPU was not initialized; this is not application qualification |
+| Uniform real SDK probe | 192 cases:144 numerical executions,48 cancellations; all passed,max error0 | Four Prepare threads and a separate consumer; six lengths |
+| Original ragged SDK probe | 800 cases:600 numerical executions,200 cancellations; all passed,max error0 | Original25 nonempty MetaSyn26 tables;50850indices unchanged |
+| Cache replay | Fresh-address hit, worker-local miss then hit, hit cancellation and later hit passed | Cache remained enabled; v2 unqualified |
+| Original off-route model preflight | Full forward and all intermediate stage comparisons passed | Correctness only; not an on-route or comparative performance result |
+| R34 synchronous fallback regression | Old capability lookup reproduced failure; corrected lookup passed | Eager-only9.1 qualification stays stable during fallback |
 | ThreadSanitizer | Compiled; runtime aborted before tests because container denies personality(ADDR_NO_RANDOMIZE) | No race-clean result claimed; container policy unchanged |
 
 Windows denied execution of one old temporary sync-expression fixture, and the
@@ -30,28 +35,33 @@ performance measurements.
 The SDK's executor-cache manager is thread local. A first lookup on a different
 Prepare worker misses; same-worker reuse can hit. SDK disassembly also shows
 executor destruction restores its HugeMem pool index before consumer cleanup.
-These observations do not replace the remaining real lifecycle tests.
+Every reviewed ragged table had a wave with four real SDK queries overlapping.
+This establishes SDK preparation concurrency, not model-level speedup.
 
 ## Current resource block
 
-The initially idle physical14 became occupied while SDK validation was running.
-The latest recorded inventory at 17:21 +08 shows compute jobs on all16 devices,
-HBM99%, utilization20–100%. The failed probe saw only7.08MiB free while its own
-allocator held32MiB. Only our probe was terminated; other jobs were untouched.
-No performance samples from this contention are accepted.
+An initial occupancy interruption cleared and SDK verification completed. At
+17:52 +08 the runtime container stopped with exit137, OOMKilled=false, before
+the new candidate's application qualification. The17:55 inventory then showed
+sglang compute processes on all16 devices, including physical8/14/15. The last
+group held approximately59–60% HBM despite utilization0; those devices were
+not free. No other jobs were stopped or modified. No comparative performance
+samples were collected or accepted from these changing resource conditions.
 
 Candidate native SHA256:
-`5182cb707fc80e55ecb7a1634248d54abbbe0a3db46bc0756d16009e119c92e2`
+`d8943e56a5b234b2dc7cb0091861087a611437661b0ddd6479d5ca610a7ccaa4`
 
-Private evidence archive:64 payloads,114695 bytes,
-SHA256 `b174750d32e20ce52cb7f57e75f7c79dcb4435b280d6ed5052bd12166f14e7e9`.
-Raw paths and launch recipes remain outside the public repository.
+The SDK profile, source hashes and both qualification receipts are described
+in [the overlay documentation](../../patches/eager_mpsc_r34/README.md).
+Raw results, resource inventories and launch recipes remain in the private
+evidence archive, outside the public repository.
+Archive002 has109 payloads,243381 bytes, SHA256
+`8dcb37235a2949c7894f2dccb7eec968b6db719e1a13fd1d9ef3f37d6d09f36a`.
 
 ## Remaining acceptance work
 
-1. Obtain one uncontended device and complete actual SDK cache replay,
-   cache-hit cancellation and all six shapes. Only then consider an exact
-   CANN9.1 binary-profile extension with its recorded evidence.
+1. Obtain one uncontended device and a stable runtime container. Run the new
+   candidate's real queue qualification, including the full unchanged model.
 2. Run `multi_caller.py` for both ingress modes: four concurrent callers,
    correct outputs, actual worker/publisher/consumer TIDs, matching sequence
    receipts and complete retirement. Join all callers before cold close;

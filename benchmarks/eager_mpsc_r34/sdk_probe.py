@@ -31,8 +31,41 @@ def main():
     parser.add_argument('--output', required=True)
     parser.add_argument('--mode', choices=('parallel', 'cache', 'all'), default='all')
     parser.add_argument('--cache-api', choices=('v1', 'v2'), default='v1')
-    parser.add_argument('--lengths', default='1,2,8,64,128,256')
+    parser.add_argument('--lengths', help='Uniform bag lengths, or table indices when --fixture is set')
+    parser.add_argument('--fixture', help='Exact frozen MetaSyn26 JSON; preserve its indices and offsets')
     args = parser.parse_args()
+    fixture = None
+    fixture_sha = None
+    if args.fixture:
+        payload = Path(args.fixture).read_bytes()
+        fixture_sha = hashlib.sha256(payload).hexdigest()
+        if fixture_sha != '5eb2663c2d00d64db83c9d5b858c78f80849841216b242c93cfcd72d2dfbade5':
+            raise ValueError('fixture differs from the frozen MetaSyn26 input')
+        fixture = json.loads(payload)
+        if fixture['batch'] != 128 or fixture['vocabulary'] != 1024:
+            raise ValueError('fixture batch/vocabulary differs from the qualification domain')
+        selected = (list(map(int, args.lengths.split(','))) if args.lengths else
+                    [i for i, table in enumerate(fixture['tables']) if table['indices_total']])
+        for index in selected:
+            if not 0 <= index < len(fixture['tables']):
+                raise ValueError('fixture table index is outside the frozen fixture')
+            table = fixture['tables'][index]
+            if table['model_table'] != index or not table['indices_total']:
+                raise ValueError('empty table remains fallback and cannot be qualified')
+            if len(table['indices']) != table['indices_total'] or len(table['offsets']) != 128:
+                raise ValueError('fixture tensor lengths are inconsistent')
+            ends = table['offsets'][1:] + [len(table['indices'])]
+            if ([end - start for start, end in zip(table['offsets'], ends)] != table['lengths']
+                    or table['offsets'][0] != 0 or min(table['lengths']) < 0):
+                raise ValueError('fixture offsets do not describe its original ragged bags')
+            if min(table['indices']) < 0 or max(table['indices']) >= 1024:
+                raise ValueError('fixture index lies outside the frozen vocabulary')
+    else:
+        selected = list(map(int, (args.lengths or '1,2,8,64,128,256').split(',')))
+        if any(length <= 0 for length in selected):
+            raise ValueError('uniform lengths must be positive')
+    if len(set(selected)) != len(selected):
+        raise ValueError('duplicate qualification selections are not allowed')
     import torch
     import torch_npu
     torch.set_num_threads(1)
@@ -102,6 +135,12 @@ def main():
             ('ACL_OP_EXEC_CACHE_SIZE', 'PTA_CACHE_ENABLE', 'TASK_QUEUE_ENABLE')},
         main_tid=threading.get_native_id(), symbol_origins=origins,
         mapped_libraries=files, reports=reports, waves=waves)
+    if fixture:
+        result['fixture'] = dict(path=args.fixture, sha256=fixture_sha,
+            selected_tables=selected,
+            indices_total_by_table={str(i): fixture['tables'][i]['indices_total'] for i in selected},
+            excluded_empty_tables=[i for i, table in enumerate(fixture['tables'])
+                                   if not table['indices_total']])
 
     def save():
         result['prepare_tids'] = sorted(prepare_tids)
@@ -205,8 +244,13 @@ def main():
         cases = []
         for lane in range(4):
             weight = torch.randn(rows, dim) + wave_index / 7 + lane / 11
-            ids = torch.randint(rows, (batch * length,), dtype=torch.int64)
-            offsets = torch.arange(batch, dtype=torch.int64) * length
+            if fixture:
+                table = fixture['tables'][length]
+                ids = torch.tensor(table['indices'], dtype=torch.int64)
+                offsets = torch.tensor(table['offsets'], dtype=torch.int64)
+            else:
+                ids = torch.randint(rows, (batch * length,), dtype=torch.int64)
+                offsets = torch.arange(batch, dtype=torch.int64) * length
             reference = torch.nn.functional.embedding_bag(ids, weight, offsets,
                 mode='sum', sparse=True)
             values = [value.npu() for value in (weight, ids, offsets)]
@@ -219,10 +263,12 @@ def main():
                 assert all(a != b for a, b in zip(addresses, previous[lane]['addresses'])
                            if a and b), 'address replay did not receive fresh storage'
             key_bytes = (run_namespace + '|length=' + str(length) + '|lane=' + str(lane)
+                + '|fixture=' + str(fixture_sha) + '|indices_count=' + str(ids.numel())
                 + '|rows=1024|dim=16|batch=128|sum|fp32|sparse|stream=' + str(stream)).encode()
             key = int.from_bytes(hashlib.sha256(key_bytes).digest()[:8], 'little') or 1
             cases.append(dict(values=values, reference=reference, addresses=addresses,
-                length=length, lane=lane, key=key, key_bytes=key_bytes))
+                length=length, lane=lane, key=key, key_bytes=key_bytes,
+                fixture_table=length if fixture else None, indices_total=ids.numel()))
         held_cases.append(cases)
         torch.npu.synchronize()
         return cases
@@ -247,11 +293,13 @@ def main():
                 torch.testing.assert_close(actual, case['reference'], atol=1e-4, rtol=1e-4)
                 error = float((actual - case['reference']).abs().max())
             reports.append(dict(label=label, length=case['length'], lane=case['lane'],
+                fixture_table=case['fixture_table'], indices_total=case['indices_total'],
                 cache_key=case['key'], cache_hit=plan['cache_hit'], cancelled=cancel,
                 prepare_tid=plan['prepare_tid'], addresses=case['addresses'],
                 passed=True, max_abs_error=error))
         queries = [plan['query_interval'] for plan in plans if plan['query_interval']]
         waves.append(dict(label=label, length=cases[0]['length'],
+            fixture_table=cases[0]['fixture_table'], indices_total=cases[0]['indices_total'],
             prepare_overlap=peak_overlap([plan['interval'] for plan in plans]),
             sdk_query_overlap=peak_overlap(queries), prepare_threads=4,
             cache_hits=sum(plan['cache_hit'] for plan in plans), cancelled=cancel))
@@ -262,7 +310,7 @@ def main():
             # Dedicated lanes distinguish same-worker and cross-worker replay.
             pools = [ThreadPoolExecutor(1) for _ in range(4)]
             try:
-                for length in map(int, args.lengths.split(',')):
+                for length in selected:
                     if args.mode in ('parallel', 'all'):
                         run_wave(pools, consumer, make_cases(length, 0), 'parallel_uncached')
                         run_wave(pools, consumer, make_cases(length, 1),
