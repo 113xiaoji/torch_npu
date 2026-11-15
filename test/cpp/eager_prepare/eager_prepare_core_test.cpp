@@ -12,6 +12,15 @@
 using Core = c10_npu::queue::EagerPrepareQueueCore;
 using namespace std::chrono_literals;
 
+bool use_mpsc_ingress = false;
+Core::Config TestConfig(size_t slots, size_t bytes, size_t workers) {
+    Core::Config config{slots, bytes, workers};
+#ifdef C10_NPU_EAGER_PREPARE_MPSC_INGRESS
+    if (use_mpsc_ingress) config.ingress = Core::IngressMode::LockFreeMpsc;
+#endif
+    return config;
+}
+
 #define CHECK(x) do { if (!(x)) throw std::runtime_error("CHECK failed: " #x); } while (false)
 
 struct Event {
@@ -65,7 +74,7 @@ struct Fifo {
 };
 
 void ReversePrepareAndMixedLegacyOrder() {
-    Core core({4, 128, 2}); Fifo fifo;
+    Core core(TestConfig(4, 128, 2)); Fifo fifo;
     Event first_started, second_done, release_first;
     std::vector<int> order;
     auto first = std::make_shared<TestJob>(); auto second = std::make_shared<TestJob>();
@@ -93,7 +102,7 @@ struct Hooks {
 };
 
 void K1BackpressureUntilRetirement() {
-    Core core({1, 64, 1}); Fifo fifo;
+    Core core(TestConfig(1, 64, 1)); Fifo fifo;
     auto a = core.Submit(std::make_shared<TestJob>(), fifo.Publisher(core));
     fifo.Drain();
     CHECK(core.Snapshot().slots_in_use == 1);
@@ -106,7 +115,7 @@ void K1BackpressureUntilRetirement() {
 }
 
 void CloseWakesBlockedSubmit() {
-    Core core({1, 64, 1}); Fifo fifo;
+    Core core(TestConfig(1, 64, 1)); Fifo fifo;
     auto a = core.Submit(std::make_shared<TestJob>(), fifo.Publisher(core));
     Event waiting; Hooks hooks; hooks.before = &waiting;
     auto next = std::async(std::launch::async, [&] {
@@ -116,7 +125,7 @@ void CloseWakesBlockedSubmit() {
 }
 
 void PrepareFailurePreservesLogicalFirst() {
-    Core core({4, 128, 2}); Fifo fifo;
+    Core core(TestConfig(4, 128, 2)); Fifo fifo;
     Event first_started, second_done, release_first;
     auto first = std::make_shared<TestJob>(); auto second = std::make_shared<TestJob>();
     first->prepare = [&] { first_started.Set(); release_first.Wait(); throw std::runtime_error("first-order"); };
@@ -132,7 +141,7 @@ void PrepareFailurePreservesLogicalFirst() {
 }
 
 void EarlierPrefixExecutesDespiteLaterFailure() {
-    Core core({3, 128, 2}); Fifo fifo;
+    Core core(TestConfig(3, 128, 2)); Fifo fifo;
     Event bad_done;
     auto first = std::make_shared<TestJob>(); auto bad = std::make_shared<TestJob>();
     bad->prepare = [&] { bad_done.Set(); throw std::runtime_error("later"); };
@@ -142,7 +151,7 @@ void EarlierPrefixExecutesDespiteLaterFailure() {
 }
 
 void PublishNotAcceptedWaitsForPrepareAck() {
-    Core core({1, 64, 1}); Event started, release;
+    Core core(TestConfig(1, 64, 1)); Event started, release;
     auto job = std::make_shared<TestJob>(); std::atomic<bool> preparing{false};
     job->prepare = [&] { preparing = true; started.Set(); release.Wait(); preparing = false; };
     job->cancel = [&] { CHECK(!preparing); };
@@ -156,7 +165,7 @@ void PublishNotAcceptedWaitsForPrepareAck() {
 }
 
 void CommittedPublishErrorKeepsOwnership() {
-    Core core({1, 64, 1}); auto job = std::make_shared<TestJob>();
+    Core core(TestConfig(1, 64, 1)); auto job = std::make_shared<TestJob>();
     auto ticket = core.Submit(job, [](const Core::TicketPtr&) {
         return Core::PublishReceipt{Core::PublishState::Committed, Error("committed error")};
     });
@@ -166,7 +175,7 @@ void CommittedPublishErrorKeepsOwnership() {
 }
 
 void ExecuteFailureHoldsUntilFenceAck() {
-    Core core({1, 64, 1}); Fifo fifo; auto job = std::make_shared<TestJob>();
+    Core core(TestConfig(1, 64, 1)); Fifo fifo; auto job = std::make_shared<TestJob>();
     job->execute = [] { throw std::runtime_error("execute failure"); };
     auto ticket = core.Submit(job, fifo.Publisher(core));
     Throws([&] { core.Consume(ticket); }, "execute failure");
@@ -175,7 +184,7 @@ void ExecuteFailureHoldsUntilFenceAck() {
 }
 
 void CancellationCannotRacePrepare() {
-    Core core({1, 64, 1}); Fifo fifo; Event started, release;
+    Core core(TestConfig(1, 64, 1)); Fifo fifo; Event started, release;
     std::atomic<bool> preparing{false}; auto job = std::make_shared<TestJob>();
     job->prepare = [&] { preparing = true; started.Set(); release.Wait(); preparing = false; };
     job->cancel = [&] { CHECK(!preparing); };
@@ -186,7 +195,7 @@ void CancellationCannotRacePrepare() {
 }
 
 void PostQueryBytesFailWithoutWaitingForLaterTicket() {
-    Core core({2, 24, 2}); Fifo fifo; Event started, release;
+    Core core(TestConfig(2, 24, 2)); Fifo fifo; Event started, release;
     auto first = std::make_shared<TestJob>(); auto second = std::make_shared<TestJob>();
     first->prepare = [&] { started.Set(); release.Wait(); first->bytes = 32; };
     first->cancel = [&] { first->bytes = 8; };
@@ -199,7 +208,7 @@ void PostQueryBytesFailWithoutWaitingForLaterTicket() {
 }
 
 void PostQueryBytesStayReservedThroughExecution() {
-    Core core({2, 64, 1}); Fifo fifo; auto job = std::make_shared<TestJob>();
+    Core core(TestConfig(2, 64, 1)); Fifo fifo; auto job = std::make_shared<TestJob>();
     job->prepare = [&] { job->bytes = 40; };
     auto ticket = core.Submit(job, fifo.Publisher(core)); fifo.Drain();
     CHECK(core.Snapshot().retained_bytes == 40);
@@ -207,13 +216,13 @@ void PostQueryBytesStayReservedThroughExecution() {
 }
 
 void InitialByteOverflowRejectedBeforeAdmission() {
-    Core core({2, 4, 1}); Fifo fifo; auto job = std::make_shared<TestJob>();
+    Core core(TestConfig(2, 4, 1)); Fifo fifo; auto job = std::make_shared<TestJob>();
     Throws([&] { core.Submit(job, fifo.Publisher(core)); }, "byte");
     CHECK(core.Snapshot().admitted == 0 && job->prepared == 0); core.Shutdown();
 }
 
 void IndeterminatePublicationRetainsOwners() {
-    Core core({2, 64, 1}); auto job = std::make_shared<TestJob>();
+    Core core(TestConfig(2, 64, 1)); auto job = std::make_shared<TestJob>();
     std::weak_ptr<TestJob> weak = job;
     auto ticket = core.Submit(job, [](const Core::TicketPtr&) {
         return Core::PublishReceipt{Core::PublishState::Indeterminate, Error("unknown ownership")};
@@ -223,7 +232,7 @@ void IndeterminatePublicationRetainsOwners() {
 }
 
 void PublishThrowIsIndeterminate() {
-    Core core({1, 64, 1});
+    Core core(TestConfig(1, 64, 1));
     auto ticket = core.Submit(std::make_shared<TestJob>(), [](const Core::TicketPtr&) -> Core::PublishReceipt {
         throw std::runtime_error("publish throw");
     });
@@ -232,7 +241,7 @@ void PublishThrowIsIndeterminate() {
 }
 
 void CleanupFailureQuarantines() {
-    Core core({1, 64, 1}); Fifo fifo; auto job = std::make_shared<TestJob>();
+    Core core(TestConfig(1, 64, 1)); Fifo fifo; auto job = std::make_shared<TestJob>();
     job->cancel = [] { throw std::runtime_error("cleanup failed"); };
     auto ticket = core.Submit(job, fifo.Publisher(core)); fifo.Drain(); core.Retire(ticket);
     CHECK(core.Snapshot().quarantined && core.Snapshot().slots_in_use == 1);
@@ -240,7 +249,7 @@ void CleanupFailureQuarantines() {
 }
 
 void CallbacksAndReattachRunWithoutStateLock() {
-    Core core({1, 64, 1}); Fifo fifo; Event started, release, waiting;
+    Core core(TestConfig(1, 64, 1)); Fifo fifo; Event started, release, waiting;
     auto job = std::make_shared<TestJob>();
     job->prepare = [&] { (void)core.Snapshot(); started.Set(); release.Wait(); };
     job->execute = [&] { (void)core.Snapshot(); };
@@ -255,7 +264,7 @@ void CallbacksAndReattachRunWithoutStateLock() {
 }
 
 void RejectDoubleConsumeAndEarlyRetire() {
-    Core core({1, 64, 1}); Fifo fifo; Event started, release;
+    Core core(TestConfig(1, 64, 1)); Fifo fifo; Event started, release;
     auto job = std::make_shared<TestJob>(); job->prepare = [&] { started.Set(); release.Wait(); };
     auto ticket = core.Submit(job, fifo.Publisher(core)); started.Wait();
     Throws([&] { core.Retire(ticket); }, "retire"); release.Set(); core.Consume(ticket);
@@ -263,7 +272,7 @@ void RejectDoubleConsumeAndEarlyRetire() {
 }
 
 void DiscardWaitsForRollbackAck() {
-    Core core({1, 64, 1}); Fifo fifo; Event started, release, waiting;
+    Core core(TestConfig(1, 64, 1)); Fifo fifo; Event started, release, waiting;
     auto job = std::make_shared<TestJob>(); std::atomic<bool> preparing{false};
     job->prepare = [&] { preparing = true; started.Set(); release.Wait(); preparing = false; };
     job->cancel = [&] { CHECK(!preparing); };
@@ -275,7 +284,7 @@ void DiscardWaitsForRollbackAck() {
 }
 
 void OwnerDestructionPrecedesCreditRelease() {
-    Core core({1, 64, 1}); Fifo fifo; bool owner_destroyed = false; bool held_until_destroyed = false;
+    Core core(TestConfig(1, 64, 1)); Fifo fifo; bool owner_destroyed = false; bool held_until_destroyed = false;
     auto job = std::make_shared<TestJob>();
     job->destroy = [&] { owner_destroyed = true; held_until_destroyed = core.Snapshot().slots_in_use == 1; };
     auto ticket = core.Submit(job, fifo.Publisher(core)); job.reset(); fifo.Drain(); core.Retire(ticket);
@@ -283,7 +292,7 @@ void OwnerDestructionPrecedesCreditRelease() {
 }
 
 void FullOriginalFifoCannotBlockPrepareProgress() {
-    Core core({2, 64, 2}); c10_npu::queue::OrderedMpscQueueCore fifo(1); fifo.Start();
+    Core core(TestConfig(2, 64, 2)); c10_npu::queue::OrderedMpscQueueCore fifo(1); fifo.Start();
     std::array<Core::TicketPtr, 1> slots; Event first_started, second_prepared;
     auto first = std::make_shared<TestJob>(); auto second = std::make_shared<TestJob>();
     first->prepare = [&] { first_started.Set(); second_prepared.Wait(); };
@@ -304,7 +313,7 @@ void FullOriginalFifoCannotBlockPrepareProgress() {
 
 void ConcurrentProducersUseRealOriginalFifo() {
     constexpr size_t total = 240, producers = 4;
-    Core core({8, 256, 4}); c10_npu::queue::OrderedMpscQueueCore fifo(8); fifo.Start();
+    Core core(TestConfig(8, 256, 4)); c10_npu::queue::OrderedMpscQueueCore fifo(8); fifo.Start();
     std::array<Core::TicketPtr, 8> slots; std::vector<uint64_t> executed;
     auto consumer = std::async(std::launch::async, [&] {
         for (size_t i = 0; i < total; ++i) {
@@ -325,7 +334,8 @@ void ConcurrentProducersUseRealOriginalFifo() {
             });
         }
     }));
-    for (auto& producer : producers_done) producer.get(); consumer.get();
+    for (auto& producer : producers_done) producer.get();
+    consumer.get();
     CHECK(executed.size() == total);
     for (size_t i = 0; i < total; ++i) CHECK(executed[i] == i);
     CHECK(core.Snapshot().admitted == total && core.Snapshot().retired == total);
@@ -339,7 +349,7 @@ struct TlsWitness {
 void QuarantineRetainsWorkerTlsAfterCoreDestruction() {
     auto destroyed = std::make_shared<std::atomic<bool>>(false);
     {
-        Core core({1, 64, 1}); auto job = std::make_shared<TestJob>();
+        Core core(TestConfig(1, 64, 1)); auto job = std::make_shared<TestJob>();
         job->prepare = [destroyed] { thread_local std::unique_ptr<TlsWitness> witness;
             witness.reset(new TlsWitness{destroyed}); };
         core.Submit(job, [](const Core::TicketPtr&) {
@@ -351,7 +361,7 @@ void QuarantineRetainsWorkerTlsAfterCoreDestruction() {
 }
 
 void NormalShutdownRetainsTlsUntilRetirement() {
-    Core core({1, 64, 1}); Fifo fifo; Event waiting;
+    Core core(TestConfig(1, 64, 1)); Fifo fifo; Event waiting;
     auto destroyed = std::make_shared<std::atomic<bool>>(false);
     auto job = std::make_shared<TestJob>();
     job->prepare = [destroyed] { thread_local std::unique_ptr<TlsWitness> witness;
@@ -364,7 +374,7 @@ void NormalShutdownRetainsTlsUntilRetirement() {
 }
 
 void SubmitReattachCanReenterSubmission() {
-    Core core({2, 64, 1}); Fifo fifo;
+    Core core(TestConfig(2, 64, 1)); Fifo fifo;
     struct ReenterHooks {
         Core& core; Fifo& fifo; Core::TicketPtr nested;
         void BeforeWait() noexcept {}
@@ -376,7 +386,7 @@ void SubmitReattachCanReenterSubmission() {
 }
 
 void FailedRetirementRetainsDeviceOwners() {
-    Core core({1, 64, 1}); Fifo fifo; auto job = std::make_shared<TestJob>();
+    Core core(TestConfig(1, 64, 1)); Fifo fifo; auto job = std::make_shared<TestJob>();
     auto ticket = core.Submit(job, fifo.Publisher(core)); fifo.Drain(); core.Retire(ticket, false);
     CHECK(core.Snapshot().quarantined && core.Snapshot().slots_in_use == 1 && job->cancelled == 0);
     Throws([&] { core.RethrowIfFailed(); }, "retirement failed");
@@ -384,7 +394,7 @@ void FailedRetirementRetainsDeviceOwners() {
 }
 
 void DiscardAfterExecuteStillNeedsDeviceRetirement() {
-    Core core({1, 64, 1}); Fifo fifo; Event executing, release, waiting;
+    Core core(TestConfig(1, 64, 1)); Fifo fifo; Event executing, release, waiting;
     auto job = std::make_shared<TestJob>();
     job->execute = [&] { executing.Set(); release.Wait(); };
     auto ticket = core.Submit(job, fifo.Publisher(core));
@@ -411,7 +421,7 @@ struct ResourceJob final : Core::Job {
 };
 
 void NonzeroCleanupAckQuarantinesExternalOwner() {
-    Core core({1, 64, 1}); Fifo fifo;
+    Core core(TestConfig(1, 64, 1)); Fifo fifo;
     auto actual_bytes = std::make_shared<std::atomic<size_t>>(0);
     auto externally_retained = std::make_shared<ResourceJob>(actual_bytes, false);
     auto ticket = core.Submit(externally_retained, fifo.Publisher(core)); fifo.Drain(); core.Retire(ticket);
@@ -423,7 +433,7 @@ void NonzeroCleanupAckQuarantinesExternalOwner() {
 }
 
 void ExplicitResourceReleaseMakesExternalWrapperHarmless() {
-    Core core({1, 64, 1}); Fifo fifo;
+    Core core(TestConfig(1, 64, 1)); Fifo fifo;
     auto actual_bytes = std::make_shared<std::atomic<size_t>>(0);
     auto externally_retained = std::make_shared<ResourceJob>(actual_bytes, true);
     auto first = core.Submit(externally_retained, fifo.Publisher(core)); fifo.Drain();
@@ -437,7 +447,7 @@ void ExplicitResourceReleaseMakesExternalWrapperHarmless() {
 }
 
 void WorkersStartedCountsActualWorkerEntry() {
-    Core core({3, 64, 3}); Fifo fifo; Event all_preparing, release;
+    Core core(TestConfig(3, 64, 3)); Fifo fifo; Event all_preparing, release;
     std::atomic<size_t> entered{0}; std::vector<Core::TicketPtr> tickets;
     for (size_t i = 0; i < 3; ++i) {
         auto job = std::make_shared<TestJob>();
@@ -450,7 +460,7 @@ void WorkersStartedCountsActualWorkerEntry() {
 }
 
 void ReservationPeaksIncludePrepareTopup() {
-    Core core({2, 80, 2}); Fifo fifo;
+    Core core(TestConfig(2, 80, 2)); Fifo fifo;
     auto first = std::make_shared<TestJob>(); auto second = std::make_shared<TestJob>();
     first->prepare = [&] { first->bytes = 24; }; second->prepare = [&] { second->bytes = 32; };
     auto a = core.Submit(first, fifo.Publisher(core)); auto b = core.Submit(second, fifo.Publisher(core));
@@ -461,7 +471,7 @@ void ReservationPeaksIncludePrepareTopup() {
 }
 
 void SynchronousPublisherAcknowledgesBeforeWaitingForConsumer() {
-    Core core({1, 64, 1}); c10_npu::queue::OrderedMpscQueueCore fifo(1); fifo.Start();
+    Core core(TestConfig(1, 64, 1)); c10_npu::queue::OrderedMpscQueueCore fifo(1); fifo.Start();
     Core::TicketPtr slot; Event consumer_done; bool completed_synchronously = true;
     auto consumer = std::async(std::launch::async, [&] {
         CHECK(fifo.ConsumeOne([&](uint32_t) { core.Consume(slot); core.Retire(slot); consumer_done.Set(); }));
@@ -480,7 +490,7 @@ void SynchronousPublisherAcknowledgesBeforeWaitingForConsumer() {
 }
 
 void EarlyCommitCannotBeRetractedByLateFailure() {
-    Core core({1, 64, 1}); auto job = std::make_shared<TestJob>();
+    Core core(TestConfig(1, 64, 1)); auto job = std::make_shared<TestJob>();
     auto ticket = core.Submit(job, [&](const Core::TicketPtr& accepted) -> Core::PublishReceipt {
         CHECK(core.MarkCommitted(accepted)); throw std::runtime_error("late publication failure");
     });
@@ -491,7 +501,7 @@ void EarlyCommitCannotBeRetractedByLateFailure() {
 }
 
 void EarlyCommitCannotBeRetractedByNotAcceptedReceipt() {
-    Core core({1, 64, 1}); auto job = std::make_shared<TestJob>();
+    Core core(TestConfig(1, 64, 1)); auto job = std::make_shared<TestJob>();
     auto ticket = core.Submit(job, [&](const Core::TicketPtr& accepted) {
         CHECK(core.MarkCommitted(accepted));
         return Core::PublishReceipt{Core::PublishState::NotAccepted, nullptr};
@@ -500,6 +510,168 @@ void EarlyCommitCannotBeRetractedByNotAcceptedReceipt() {
     CHECK(!core.Snapshot().quarantined && core.Snapshot().slots_in_use == 1);
     Throws([&] { core.Consume(ticket); }, "committed");
     core.Retire(ticket); core.Shutdown();
+}
+
+void MpscPublishesOnOneDedicatedNativeThread() {
+    if (!use_mpsc_ingress) return;
+    Core core(TestConfig(2, 64, 1)); Fifo fifo;
+    const auto caller = std::this_thread::get_id();
+    std::thread::id publisher;
+    auto ticket = core.Submit(std::make_shared<TestJob>(), [&](const Core::TicketPtr& value) {
+        publisher = std::this_thread::get_id(); return fifo.Publish(core, value);
+    });
+    fifo.Drain(); core.Retire(ticket); core.Shutdown();
+    CHECK(publisher != caller);
+    const auto snapshot = core.Snapshot();
+    CHECK(snapshot.publisher_started == 1 && snapshot.ingress_atomic_lock_free);
+    CHECK(snapshot.retained_core_mutex && !snapshot.submit_mutex_used);
+}
+
+void MpscPendingRequestsHoldCreditsAndDrainAfterClose() {
+    if (!use_mpsc_ingress) return;
+    Core core(TestConfig(3, 16, 1)); Fifo fifo;
+    Event publishing, release;
+    auto first = std::async(std::launch::async, [&] {
+        return core.Submit(std::make_shared<TestJob>(), [&](const Core::TicketPtr& value) {
+            publishing.Set(); release.Wait(); return fifo.Publish(core, value);
+        });
+    });
+    publishing.Wait();
+    auto second = std::async(std::launch::async, [&] {
+        return core.Submit(std::make_shared<TestJob>(), fifo.Publisher(core));
+    });
+    bool pending = false;
+    const auto deadline = std::chrono::steady_clock::now() + 5s;
+    do {
+#ifdef C10_NPU_EAGER_PREPARE_MPSC_INGRESS
+        pending = core.Snapshot().ingress_pending == 1;
+#endif
+        if (pending) break;
+        std::this_thread::yield();
+    } while (std::chrono::steady_clock::now() < deadline);
+    const auto reserved = core.Snapshot();
+    Event entered;
+    auto third = std::async(std::launch::async, [&] {
+        entered.Set();
+        Throws([&] { (void)core.Submit(std::make_shared<TestJob>(), fifo.Publisher(core)); }, "closed");
+    });
+    entered.Wait(); core.Close();
+    Event closing; Hooks close_hooks; close_hooks.core = &core; close_hooks.before = &closing;
+    auto shutdown = std::async(std::launch::async, [&] { core.Shutdown(close_hooks); });
+    closing.Wait();
+    const bool shutdown_waited = shutdown.wait_for(0ms) == std::future_status::timeout;
+    release.Set();
+    third.get(); auto a = first.get(); auto b = second.get();
+    fifo.Drain(); core.Retire(a); core.Retire(b); shutdown.get();
+    CHECK(pending);
+    CHECK(shutdown_waited);
+    CHECK(reserved.slots_in_use == 2 && reserved.retained_bytes == 16 && reserved.admitted == 1);
+    CHECK(a->sequence == 0 && b->sequence == 1);
+}
+
+void MpscClosePreservesPreexistingProducerPermit() {
+    if (!use_mpsc_ingress) return;
+#ifdef C10_NPU_MPSC_CLOSE_GATE
+    c10_npu::queue::LockFreeIngressGate gate;
+    c10_npu::queue::LockFreeMpscIngress<int> ingress(2);
+    Event claimed, resume;
+    auto producer = std::async(std::launch::async, [&] {
+        CHECK(gate.TryEnter());
+        auto* node = ingress.TryClaim(); CHECK(node); node->value = 7;
+        claimed.Set(); resume.Wait();
+        ingress.Publish(node); gate.Leave();
+    });
+    claimed.Wait(); gate.Close();
+    const bool closed = gate.Closed(), rejected = !gate.TryEnter();
+    const size_t active = gate.ActiveProducers();
+    resume.Set(); producer.get();
+    auto* node = ingress.TakeBatch(); CHECK(node && node->value == 7 && !node->next);
+    ingress.Release(node);
+    CHECK(closed && rejected && active == 1 && gate.ActiveProducers() == 0);
+#else
+    CHECK(!use_mpsc_ingress && "atomic admission close gate is missing");
+#endif
+}
+
+void MpscUnlinkedProducerDoesNotBlockBatchProgress() {
+    if (!use_mpsc_ingress) return;
+    c10_npu::queue::LockFreeMpscIngress<int> ingress(3);
+    auto* paused = ingress.TryClaim(); CHECK(paused); paused->value = 1;
+    auto* completed = ingress.TryClaim(); CHECK(completed); completed->value = 2;
+    ingress.Publish(completed);
+    auto* batch = ingress.TakeBatch(); CHECK(batch == completed && batch->value == 2 && !batch->next);
+    ingress.Release(batch);
+    ingress.Publish(paused);
+    batch = ingress.TakeBatch(); CHECK(batch == paused && batch->value == 1 && !batch->next);
+    ingress.Release(batch);
+    for (int round = 0; round != 1000; ++round) {
+        for (int value = 0; value != 3; ++value) {
+            auto* node = ingress.TryClaim(); CHECK(node); node->value = value; ingress.Publish(node);
+        }
+        CHECK(!ingress.TryClaim());
+        batch = ingress.TakeBatch();
+        for (int value = 0; value != 3; ++value) {
+            CHECK(batch && batch->value == value);
+            auto* node = batch; batch = batch->next; ingress.Release(node);
+        }
+        CHECK(!batch && ingress.Empty());
+    }
+}
+
+void MpscPendingFailureCleansOrQuarantinesBeforeShutdown() {
+    if (!use_mpsc_ingress) return;
+    for (bool cleanup_fails : {false, true}) {
+        Core core(TestConfig(2, 64, 1)); Event publishing, release;
+        auto pending_job = std::make_shared<TestJob>();
+        pending_job->cleanup_failed = cleanup_fails;
+        auto first = std::async(std::launch::async, [&] {
+            return core.Submit(std::make_shared<TestJob>(), [&](const Core::TicketPtr&) {
+                publishing.Set(); release.Wait();
+                return Core::PublishReceipt{Core::PublishState::NotAccepted, Error("unique pending failure")};
+            });
+        });
+        publishing.Wait();
+        auto second = std::async(std::launch::async, [&] {
+            Throws([&] { (void)core.Submit(pending_job, [](const Core::TicketPtr&) -> Core::PublishReceipt {
+                throw std::runtime_error("pending request must never publish");
+            }); }, "unique pending failure");
+        });
+        bool pending = false;
+        const auto deadline = std::chrono::steady_clock::now() + 5s;
+        do {
+            pending = core.Snapshot().ingress_pending == 1;
+            if (pending) break;
+            std::this_thread::yield();
+        } while (std::chrono::steady_clock::now() < deadline);
+        release.Set(); first.get(); second.get(); CHECK(pending);
+        if (cleanup_fails) Throws([&] { core.Shutdown(); }, "quarantined");
+        else core.Shutdown();
+        const auto snapshot = core.Snapshot();
+        CHECK(pending_job->prepared == 0 && pending_job->cancelled == 1);
+        CHECK(snapshot.ingress_pending == 0 && snapshot.ingress_active_producers == 0);
+        CHECK(snapshot.quarantined == cleanup_fails && snapshot.slots_in_use == (cleanup_fails ? 1U : 0U));
+        CHECK(snapshot.retained_bytes == (cleanup_fails ? 8U : 0U));
+    }
+}
+
+void MpscPublisherTlsStopsOnlyAfterSuccessfulRetirement() {
+    if (!use_mpsc_ingress) return;
+    for (bool quarantine : {false, true}) {
+        auto destroyed = std::make_shared<std::atomic<bool>>(false);
+        {
+            Core core(TestConfig(1, 64, 1)); Fifo fifo;
+            auto ticket = core.Submit(std::make_shared<TestJob>(), [&](const Core::TicketPtr& value) {
+                thread_local std::unique_ptr<TlsWitness> witness;
+                witness.reset(new TlsWitness{destroyed});
+                return quarantine ? Core::PublishReceipt{Core::PublishState::Indeterminate, Error("uncertain publisher")} :
+                    fifo.Publish(core, value);
+            });
+            CHECK(!*destroyed);
+            if (quarantine) Throws([&] { core.Shutdown(); }, "quarantined");
+            else { fifo.Drain(); core.Retire(ticket); core.Shutdown(); }
+        }
+        CHECK(destroyed->load() != quarantine);
+    }
 }
 
 int main() {
@@ -537,12 +709,21 @@ int main() {
         {"synchronous publisher ACK precedes consumer wait", SynchronousPublisherAcknowledgesBeforeWaitingForConsumer},
         {"early commit cannot be retracted by late failure", EarlyCommitCannotBeRetractedByLateFailure},
         {"early commit cannot be retracted by NotAccepted", EarlyCommitCannotBeRetractedByNotAcceptedReceipt},
+        {"MPSC uses a dedicated publisher", MpscPublishesOnOneDedicatedNativeThread},
+        {"MPSC pending credits survive close", MpscPendingRequestsHoldCreditsAndDrainAfterClose},
+        {"MPSC close preserves preexisting producer permit", MpscClosePreservesPreexistingProducerPermit},
+        {"MPSC unlinked producer permits batch progress and reuse", MpscUnlinkedProducerDoesNotBlockBatchProgress},
+        {"MPSC pending failure cleanup and quarantine", MpscPendingFailureCleansOrQuarantinesBeforeShutdown},
+        {"MPSC publisher TLS retirement and quarantine", MpscPublisherTlsStopsOnlyAfterSuccessfulRetirement},
     };
     size_t passed = 0;
-    for (const auto& test : tests) {
-        try { test.second(); ++passed; std::cout << "PASS " << test.first << '\n'; }
-        catch (const std::exception& error) { std::cerr << "FAIL " << test.first << ": " << error.what() << '\n'; }
+    for (bool mpsc : {false, true}) {
+        use_mpsc_ingress = mpsc;
+        for (const auto& test : tests) {
+            try { test.second(); ++passed; std::cout << "PASS " << (mpsc ? "mpsc " : "mutex ") << test.first << '\n'; }
+            catch (const std::exception& error) { std::cerr << "FAIL " << (mpsc ? "mpsc " : "mutex ") << test.first << ": " << error.what() << '\n'; }
+        }
     }
     std::cout << passed << " host contract tests passed (no NPU execution).\n";
-    return passed == sizeof(tests) / sizeof(tests[0]) ? 0 : 1;
+    return passed == 2 * sizeof(tests) / sizeof(tests[0]) ? 0 : 1;
 }

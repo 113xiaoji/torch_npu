@@ -16,6 +16,7 @@
 #include <atomic>
 #include <algorithm>
 #include <cstring>
+#include <cstdlib>
 #include <map>
 #include <mutex>
 #include <sstream>
@@ -31,6 +32,7 @@ std::atomic<bool> enabled_flag{false}; // Off fast path never allocates runtime 
 std::atomic<bool> trace_flag{false};
 struct Counts {
     uint64_t seen=0, eligible=0, queued=0, prepared=0, executed=0, returned=0, fallback=0;
+    uint64_t sdk_prepare_calls=0;
     std::map<std::string,uint64_t> reasons;
     bool qualified=false;
     uint64_t fallback_fences=0;
@@ -39,6 +41,7 @@ struct Identity {
     std::atomic<uint64_t> sequence{std::numeric_limits<uint64_t>::max()};
     uint64_t caller_tid=0;
     std::atomic<uint64_t> consumer_tid{0};
+    std::atomic<uint64_t> publisher_tid{0};
 };
 struct Trace {
     std::shared_ptr<Identity> identity;
@@ -59,6 +62,9 @@ struct State {
     std::shared_ptr<Core> core;
     std::thread::id caller_thread;
     uint64_t caller_tid=0;
+    void* primary_context=nullptr;
+    bool multiple_callers=false;
+    Core::IngressMode ingress=Core::IngressMode::SubmitMutex;
     size_t active_submitters=0;
     std::map<std::string,Counts> operators;
     SequenceOrderEvidence admission_order, execution_order;
@@ -137,10 +143,13 @@ void note_error(const char* phase, const std::string& operation, uint64_t sequen
 }
 void count_event(const std::string& operation, const char* event, const Identity& identity) {
     auto& s=state(); std::lock_guard<std::mutex> lock(s.mu); auto& n=s.operators[operation];
-    if (std::strcmp(event,"prepared")==0) ++n.prepared;
+    if (std::strcmp(event,"prepared")==0) {
+        ++n.prepared;
+        if (!BuildUsesHostSimulation()) ++n.sdk_prepare_calls;
+    }
     else if (std::strcmp(event,"executed")==0) {
         ++n.executed;
-        if (BuildUsesHostSimulation()) s.execution_order.Record(identity.sequence.load(std::memory_order_acquire),operation.c_str());
+        s.execution_order.Record(identity.sequence.load(std::memory_order_acquire),operation.c_str());
     }
     else if (std::strcmp(event,"returned")==0) ++n.returned;
 }
@@ -264,7 +273,7 @@ bool Admit(const char* name,bool qualified,const char* decline_reason,bool argum
     check_queue_configuration();
     auto& s=state(); std::shared_ptr<Core> core;
     { std::lock_guard<std::mutex> lock(s.mu); core=s.core;
-      TORCH_CHECK(s.caller_thread==std::this_thread::get_id(),"R24 eager Prepare currently admits one native caller thread per configured domain");
+      TORCH_CHECK(s.multiple_callers || s.caller_thread==std::this_thread::get_id(),"eager Prepare domain admits only its configured caller");
       if (s.first_error) std::rethrow_exception(s.first_error); }
     core->RethrowIfFailed();
     host_regions::PrepareOwnedOpApiCallerState();
@@ -328,13 +337,15 @@ void SubmitImpl(const char* name,std::unique_ptr<host_regions::OwnedOpApiPayload
         ~Submitter() noexcept { std::lock_guard<std::mutex> lock(state.mu); --state.active_submitters; state.submitters_changed.notify_all(); }
     };
     { std::lock_guard<std::mutex> lock(s.mu);
-      TORCH_CHECK(s.enabled && s.core && s.caller_thread==std::this_thread::get_id(),"eager Prepare admission is closed or caller changed");
+      TORCH_CHECK(s.enabled && s.core && (s.multiple_callers || s.caller_thread==std::this_thread::get_id()),"eager Prepare admission is closed or caller changed");
       core=s.core; ++s.active_submitters; }
     Submitter submitter{s};
     TORCH_CHECK(!host_regions::OwnedOpApiEnabled(),"eager Prepare cannot nest the R22 capture domain");
     host_regions::PrepareOwnedOpApiCallerState();
     auto caller=std::make_shared<hdb_native::CallerTls>(true);
     TORCH_CHECK(caller->context(),"eager Prepare requires the current primary Context");
+    { std::lock_guard<std::mutex> lock(s.mu);
+      TORCH_CHECK(caller->context()==s.primary_context,"eager Prepare caller changed the configured primary Context"); }
     auto stream=c10_npu::getDefaultNPUStream(0).stream(false);
     const std::string operation(name);
     bool tracing;
@@ -348,15 +359,20 @@ void SubmitImpl(const char* name,std::unique_ptr<host_regions::OwnedOpApiPayload
         // Detached before Submit's locks; native workers and the original FIFO
         // consumer never enter Python or wait for the calling interpreter.
         hdb_native::WaitDetach detached;
-        auto ticket=core->Submit(job,[&](const Core::TicketPtr& value) {
+        auto ticket=core->Submit(job,[core,caller,identity,retirement,operation,tracing](const Core::TicketPtr& value) {
+            // Publication may execute on a dedicated native thread. Own all
+            // captures and install caller TLS before entering the original FIFO.
+            hdb_native::TaskTls publication_tls(*caller,true);
             identity->sequence.store(value->sequence,std::memory_order_release);
-            if (BuildUsesHostSimulation()) { std::lock_guard<std::mutex> lock(s.mu); s.admission_order.Record(value->sequence,name); }
+            if (tracing) identity->publisher_tid.store(native_tid(),std::memory_order_release);
+            { auto& runtime=state(); std::lock_guard<std::mutex> lock(runtime.mu);
+              runtime.admission_order.Record(value->sequence,operation.c_str()); }
             retirement->ticket=value;
             std::atomic<bool> accepted{false},commit_failed{false};
             std::exception_ptr error;
             try {
                 at_npu::native::ExecuteParasOpApi parameters;
-                std::strncpy(parameters.opType,name,sizeof(parameters.opType)-1);
+                std::strncpy(parameters.opType,operation.c_str(),sizeof(parameters.opType)-1);
                 parameters.customHandler=[core,value,retirement]() { core->Consume(value); return 0; };
                 queue::QueueParas queue_parameter(queue::EXECUTE_OPAPI,sizeof(parameters),&parameters);
                 PublicationMarker marker(&queue_parameter,accepted,*core,value,commit_failed);
@@ -405,9 +421,19 @@ std::string Configure(Configuration config) {
         TORCH_CHECK(caller.context(),"eager Prepare configure requires the initialized device0 primary Context");
         host_regions::PrepareOwnedOpApiCallerState();
         CheckSdkConfiguration();
+        const auto* ingress_setting=std::getenv("TORCH_NPU_EAGER_PREPARE_INGRESS");
+        TORCH_CHECK(!ingress_setting || std::strcmp(ingress_setting,"mutex")==0 || std::strcmp(ingress_setting,"mpsc")==0,
+            "TORCH_NPU_EAGER_PREPARE_INGRESS must be mutex or mpsc");
+        const auto ingress=ingress_setting && std::strcmp(ingress_setting,"mpsc")==0 ?
+            Core::IngressMode::LockFreeMpsc : Core::IngressMode::SubmitMutex;
+        const auto* multi_setting=std::getenv("TORCH_NPU_EAGER_PREPARE_MULTI_CALLER");
+        TORCH_CHECK(!multi_setting || std::strcmp(multi_setting,"0")==0 || std::strcmp(multi_setting,"1")==0,
+            "TORCH_NPU_EAGER_PREPARE_MULTI_CALLER must be 0 or 1");
         std::vector<Trace> trace; trace.reserve(config.diagnostic_trace ? config.trace_limit : 0);
-        auto core=std::make_shared<Core>(Core::Config{config.capacity,config.byte_limit,config.workers});
+        auto core=std::make_shared<Core>(Core::Config{config.capacity,config.byte_limit,config.workers,ingress});
         std::lock_guard<std::mutex> lock(s.mu); s.core=std::move(core); s.config=config; s.operators.clear();
+        s.ingress=ingress; s.multiple_callers=multi_setting && std::strcmp(multi_setting,"1")==0;
+        s.primary_context=caller.context();
         s.fifo_drained=false; s.device_synchronized=false; s.workers_stopped=false; s.closure_passed=false;
         s.peak_slots=0; s.peak_bytes=0;
         s.admission_order=SequenceOrderEvidence{}; s.execution_order=SequenceOrderEvidence{};
@@ -434,6 +460,10 @@ std::string Snapshot() {
     out << "{\"schema\":1,\"mode\":" << quote(s.enabled ? "eager_prepare" : "off") << ",\"enabled\":" << boolean(s.enabled)
         << ",\"workers\":" << s.config.workers << ",\"capacity\":" << s.config.capacity << ",\"byte_limit\":" << s.config.byte_limit;
     out << ",\"caller_tid\":" << s.caller_tid;
+    out << ",\"ingress\":" << quote(s.ingress==Core::IngressMode::LockFreeMpsc ? "mpsc" : "mutex")
+        << ",\"multiple_callers\":" << boolean(s.multiple_callers)
+        << ",\"close_requires_callers_joined\":true"
+        << ",\"global_lock_free\":false";
     out << ",\"backend\":" << quote(BackendName())
         << ",\"real_sdk_qualified\":" << boolean(!BuildUsesHostSimulation() && std::any_of(s.operators.begin(),s.operators.end(),
             [](const auto& entry) { return entry.second.qualified; }))
@@ -451,6 +481,7 @@ std::string Snapshot() {
         if (!first) out << ','; first=false; const auto& n=entry.second;
         out << quote(entry.first) << ":{\"seen\":" << n.seen << ",\"eligible\":" << n.eligible << ",\"queued\":" << n.queued
             << ",\"prepared\":" << n.prepared << ",\"executed\":" << n.executed << ",\"returned\":" << n.returned
+            << ",\"sdk_prepare_calls\":" << n.sdk_prepare_calls
             << ",\"fallback\":" << n.fallback << ",\"fallback_reasons\":{"; bool rfirst=true;
         for (const auto& reason:n.reasons) { if (!rfirst) out << ','; rfirst=false; out << quote(reason.first) << ':' << reason.second; }
         out << "},\"fallback_fences\":" << n.fallback_fences << '}';
@@ -459,6 +490,12 @@ std::string Snapshot() {
         << ",\"queued\":" << q.queued << ",\"preparing\":" << q.preparing << ",\"ready\":" << q.ready
         << ",\"admitted\":" << q.admitted << ",\"retired\":" << q.retired << ",\"closed\":" << boolean(q.closed)
         << ",\"workers_started\":" << q.workers_started
+        << ",\"ingress_pending\":" << q.ingress_pending
+        << ",\"ingress_active_producers\":" << q.ingress_active_producers
+        << ",\"publisher_started\":" << q.publisher_started
+        << ",\"ingress_atomic_lock_free\":" << boolean(q.ingress_atomic_lock_free)
+        << ",\"retained_core_mutex\":" << boolean(q.retained_core_mutex)
+        << ",\"submit_mutex_used\":" << boolean(q.submit_mutex_used)
         << ",\"quarantined\":" << boolean(q.quarantined) << ",\"first_failed_sequence\":";
     if (q.first_failed_sequence==std::numeric_limits<uint64_t>::max()) out << "null"; else out << q.first_failed_sequence;
     out << "},\"peaks\":{\"slots_in_use\":" << q.peak_slots_in_use << ",\"retained_bytes\":" << q.peak_retained_bytes << "},\"closure\":{\"admission_closed\":"
@@ -472,10 +509,10 @@ std::string Snapshot() {
         if (s.error_sequence==std::numeric_limits<uint64_t>::max()) out << "null"; else out << s.error_sequence;
         out << ",\"message\":" << quote(describe(s.first_error)) << '}';
     }
-    out << ",\"order_evidence\":{\"enabled\":" << boolean(BuildUsesHostSimulation())
+    out << ",\"order_evidence\":{\"enabled\":true"
         << ",\"admitted_count\":" << s.admission_order.count << ",\"executed_count\":" << s.execution_order.count
         << ",\"admitted_sequence_hash\":" << s.admission_order.hash << ",\"executed_sequence_hash\":" << s.execution_order.hash
-        << ",\"passed\":" << boolean(BuildUsesHostSimulation() && s.closure_passed && s.admission_order.ordered &&
+        << ",\"passed\":" << boolean(s.closure_passed && s.admission_order.ordered &&
             s.execution_order.ordered && s.admission_order.count==s.execution_order.count && s.admission_order.hash==s.execution_order.hash) << '}';
     out << ",\"diagnostic_trace\":{\"enabled\":" << boolean(s.config.diagnostic_trace) << ",\"limit\":" << s.config.trace_limit
         << ",\"dropped\":" << s.trace_dropped+s.trace_errors.load(std::memory_order_relaxed)
@@ -490,7 +527,8 @@ std::string Snapshot() {
             << ",\"shape_unknown\":" << boolean(trace.shape_signature.empty()) << ",\"shape_signature\":";
         if (trace.shape_signature.empty()) out << "null"; else out << quote(trace.shape_signature);
         out
-            << ",\"caller_tid\":" << trace.identity->caller_tid << ",\"consumer_tid\":";
+            << ",\"caller_tid\":" << trace.identity->caller_tid
+            << ",\"publisher_tid\":" << trace.identity->publisher_tid.load(std::memory_order_acquire) << ",\"consumer_tid\":";
         const auto consumer=trace.identity->consumer_tid.load(std::memory_order_acquire);
         if (!consumer) out << "null"; else out << consumer;
         out << ",\"start_ns\":" << trace.start_ns << ",\"end_ns\":" << trace.end_ns

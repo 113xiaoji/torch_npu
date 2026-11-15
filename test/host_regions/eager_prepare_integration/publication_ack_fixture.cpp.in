@@ -17,8 +17,8 @@ struct Job final : Core::Job {
     int executions=0;
     size_t bytes=7;
 };
-void run_case(int late) {
-    auto core=std::make_shared<Core>(Core::Config{1,64,1});
+void run_case(int late, Core::IngressMode ingress) {
+    auto core=std::make_shared<Core>(Core::Config{1,64,1,ingress});
     c10_npu::queue::OrderedMpscQueueCore fifo(1); fifo.Start();
     c10_npu::queue::NoopWaitHooks hooks;
     Core::TicketPtr slot;
@@ -61,4 +61,8 @@ void run_case(int late) {
     assert(job->executions==1 && job->bytes==0);
 }
 } // namespace c10_npu::eager_prepare
-int main() { for (int late=0;late<4;++late) c10_npu::eager_prepare::run_case(late); }
+int main() {
+    using Core=c10_npu::queue::EagerPrepareQueueCore;
+    for (auto ingress : {Core::IngressMode::SubmitMutex, Core::IngressMode::LockFreeMpsc})
+        for (int late=0;late<4;++late) c10_npu::eager_prepare::run_case(late,ingress);
+}

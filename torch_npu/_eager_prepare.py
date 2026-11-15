@@ -25,6 +25,12 @@ def configure(*, enabled=False, workers=4, capacity=8, byte_limit=536870912,
     ``allowed_ops`` requests eligibility. ``qualified_ops`` in the returned
     snapshot identifies the independently qualified subset; unsupported calls
     keep the original eager route and record a fallback reason.
+
+    R34 process selectors are read once when enabling: INGRESS=mutex|mpsc and
+    MULTI_CALLER=0|1, prefixed TORCH_NPU_EAGER_PREPARE_. With multiple callers,
+    the owner must join every model/caller before drain_close or reconfigure;
+    close does not lease an entire model forward or an ordinary fallback call.
+    MPSC ingress does not remove core, PTA, allocator or SDK internal locks.
     """
     if type(enabled) is not bool:
         raise TypeError('enabled must be bool')
@@ -60,5 +66,6 @@ def drain_close():
 
     A failure propagates unchanged and retains the quarantined worker domain;
     it is not an acknowledgement that SDK resources were reclaimed.
+    Join all model callers before invoking this cold lifecycle operation.
     """
     return _result(_torch_npu._C._npu_eager_prepare_drain_close())

@@ -62,7 +62,61 @@ It is a cumulative birth counter, not the configured worker count, and can be
 less than the configuration immediately after construction while OS threads
 are still starting.
 
-Snapshot::peak_slots_in_use and peak_retained_bytes record the actual high-water
-marks under the reservation lock, including successful Prepare byte top-ups.
-They remain available after retirement. These are reservation peaks, not sampled
-producer-return values or opaque SDK allocation peaks.
+Snapshot::peak_slots_in_use and peak_retained_bytes record reservations observed
+under the state lock, including successful Prepare byte top-ups. They remain
+available after retirement. In MPSC mode a producer can reserve atomic credits
+before reaching that lock; a transient pending peak can therefore be missed.
+The atomic slot/byte caps still apply to those pending reservations. These
+counters do not measure opaque SDK allocation peaks.
+
+## Optional MPSC ingress (R34)
+
+The same binary runs both configurations. Existing three-field aggregates keep
+the mutex route; the fourth field selects the experimental ingress:
+
+```cpp
+Core::Config baseline{8, 536870912, 4};
+Core::Config candidate{8, 536870912, 4, Core::IngressMode::LockFreeMpsc};
+```
+
+The test executable runs the original contract suite with both configurations.
+The MPSC route preallocates fixed descriptors and uses atomic descriptor claims,
+slot/byte reservations, and a CAS producer stack. A dedicated native publisher
+detaches and reverses batches, assigns sequences on dequeue, dispatches Prepare,
+and then publishes to the original FIFO. A producer paused before its enqueue
+CAS exposes no hole. Descriptors are reused only after the publisher's full
+completion ACK and caller cleanup; the consumer saves its successor before ACK.
+Producers never dereference existing head nodes, so recycled head addresses do
+not require hazard pointers for this push/exchange algorithm.
+
+Close atomically closes a combined admission-bit/active-producer-count gate.
+A producer holding a permit from before Close may still link afterwards; it
+belongs to the accepted prefix. Close does not drain that prefix. Shutdown waits
+for active permits, pending reservations, publisher callbacks, worker jobs, and
+real retirements. Production callers must stop and join all submitters before
+draining the original FIFO. A first failure cancels unpublished pending jobs;
+cleanup failure retains descriptors, credits, owners, and live thread TLS until
+process exit.
+
+This is an experiment in a lock-free ingress primitive. The blocking Submit
+wrapper still takes state_mu for its completion wait. The publisher, worker
+queue, readiness, consumption, accounting transitions, original PTA FIFO,
+allocators, and SDK are not globally lock-free. Snapshot reports
+ingress_atomic_lock_free, retained_core_mutex, and submit_mutex_used explicitly.
+Both compile-time requirements and runtime is_lock_free checks cover the
+primitive's atomics. Payload/callback construction occurs before the primitive;
+ticket/map/deque allocation still occurs on the publisher.
+
+Submit waits for the entire publisher function to finish, preserving lifetime
+and late-error behavior. The existing early ownership-copy MarkCommitted ACK
+still breaks the synchronous INIT consumer/publication dependency. The native
+publisher requires owned callback captures and captured caller TLS/context.
+In C++17 its empty-queue wait has a one-millisecond fallback to handle a producer
+paused after its enqueue CAS and before notification. The extra native thread,
+handoff, waits, and notifications are part of candidate performance.
+
+The host suite additionally covers preempted producer permits at Close,
+unlinked-producer progress, cross-batch descriptor reuse, pending slot/byte
+credits, Shutdown waiting for pending work, pending failure cleanup/quarantine,
+and publisher TLS retirement/quarantine. No host result proves NPU numerical
+correctness, SDK parallel-query qualification, or a performance gain.
