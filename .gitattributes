@@ -118,3 +118,7 @@ patches/eager_mpsc_r34/** -text whitespace=trailing-space,space-before-tab,cr-at
 benchmarks/eager_mpsc_r34/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
 test/eager_mpsc_r34/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
 torch_npu/csrc/core/npu/LockFreeMpscIngress.h -text whitespace=trailing-space,space-before-tab,cr-at-eol
+
+# Preserve the R35 measured client/adapter source closure across checkouts.
+benchmarks/forward_concurrency_r35/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+test/forward_concurrency_r35/** -text whitespace=trailing-space,space-before-tab,cr-at-eol

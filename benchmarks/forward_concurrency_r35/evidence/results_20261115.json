@@ -1,0 +1,899 @@
+{
+  "schema": 1,
+  "scenario": "shared read-only full DLRM; closed-loop Python clients; one outstanding request per client; no cross-request batching",
+  "requests_per_performance_case": 3000,
+  "samples_per_request": 128,
+  "input_bank_types": 8,
+  "model": {
+    "batch": 128,
+    "tables": 26,
+    "vocabulary": 1024,
+    "embedding_dim": 16,
+    "indices_per_request": 50850
+  },
+  "cases": {
+    "cpu/giloff-c1-cpu-off": {
+      "device": "cpu",
+      "case_id": "giloff-c1-cpu-off",
+      "gil_mode": "off",
+      "actual_gil": {
+        "expected": false,
+        "before": false,
+        "after": false,
+        "build_disabled": 1
+      },
+      "callers": 1,
+      "stream_mode": "cpu",
+      "backend": "off",
+      "total_requests": 3000,
+      "warmup_per_caller": 24,
+      "throughput_requests_per_second": 538.7531106089364,
+      "latency_p50_ns": 1847850,
+      "latency_p95_ns": 1870411,
+      "latency_p99_ns": 1885231,
+      "host_forward_peak": 1,
+      "caller_cpu_per_request_ns": 1852811.88,
+      "numeric_validation": {
+        "passed": true,
+        "validated_requests": 3000,
+        "finite_count": 3000,
+        "shape_count": 3000,
+        "reference_compared_count": 3000,
+        "expected_shape": [
+          128,
+          1
+        ],
+        "max_abs_error": 0.0,
+        "rtol": 0.0001,
+        "atol": 1e-05
+      },
+      "source_sha256": "5bced24dd1fe1f50638d774e18efbb97442917fed2b8c6ef94e25a84806b2d11",
+      "source_result_sha256": "218e0ca537e30387bc36d32d515ef88e6e6061a5131c7cd14dde830baa00873c",
+      "input_bank_sha256": "471ed62048b5ceac1cd5f26332b0a2bb0cc1782bd4977b71f486c6655dd5f719",
+      "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+      "native_gate": null,
+      "close_gate": null
+    },
+    "cpu/giloff-c2-cpu-off": {
+      "device": "cpu",
+      "case_id": "giloff-c2-cpu-off",
+      "gil_mode": "off",
+      "actual_gil": {
+        "expected": false,
+        "before": false,
+        "after": false,
+        "build_disabled": 1
+      },
+      "callers": 2,
+      "stream_mode": "cpu",
+      "backend": "off",
+      "total_requests": 3000,
+      "warmup_per_caller": 24,
+      "throughput_requests_per_second": 1057.7109309985153,
+      "latency_p50_ns": 1870871,
+      "latency_p95_ns": 1947354,
+      "latency_p99_ns": 1973475,
+      "host_forward_peak": 2,
+      "caller_cpu_per_request_ns": 1884373.6466666667,
+      "numeric_validation": {
+        "passed": true,
+        "validated_requests": 3000,
+        "finite_count": 3000,
+        "shape_count": 3000,
+        "reference_compared_count": 3000,
+        "expected_shape": [
+          128,
+          1
+        ],
+        "max_abs_error": 0.0,
+        "rtol": 0.0001,
+        "atol": 1e-05
+      },
+      "source_sha256": "5bced24dd1fe1f50638d774e18efbb97442917fed2b8c6ef94e25a84806b2d11",
+      "source_result_sha256": "89f5181903647ecc0de6a37fab493d405982989b266a09cb149365d207d253b9",
+      "input_bank_sha256": "471ed62048b5ceac1cd5f26332b0a2bb0cc1782bd4977b71f486c6655dd5f719",
+      "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+      "native_gate": null,
+      "close_gate": null
+    },
+    "cpu/giloff-c4-cpu-off": {
+      "device": "cpu",
+      "case_id": "giloff-c4-cpu-off",
+      "gil_mode": "off",
+      "actual_gil": {
+        "expected": false,
+        "before": false,
+        "after": false,
+        "build_disabled": 1
+      },
+      "callers": 4,
+      "stream_mode": "cpu",
+      "backend": "off",
+      "total_requests": 3000,
+      "warmup_per_caller": 24,
+      "throughput_requests_per_second": 1941.7656846506677,
+      "latency_p50_ns": 2049436,
+      "latency_p95_ns": 2101258,
+      "latency_p99_ns": 2130049,
+      "host_forward_peak": 4,
+      "caller_cpu_per_request_ns": 2050316.3266666667,
+      "numeric_validation": {
+        "passed": true,
+        "validated_requests": 3000,
+        "finite_count": 3000,
+        "shape_count": 3000,
+        "reference_compared_count": 3000,
+        "expected_shape": [
+          128,
+          1
+        ],
+        "max_abs_error": 0.0,
+        "rtol": 0.0001,
+        "atol": 1e-05
+      },
+      "source_sha256": "5bced24dd1fe1f50638d774e18efbb97442917fed2b8c6ef94e25a84806b2d11",
+      "source_result_sha256": "027d2b6bb2dc0f68a99982d25924ff0dde8d1734e8ee245bc4e30ea6ba372ebd",
+      "input_bank_sha256": "471ed62048b5ceac1cd5f26332b0a2bb0cc1782bd4977b71f486c6655dd5f719",
+      "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+      "native_gate": null,
+      "close_gate": null
+    },
+    "cpu/gilon-c1-cpu-off": {
+      "device": "cpu",
+      "case_id": "gilon-c1-cpu-off",
+      "gil_mode": "on",
+      "actual_gil": {
+        "expected": true,
+        "before": true,
+        "after": true,
+        "build_disabled": 1
+      },
+      "callers": 1,
+      "stream_mode": "cpu",
+      "backend": "off",
+      "total_requests": 3000,
+      "warmup_per_caller": 24,
+      "throughput_requests_per_second": 538.3017085269355,
+      "latency_p50_ns": 1846157,
+      "latency_p95_ns": 1890159,
+      "latency_p99_ns": 1911710,
+      "host_forward_peak": 1,
+      "caller_cpu_per_request_ns": 1854040.79,
+      "numeric_validation": {
+        "passed": true,
+        "validated_requests": 3000,
+        "finite_count": 3000,
+        "shape_count": 3000,
+        "reference_compared_count": 3000,
+        "expected_shape": [
+          128,
+          1
+        ],
+        "max_abs_error": 0.0,
+        "rtol": 0.0001,
+        "atol": 1e-05
+      },
+      "source_sha256": "5bced24dd1fe1f50638d774e18efbb97442917fed2b8c6ef94e25a84806b2d11",
+      "source_result_sha256": "e795e37dbdabc08719c97ab28151e47fbae6a950998b241dcd0cc91ffc8db9ee",
+      "input_bank_sha256": "471ed62048b5ceac1cd5f26332b0a2bb0cc1782bd4977b71f486c6655dd5f719",
+      "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+      "native_gate": null,
+      "close_gate": null
+    },
+    "cpu/gilon-c2-cpu-off": {
+      "device": "cpu",
+      "case_id": "gilon-c2-cpu-off",
+      "gil_mode": "on",
+      "actual_gil": {
+        "expected": true,
+        "before": true,
+        "after": true,
+        "build_disabled": 1
+      },
+      "callers": 2,
+      "stream_mode": "cpu",
+      "backend": "off",
+      "total_requests": 3000,
+      "warmup_per_caller": 24,
+      "throughput_requests_per_second": 769.536413703564,
+      "latency_p50_ns": 2602878,
+      "latency_p95_ns": 2720383,
+      "latency_p99_ns": 2779646,
+      "host_forward_peak": 2,
+      "caller_cpu_per_request_ns": 2248449.67,
+      "numeric_validation": {
+        "passed": true,
+        "validated_requests": 3000,
+        "finite_count": 3000,
+        "shape_count": 3000,
+        "reference_compared_count": 3000,
+        "expected_shape": [
+          128,
+          1
+        ],
+        "max_abs_error": 0.0,
+        "rtol": 0.0001,
+        "atol": 1e-05
+      },
+      "source_sha256": "5bced24dd1fe1f50638d774e18efbb97442917fed2b8c6ef94e25a84806b2d11",
+      "source_result_sha256": "c174f4db6222d3e238e1a587cfa82853b579717792b8c61eb5acb6dfa9813a8e",
+      "input_bank_sha256": "471ed62048b5ceac1cd5f26332b0a2bb0cc1782bd4977b71f486c6655dd5f719",
+      "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+      "native_gate": null,
+      "close_gate": null
+    },
+    "cpu/gilon-c4-cpu-off": {
+      "device": "cpu",
+      "case_id": "gilon-c4-cpu-off",
+      "gil_mode": "on",
+      "actual_gil": {
+        "expected": true,
+        "before": true,
+        "after": true,
+        "build_disabled": 1
+      },
+      "callers": 4,
+      "stream_mode": "cpu",
+      "backend": "off",
+      "total_requests": 3000,
+      "warmup_per_caller": 24,
+      "throughput_requests_per_second": 729.5176932039302,
+      "latency_p50_ns": 5472408,
+      "latency_p95_ns": 6065663,
+      "latency_p99_ns": 6315023,
+      "host_forward_peak": 4,
+      "caller_cpu_per_request_ns": 3116376.2533333334,
+      "numeric_validation": {
+        "passed": true,
+        "validated_requests": 3000,
+        "finite_count": 3000,
+        "shape_count": 3000,
+        "reference_compared_count": 3000,
+        "expected_shape": [
+          128,
+          1
+        ],
+        "max_abs_error": 0.0,
+        "rtol": 0.0001,
+        "atol": 1e-05
+      },
+      "source_sha256": "5bced24dd1fe1f50638d774e18efbb97442917fed2b8c6ef94e25a84806b2d11",
+      "source_result_sha256": "6db4e61a24bf270b54dd3a985d8bc19ecbfd5af228047494f035eace441556d1",
+      "input_bank_sha256": "471ed62048b5ceac1cd5f26332b0a2bb0cc1782bd4977b71f486c6655dd5f719",
+      "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+      "native_gate": null,
+      "close_gate": null
+    },
+    "npu/giloff-c1-private-off": {
+      "device": "npu",
+      "case_id": "giloff-c1-private-off",
+      "gil_mode": "off",
+      "actual_gil": {
+        "expected": false,
+        "before": false,
+        "after": false,
+        "build_disabled": 1
+      },
+      "callers": 1,
+      "stream_mode": "private",
+      "backend": "off",
+      "total_requests": 3000,
+      "warmup_per_caller": 24,
+      "throughput_requests_per_second": 561.8332494126442,
+      "latency_p50_ns": 1770787,
+      "latency_p95_ns": 1796808,
+      "latency_p99_ns": 1812538,
+      "host_forward_peak": 1,
+      "caller_cpu_per_request_ns": 1764963.6433333333,
+      "numeric_validation": {
+        "passed": true,
+        "validated_requests": 3000,
+        "finite_count": 3000,
+        "shape_count": 3000,
+        "reference_compared_count": 3000,
+        "expected_shape": [
+          128,
+          1
+        ],
+        "max_abs_error": 8.940696716308594e-08,
+        "rtol": 0.0001,
+        "atol": 1e-05
+      },
+      "source_sha256": "9382008fd6b5ffa188e4d874fef7727dbf1c24d9fca2d0b6aa8f0530d60ec247",
+      "source_result_sha256": "2d1d349b25cf44d4d809f09e3ee1d703d9843f1b52cac4ecd3baa2afc83c0c13",
+      "input_bank_sha256": "471ed62048b5ceac1cd5f26332b0a2bb0cc1782bd4977b71f486c6655dd5f719",
+      "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+      "native_gate": {
+        "passed": true,
+        "queued": 0,
+        "sdk_prepare_calls": 0,
+        "scope": "original PTA TQ1"
+      },
+      "close_gate": {
+        "passed": true,
+        "scope": "inactive Prepare; original synchronization completed"
+      }
+    },
+    "npu/giloff-c2-private-off": {
+      "device": "npu",
+      "case_id": "giloff-c2-private-off",
+      "gil_mode": "off",
+      "actual_gil": {
+        "expected": false,
+        "before": false,
+        "after": false,
+        "build_disabled": 1
+      },
+      "callers": 2,
+      "stream_mode": "private",
+      "backend": "off",
+      "total_requests": 3000,
+      "warmup_per_caller": 24,
+      "throughput_requests_per_second": 963.931919014143,
+      "latency_p50_ns": 2032348,
+      "latency_p95_ns": 2253138,
+      "latency_p99_ns": 2313700,
+      "host_forward_peak": 2,
+      "caller_cpu_per_request_ns": 1989041.42,
+      "numeric_validation": {
+        "passed": true,
+        "validated_requests": 3000,
+        "finite_count": 3000,
+        "shape_count": 3000,
+        "reference_compared_count": 3000,
+        "expected_shape": [
+          128,
+          1
+        ],
+        "max_abs_error": 8.940696716308594e-08,
+        "rtol": 0.0001,
+        "atol": 1e-05
+      },
+      "source_sha256": "9382008fd6b5ffa188e4d874fef7727dbf1c24d9fca2d0b6aa8f0530d60ec247",
+      "source_result_sha256": "5ebcb84b460c0ec18889c6a67b600e95c45264283793fef12f0c6307063a2c12",
+      "input_bank_sha256": "471ed62048b5ceac1cd5f26332b0a2bb0cc1782bd4977b71f486c6655dd5f719",
+      "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+      "native_gate": {
+        "passed": true,
+        "queued": 0,
+        "sdk_prepare_calls": 0,
+        "scope": "original PTA TQ1"
+      },
+      "close_gate": {
+        "passed": true,
+        "scope": "inactive Prepare; original synchronization completed"
+      }
+    },
+    "npu/giloff-c4-private-off": {
+      "device": "npu",
+      "case_id": "giloff-c4-private-off",
+      "gil_mode": "off",
+      "actual_gil": {
+        "expected": false,
+        "before": false,
+        "after": false,
+        "build_disabled": 1
+      },
+      "callers": 4,
+      "stream_mode": "private",
+      "backend": "off",
+      "total_requests": 3000,
+      "warmup_per_caller": 24,
+      "throughput_requests_per_second": 1284.3130214977907,
+      "latency_p50_ns": 3114375,
+      "latency_p95_ns": 3186518,
+      "latency_p99_ns": 3256960,
+      "host_forward_peak": 4,
+      "caller_cpu_per_request_ns": 2519038.8133333335,
+      "numeric_validation": {
+        "passed": true,
+        "validated_requests": 3000,
+        "finite_count": 3000,
+        "shape_count": 3000,
+        "reference_compared_count": 3000,
+        "expected_shape": [
+          128,
+          1
+        ],
+        "max_abs_error": 8.940696716308594e-08,
+        "rtol": 0.0001,
+        "atol": 1e-05
+      },
+      "source_sha256": "9382008fd6b5ffa188e4d874fef7727dbf1c24d9fca2d0b6aa8f0530d60ec247",
+      "source_result_sha256": "c2929b32b9e085646114e4207b1bab0023ce76e45119193a21e67f79b6ba2751",
+      "input_bank_sha256": "471ed62048b5ceac1cd5f26332b0a2bb0cc1782bd4977b71f486c6655dd5f719",
+      "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+      "native_gate": {
+        "passed": true,
+        "queued": 0,
+        "sdk_prepare_calls": 0,
+        "scope": "original PTA TQ1"
+      },
+      "close_gate": {
+        "passed": true,
+        "scope": "inactive Prepare; original synchronization completed"
+      }
+    },
+    "npu/gilon-c4-private-off": {
+      "device": "npu",
+      "case_id": "gilon-c4-private-off",
+      "gil_mode": "on",
+      "actual_gil": {
+        "expected": true,
+        "before": true,
+        "after": true,
+        "build_disabled": 1
+      },
+      "callers": 4,
+      "stream_mode": "private",
+      "backend": "off",
+      "total_requests": 3000,
+      "warmup_per_caller": 24,
+      "throughput_requests_per_second": 622.4478246462496,
+      "latency_p50_ns": 6402367,
+      "latency_p95_ns": 7123518,
+      "latency_p99_ns": 7455032,
+      "host_forward_peak": 4,
+      "caller_cpu_per_request_ns": 3295822.046666667,
+      "numeric_validation": {
+        "passed": true,
+        "validated_requests": 3000,
+        "finite_count": 3000,
+        "shape_count": 3000,
+        "reference_compared_count": 3000,
+        "expected_shape": [
+          128,
+          1
+        ],
+        "max_abs_error": 8.940696716308594e-08,
+        "rtol": 0.0001,
+        "atol": 1e-05
+      },
+      "source_sha256": "9382008fd6b5ffa188e4d874fef7727dbf1c24d9fca2d0b6aa8f0530d60ec247",
+      "source_result_sha256": "2d387bd57c360f7597b2815c607833c3ddac8c55ffbeba974794e968c26316fd",
+      "input_bank_sha256": "471ed62048b5ceac1cd5f26332b0a2bb0cc1782bd4977b71f486c6655dd5f719",
+      "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+      "native_gate": {
+        "passed": true,
+        "queued": 0,
+        "sdk_prepare_calls": 0,
+        "scope": "original PTA TQ1"
+      },
+      "close_gate": {
+        "passed": true,
+        "scope": "inactive Prepare; original synchronization completed"
+      }
+    },
+    "npu/giloff-c4-shared-off": {
+      "device": "npu",
+      "case_id": "giloff-c4-shared-off",
+      "gil_mode": "off",
+      "actual_gil": {
+        "expected": false,
+        "before": false,
+        "after": false,
+        "build_disabled": 1
+      },
+      "callers": 4,
+      "stream_mode": "shared",
+      "backend": "off",
+      "total_requests": 3000,
+      "warmup_per_caller": 24,
+      "throughput_requests_per_second": 724.2151820690366,
+      "latency_p50_ns": 5514028,
+      "latency_p95_ns": 5665195,
+      "latency_p99_ns": 5971918,
+      "host_forward_peak": 4,
+      "caller_cpu_per_request_ns": 2972532.95,
+      "numeric_validation": {
+        "passed": true,
+        "validated_requests": 3000,
+        "finite_count": 3000,
+        "shape_count": 3000,
+        "reference_compared_count": 3000,
+        "expected_shape": [
+          128,
+          1
+        ],
+        "max_abs_error": 8.940696716308594e-08,
+        "rtol": 0.0001,
+        "atol": 1e-05
+      },
+      "source_sha256": "9382008fd6b5ffa188e4d874fef7727dbf1c24d9fca2d0b6aa8f0530d60ec247",
+      "source_result_sha256": "c19536a354b42a9fb5909fce301a644d5a5c9da99c2f1f6af3def2fe69826e73",
+      "input_bank_sha256": "471ed62048b5ceac1cd5f26332b0a2bb0cc1782bd4977b71f486c6655dd5f719",
+      "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+      "native_gate": {
+        "passed": true,
+        "queued": 0,
+        "sdk_prepare_calls": 0,
+        "scope": "original PTA TQ1"
+      },
+      "close_gate": {
+        "passed": true,
+        "scope": "inactive Prepare; original synchronization completed"
+      }
+    },
+    "npu/giloff-c4-shared-mutex4": {
+      "device": "npu",
+      "case_id": "giloff-c4-shared-mutex4",
+      "gil_mode": "off",
+      "actual_gil": {
+        "expected": false,
+        "before": false,
+        "after": false,
+        "build_disabled": 1
+      },
+      "callers": 4,
+      "stream_mode": "shared",
+      "backend": "mutex4",
+      "total_requests": 3000,
+      "warmup_per_caller": 24,
+      "throughput_requests_per_second": 346.9728441647999,
+      "latency_p50_ns": 10390429,
+      "latency_p95_ns": 22933710,
+      "latency_p99_ns": 26688502,
+      "host_forward_peak": 4,
+      "caller_cpu_per_request_ns": 5447447.303333334,
+      "numeric_validation": {
+        "passed": true,
+        "validated_requests": 3000,
+        "finite_count": 3000,
+        "shape_count": 3000,
+        "reference_compared_count": 3000,
+        "expected_shape": [
+          128,
+          1
+        ],
+        "max_abs_error": 8.940696716308594e-08,
+        "rtol": 0.0001,
+        "atol": 1e-05
+      },
+      "source_sha256": "9382008fd6b5ffa188e4d874fef7727dbf1c24d9fca2d0b6aa8f0530d60ec247",
+      "source_result_sha256": "f652dbc0aa4b93a746c55a4913706213885d4958047682f929e66adcf44e669c",
+      "input_bank_sha256": "471ed62048b5ceac1cd5f26332b0a2bb0cc1782bd4977b71f486c6655dd5f719",
+      "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+      "native_gate": {
+        "passed": true,
+        "queued": 75000,
+        "sdk_prepare_calls": 75000,
+        "sdk_query_calls": null,
+        "sdk_cache_hits": null,
+        "operators": {
+          "aclnnAddmm": {
+            "seen": 18000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 18000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_unregistered": 18000
+            }
+          },
+          "aclnnBatchMatMul": {
+            "seen": 3000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 3000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_unregistered": 3000
+            }
+          },
+          "aclnnCat": {
+            "seen": 6000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 6000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_unregistered": 6000
+            }
+          },
+          "aclnnEmbeddingBag": {
+            "seen": 78000,
+            "eligible": 75000,
+            "queued": 75000,
+            "prepared": 75000,
+            "executed": 75000,
+            "returned": 75000,
+            "fallback": 3000,
+            "sdk_prepare_calls": 75000,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "argument_contract_unadmitted": 3000
+            }
+          },
+          "aclnnIndex": {
+            "seen": 3000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 3000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_unregistered": 3000
+            }
+          },
+          "aclnnInplaceZero": {
+            "seen": 3000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 3000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_unregistered": 3000
+            }
+          },
+          "aclnnRelu": {
+            "seen": 15000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 15000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_not_allowed": 15000
+            }
+          },
+          "aclnnSigmoid": {
+            "seen": 3000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 3000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_unregistered": 3000
+            }
+          }
+        },
+        "model_core_coverage": "partial",
+        "scope": "real owned EmbeddingBag Prepare through original PTA FIFO; fallbacks included in E2E"
+      },
+      "close_gate": {
+        "passed": true,
+        "admitted": 77400,
+        "order_evidence": {
+          "enabled": true,
+          "admitted_count": 77400,
+          "executed_count": 77400,
+          "admitted_sequence_hash": 5124789397935034165,
+          "executed_sequence_hash": 5124789397935034165,
+          "passed": true
+        }
+      }
+    },
+    "npu/giloff-c4-shared-mpsc4": {
+      "device": "npu",
+      "case_id": "giloff-c4-shared-mpsc4",
+      "gil_mode": "off",
+      "actual_gil": {
+        "expected": false,
+        "before": false,
+        "after": false,
+        "build_disabled": 1
+      },
+      "callers": 4,
+      "stream_mode": "shared",
+      "backend": "mpsc4",
+      "total_requests": 3000,
+      "warmup_per_caller": 24,
+      "throughput_requests_per_second": 280.81880796816637,
+      "latency_p50_ns": 12973280,
+      "latency_p95_ns": 25890518,
+      "latency_p99_ns": 29541306,
+      "host_forward_peak": 4,
+      "caller_cpu_per_request_ns": 6337337.29,
+      "numeric_validation": {
+        "passed": true,
+        "validated_requests": 3000,
+        "finite_count": 3000,
+        "shape_count": 3000,
+        "reference_compared_count": 3000,
+        "expected_shape": [
+          128,
+          1
+        ],
+        "max_abs_error": 8.940696716308594e-08,
+        "rtol": 0.0001,
+        "atol": 1e-05
+      },
+      "source_sha256": "9382008fd6b5ffa188e4d874fef7727dbf1c24d9fca2d0b6aa8f0530d60ec247",
+      "source_result_sha256": "e9947efd83828203223f2e5a501ba27023e7818b853b8f078468c695c22c4f00",
+      "input_bank_sha256": "471ed62048b5ceac1cd5f26332b0a2bb0cc1782bd4977b71f486c6655dd5f719",
+      "python_sha256": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+      "native_gate": {
+        "passed": true,
+        "queued": 75000,
+        "sdk_prepare_calls": 75000,
+        "sdk_query_calls": null,
+        "sdk_cache_hits": null,
+        "operators": {
+          "aclnnAddmm": {
+            "seen": 18000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 18000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_unregistered": 18000
+            }
+          },
+          "aclnnBatchMatMul": {
+            "seen": 3000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 3000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_unregistered": 3000
+            }
+          },
+          "aclnnCat": {
+            "seen": 6000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 6000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_unregistered": 6000
+            }
+          },
+          "aclnnEmbeddingBag": {
+            "seen": 78000,
+            "eligible": 75000,
+            "queued": 75000,
+            "prepared": 75000,
+            "executed": 75000,
+            "returned": 75000,
+            "fallback": 3000,
+            "sdk_prepare_calls": 75000,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "argument_contract_unadmitted": 3000
+            }
+          },
+          "aclnnIndex": {
+            "seen": 3000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 3000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_unregistered": 3000
+            }
+          },
+          "aclnnInplaceZero": {
+            "seen": 3000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 3000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_unregistered": 3000
+            }
+          },
+          "aclnnRelu": {
+            "seen": 15000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 15000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_not_allowed": 15000
+            }
+          },
+          "aclnnSigmoid": {
+            "seen": 3000,
+            "eligible": 0,
+            "queued": 0,
+            "prepared": 0,
+            "executed": 0,
+            "returned": 0,
+            "fallback": 3000,
+            "sdk_prepare_calls": 0,
+            "sdk_query_calls": null,
+            "sdk_cache_hits": null,
+            "fallback_reasons": {
+              "operator_unregistered": 3000
+            }
+          }
+        },
+        "model_core_coverage": "partial",
+        "scope": "real owned EmbeddingBag Prepare through original PTA FIFO; fallbacks included in E2E"
+      },
+      "close_gate": {
+        "passed": true,
+        "admitted": 77400,
+        "order_evidence": {
+          "enabled": true,
+          "admitted_count": 77400,
+          "executed_count": 77400,
+          "admitted_sequence_hash": 5124789397935034165,
+          "executed_sequence_hash": 5124789397935034165,
+          "passed": true
+        }
+      }
+    }
+  },
+  "ratios": {
+    "cpu_giloff4_over1": 3.6041846374788418,
+    "cpu_giloff4_over_gilon4": 2.661711570178277,
+    "npu_private_giloff4_over1": 2.2859327439955655,
+    "npu_private_giloff4_over_gilon4": 2.063326387601552,
+    "npu_private4_over_shared4": 1.7733859401132552
+  },
+  "limitations": [
+    "One round per case; NPU is a predeclared subset, not a full14-case grid.",
+    "Same free-threaded interpreter binary with natural GIL-off versus -Xgil=1, not a standard GIL-build comparison.",
+    "No network/input preprocessing/serialization in timing; inputs preloaded.",
+    "Host spans/independent streams do not prove device kernel overlap.",
+    "CPU source5bced and NPU source9382 are separate closures; only split-provider offline audit compatibility changed, timed engine/service/input code unchanged.",
+    "No host exclusivity claim; some short NPU request windows had no in-window4s resource sample."
+  ]
+}
