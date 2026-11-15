@@ -1,6 +1,9 @@
 # R34 A3 verification status — 2026-11-15
 
 **No model performance result is available. Global lock freedom is not achieved.**
+The new queue has now passed actual A3 DLRM correctness and four-caller order /
+retirement qualification. [The machine-readable results](evidence/real_queue_qualification_20261115.json)
+contain the unchanged model/input identities, counters and diagnostic spans.
 The optional bounded MPSC ingress and dedicated FIFO publisher are implemented;
 the runtime still uses core/state mutexes, the original PTA FIFO and allocators.
 The original mutex ingress remains the default and the comparison uses one
@@ -24,6 +27,10 @@ symbol's mapped binary size/SHA; R22 and the older9.2 capability stay unchanged.
 | Cache replay | Fresh-address hit, worker-local miss then hit, hit cancellation and later hit passed | Cache remained enabled; v2 unqualified |
 | Original off-route model preflight | Full forward and all intermediate stage comparisons passed | Correctness only; not an on-route or comparative performance result |
 | R34 synchronous fallback regression | Old capability lookup reproduced failure; corrected lookup passed | Eager-only9.1 qualification stays stable during fallback |
+| Actual MPSC4 DLRM | Eight full forwards plus all intermediate stages passed; full output max error8.94e-8 | Original B128/T26/V1024/D16 and50850IDs unchanged |
+| Actual ordered queue | Timed correctness delta75 real SDK calls; whole process300 tickets executed and retired in order, zero retained owners | Real CANN9.1, original PTA FIFO; not shadow |
+| Four concurrent callers | MPSC and mutex each passed32 real calls; four Prepare workers, one consumer; publisher identity checked | Correct outputs, complete trace/order/retirement ACKs |
+| Two-forward cold diagnostic | Both routes reached Prepare-span peak4;50 real calls each | Inclusive cold Prepare spans; not steady-state E2E |
 | ThreadSanitizer | Compiled; runtime aborted before tests because container denies personality(ADDR_NO_RANDOMIZE) | No race-clean result claimed; container policy unchanged |
 
 Windows denied execution of one old temporary sync-expression fixture, and the
@@ -40,13 +47,33 @@ This establishes SDK preparation concurrency, not model-level speedup.
 
 ## Current resource block
 
-An initial occupancy interruption cleared and SDK verification completed. At
-17:52 +08 the runtime container stopped with exit137, OOMKilled=false, before
-the new candidate's application qualification. The17:55 inventory then showed
-sglang compute processes on all16 devices, including physical8/14/15. The last
-group held approximately59–60% HBM despite utilization0; those devices were
-not free. No other jobs were stopped or modified. No comparative performance
-samples were collected or accepted from these changing resource conditions.
+The19:12 retry initially saw resident SGLang processes. When compute processes
+cleared, the first independent-container attempt still failed at aclInit507008:
+kernel logs showed a UDA device-namespace conflict. After that namespace owner
+exited, a fresh process passed actual model qualification and all four auxiliary
+checks above. No driver/sharing/security setting or other service was changed.
+
+The new test container then received Docker SIGTERM and SIGKILL at19:32 +08,
+exiting137 with OOMKilled=false. Another TP16 namespace subsequently reserved
+all16 devices. The seven-arm cohort failed before its first correctness worker;
+**zero valid performance windows were collected**. The event record does not
+identify who requested the stop, and no attribution is made.
+
+Read-only resource monitoring ran19:29:09–19:36:45,114 samples at approximately
+4-second intervals, and observed foreign processes in35 samples. Qualification
+had completed at19:26:21, before monitoring began; this monitor cannot establish
+an exclusive qualification interval. Numerical/order correctness remains valid,
+but the cold spans below cannot establish a performance improvement.
+
+| Cold Prepare diagnostic | Calls | Span peak | Wall p50 | Total thread CPU |
+| --- | ---: | ---: | ---: | ---: |
+| MPSC, workers4 | 50 | 4 | 48.632µs | 9.081ms |
+| Mutex, workers4 | 50 | 4 | 43.412µs | 9.631ms |
+
+Interaction and other unqualified operators retain the original fenced path.
+In the model correctness window, each forward had25 prepared EmbeddingBag
+calls and18 conservative fallbacks, including the unchanged empty table. These
+are coverage/synchronization counts, not a measured bottleneck attribution.
 
 Candidate native SHA256:
 `d8943e56a5b234b2dc7cb0091861087a611437661b0ddd6479d5ca610a7ccaa4`
@@ -57,20 +84,20 @@ Raw results, resource inventories and launch recipes remain in the private
 evidence archive, outside the public repository.
 Archive002 has109 payloads,243381 bytes, SHA256
 `8dcb37235a2949c7894f2dccb7eec968b6db719e1a13fd1d9ef3f37d6d09f36a`.
+The retry archive has58 payloads,164986 bytes, SHA256
+`5c40d2fa894cd56a4c7d9711543e967843a66c5b006a9b423d0ea346a039d3b3`.
 
 ## Remaining acceptance work
 
-1. Obtain one uncontended device and a stable runtime container. Run the new
-   candidate's real queue qualification, including the full unchanged model.
-2. Run `multi_caller.py` for both ingress modes: four concurrent callers,
-   correct outputs, actual worker/publisher/consumer TIDs, matching sequence
-   receipts and complete retirement. Join all callers before cold close;
-   concurrent model/fallback and lifecycle calls are outside the contract.
-3. Run the bounded DLRM diagnostic to measure actual Prepare overlap, then
-   seven correctness arms and the matched off(TQ1)/mutex/mpsc workers1/2/4
+1. Obtain an allocated device and a test container that stays available for
+   the complete comparison, approximately20minutes.
+2. Run the seven correctness arms and matched off(TQ1)/mutex/mpsc workers1/2/4
    E2E campaign. Keep the original model, mixed inputs, cache and precision.
-4. Report medians, tails and CPU cost from accepted raw samples. A faster
+3. Report medians, tails and CPU cost from accepted raw samples. A faster
    queue microbenchmark or an SDK overlap interval is not model speedup.
+
+Join all callers before cold close; concurrent model/fallback and lifecycle
+calls remain outside the contract.
 
 The CAS ingress removes `submit_mu` from that route. It does not remove
 `state_mu`, integration counters' mutex, blocking publication ACKs or downstream
