@@ -1,6 +1,9 @@
 # R34 A3 verification status — 2026-11-15
 
-**No model performance result is available. Global lock freedom is not achieved.**
+**The completed performance pilot found no speedup. Global lock freedom is not achieved.**
+See [the seven-arm results and analysis](PERFORMANCE_RESULTS.md) for the newer
+3000-sample-per-arm comparison. Earlier interrupted attempts below remain part
+of the evidence history; their zero-window status does not describe the new pilot.
 The new queue has now passed actual A3 DLRM correctness and four-caller order /
 retirement qualification. [The machine-readable results](evidence/real_queue_qualification_20261115.json)
 contain the unchanged model/input identities, counters and diagnostic spans.
@@ -89,12 +92,10 @@ The retry archive has58 payloads,164986 bytes, SHA256
 
 ## Remaining acceptance work
 
-1. Obtain an allocated device and a test container that stays available for
-   the complete comparison, approximately20minutes.
-2. Run the seven correctness arms and matched off(TQ1)/mutex/mpsc workers1/2/4
-   E2E campaign. Keep the original model, mixed inputs, cache and precision.
-3. Report medians, tails and CPU cost from accepted raw samples. A faster
-   queue microbenchmark or an SDK overlap interval is not model speedup.
+The newer run completed all seven correctness arms and one full performance
+round, with all native/numerical/order/closure gates passing. Remaining evidence
+includes repeated balanced rounds, direct phase timing and multi-Python-caller
+throughput. The single-round measurements must retain their pilot designation.
 
 Join all callers before cold close; concurrent model/fallback and lifecycle
 calls remain outside the contract.

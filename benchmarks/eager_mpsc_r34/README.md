@@ -1,10 +1,14 @@
 # R34 real A3 eager Prepare ingress comparison
 
 Current actual results and unfinished gates: [A3_VALIDATION.md](A3_VALIDATION.md).
+The completed seven-arm, one-round A3 performance pilot and analysis are in
+[PERFORMANCE_RESULTS.md](PERFORMANCE_RESULTS.md). All six enabled routes were
+slower in that pilot; all groups used the same GIL-disabled runtime and one
+Python model caller. This does not measure multi-Python-caller throughput.
 The candidate is compiled and CPU-tested; exact CANN9.1 v1 SDK qualification
 passed for the reviewed uniform and original ragged inputs. Actual A3 queue /
-model correctness and four-caller ordering also passed. Comparative E2E remains
-pending a stable device/container window. There is no R34 speedup claim.
+model correctness and four-caller ordering also passed. Comparative E2E now has
+one completed pilot, not a full14-round balanced result. There is no speedup claim.
 
 The primary experiment calls the byte-pinned original DLRM with the R31 MetaSyn26
 input (`c4507e…`) directly. It compares seven arms in the **same newly built
