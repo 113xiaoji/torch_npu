@@ -1,0 +1,1259 @@
+{
+  "schema": 1,
+  "performance_evidence": false,
+  "candidate_native_sha256": "d8943e56a5b234b2dc7cb0091861087a611437661b0ddd6479d5ca610a7ccaa4",
+  "profiles": {
+    "mpsc4": {
+      "summary": {
+        "schema": 1,
+        "performance_evidence": false,
+        "window_start_ns": 296310113990867,
+        "window_end_ns": 296310608410347,
+        "window_ns": 494419480,
+        "snapshot_entries": 4,
+        "snapshot_returns": 4,
+        "counts": {
+          "admit": 4300,
+          "fallback_drain": 1900,
+          "fallback_sync": 1800,
+          "cache": 4300,
+          "submit": 2500,
+          "event_create": 2500,
+          "prepare": 2500,
+          "event_record": 2500,
+          "event_wait": 2500,
+          "event_destroy": 2500
+        },
+        "tids": {
+          "admit": {
+            "3140043": 4300
+          },
+          "fallback_drain": {
+            "3140043": 1900
+          },
+          "fallback_sync": {
+            "3140043": 1800
+          },
+          "cache": {
+            "3140043": 1800,
+            "3143284": 604,
+            "3143283": 654,
+            "3143285": 612,
+            "3143286": 630
+          },
+          "submit": {
+            "3140043": 2500
+          },
+          "event_create": {
+            "3140043": 2500
+          },
+          "prepare": {
+            "3143284": 604,
+            "3143283": 654,
+            "3143285": 612,
+            "3143286": 630
+          },
+          "event_record": {
+            "3143252": 2356,
+            "3140043": 144
+          },
+          "event_wait": {
+            "3143252": 2356,
+            "3140043": 144
+          },
+          "event_destroy": {
+            "3143252": 2356,
+            "3140043": 144
+          }
+        },
+        "cache": {
+          "hit": 4300
+        },
+        "cache_by_tid": {
+          "3140043": {
+            "hit": 1800
+          },
+          "3143284": {
+            "hit": 604
+          },
+          "3143283": {
+            "hit": 654
+          },
+          "3143285": {
+            "hit": 612
+          },
+          "3143286": {
+            "hit": 630
+          }
+        },
+        "admit_results": {
+          "fallback": 1800,
+          "queued": 2500
+        },
+        "phases": {
+          "fallback_drain": {
+            "paired": 1900,
+            "sum_ns": 5431672,
+            "p50_ns": 1640,
+            "p95_ns": 13020
+          },
+          "fallback_sync": {
+            "paired": 1800,
+            "sum_ns": 19296951,
+            "p50_ns": 7440,
+            "p95_ns": 60943
+          },
+          "admit": {
+            "paired": 4300,
+            "sum_ns": 53042109,
+            "p50_ns": 11931,
+            "p95_ns": 34241
+          },
+          "cache": {
+            "paired": 4300,
+            "sum_ns": 8712999,
+            "p50_ns": 1920,
+            "p95_ns": 2720
+          },
+          "event_create": {
+            "paired": 2500,
+            "sum_ns": 7655254,
+            "p50_ns": 2850,
+            "p95_ns": 4181
+          },
+          "prepare": {
+            "paired": 2500,
+            "sum_ns": 29841259,
+            "p50_ns": 11561,
+            "p95_ns": 14961
+          },
+          "submit": {
+            "paired": 2500,
+            "sum_ns": 218497909,
+            "p50_ns": 79234,
+            "p95_ns": 164527
+          },
+          "event_record": {
+            "paired": 2500,
+            "sum_ns": 23528847,
+            "p50_ns": 8701,
+            "p95_ns": 12871
+          },
+          "event_wait": {
+            "paired": 2500,
+            "sum_ns": 67786528,
+            "p50_ns": 11870,
+            "p95_ns": 127936
+          },
+          "event_destroy": {
+            "paired": 2500,
+            "sum_ns": 21018632,
+            "p50_ns": 3180,
+            "p95_ns": 17791
+          }
+        },
+        "unpaired_returns": 0,
+        "unpaired_entries": 0,
+        "caution": "Nested/cross-thread durations overlap. Summed wall times are not additive E2E shares. Check perf lost events separately.",
+        "worker_cache": {
+          "hit": 2500
+        },
+        "expected_enabled_counts_passed": true
+      },
+      "worker_gates": {
+        "passed": true,
+        "native_timed_gate": {
+          "passed": true,
+          "queued": 2500,
+          "sdk_prepare_calls": 2500,
+          "sdk_query_calls": null,
+          "sdk_cache_hits": null,
+          "operators": {
+            "aclnnAddmm": {
+              "seen": 600,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 600,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_unregistered": 600
+              }
+            },
+            "aclnnBatchMatMul": {
+              "seen": 100,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 100,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_unregistered": 100
+              }
+            },
+            "aclnnCat": {
+              "seen": 200,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 200,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_unregistered": 200
+              }
+            },
+            "aclnnEmbeddingBag": {
+              "seen": 2600,
+              "eligible": 2500,
+              "queued": 2500,
+              "prepared": 2500,
+              "executed": 2500,
+              "returned": 2500,
+              "fallback": 100,
+              "sdk_prepare_calls": 2500,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "argument_contract_unadmitted": 100
+              }
+            },
+            "aclnnIndex": {
+              "seen": 100,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 100,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_unregistered": 100
+              }
+            },
+            "aclnnInplaceZero": {
+              "seen": 100,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 100,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_unregistered": 100
+              }
+            },
+            "aclnnRelu": {
+              "seen": 500,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 500,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_not_allowed": 500
+              }
+            },
+            "aclnnSigmoid": {
+              "seen": 100,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 100,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_unregistered": 100
+              }
+            }
+          },
+          "model_core_coverage": "partial",
+          "scope": "real owned EmbeddingBag Prepare through original PTA FIFO; fallbacks included in E2E"
+        },
+        "close_gate": {
+          "passed": true,
+          "admitted": 3750,
+          "order_evidence": {
+            "enabled": true,
+            "admitted_count": 3750,
+            "executed_count": 3750,
+            "admitted_sequence_hash": 14214396768644529360,
+            "executed_sequence_hash": 14214396768644529360,
+            "passed": true
+          }
+        },
+        "numeric_final": {
+          "passed": true,
+          "shape": [
+            128,
+            1
+          ],
+          "finite": true,
+          "rtol": 0.0001,
+          "atol": 1e-05,
+          "max_abs_error": 8.940696716308594e-08
+        },
+        "gil_enabled": false,
+        "samples": 100,
+        "warmup": 50
+      },
+      "registered_after_capture": false,
+      "perf_data_sha256": "756ab494fbc9753be4e32a444dbf8b418f54a449742bb3c8b510ecaac66389eb",
+      "summary_sha256": "640440e34a70f7e4df7cb05934aeb7817e74e35501625835b2bd35462fc2c3bd",
+      "detail": {
+        "performance_evidence": false,
+        "forward_count": 100,
+        "window_ms_per_forward": 4.9441948,
+        "expected_native_sha256": "d8943e56a5b234b2dc7cb0091861087a611437661b0ddd6479d5ca610a7ccaa4",
+        "phase_source": "same immutable raw perf trace; current repository production modifications are not inputs",
+        "phases": {
+          "fallback_drain": {
+            "count": 1900,
+            "sum_ms_per_forward": 0.05431672,
+            "mean_us_per_call": 2.858774736842105,
+            "p50_us": 1.64,
+            "p95_us": 13.02
+          },
+          "fallback_sync": {
+            "count": 1800,
+            "sum_ms_per_forward": 0.19296951,
+            "mean_us_per_call": 10.720528333333334,
+            "p50_us": 7.44,
+            "p95_us": 60.943
+          },
+          "admit_fallback": {
+            "count": 1800,
+            "sum_ms_per_forward": 0.37786818,
+            "mean_us_per_call": 20.992676666666668,
+            "p50_us": 14.871,
+            "p95_us": 80.453
+          },
+          "cache": {
+            "count": 4300,
+            "sum_ms_per_forward": 0.08712999,
+            "mean_us_per_call": 2.0262788372093024,
+            "p50_us": 1.92,
+            "p95_us": 2.72
+          },
+          "admit_queued": {
+            "count": 2500,
+            "sum_ms_per_forward": 0.15255291,
+            "mean_us_per_call": 6.1021164,
+            "p50_us": 2.59,
+            "p95_us": 21.471
+          },
+          "event_create": {
+            "count": 2500,
+            "sum_ms_per_forward": 0.07655253999999999,
+            "mean_us_per_call": 3.0621016,
+            "p50_us": 2.85,
+            "p95_us": 4.181
+          },
+          "prepare": {
+            "count": 2500,
+            "sum_ms_per_forward": 0.29841259000000003,
+            "mean_us_per_call": 11.9365036,
+            "p50_us": 11.561,
+            "p95_us": 14.961
+          },
+          "submit": {
+            "count": 2500,
+            "sum_ms_per_forward": 2.1849790899999997,
+            "mean_us_per_call": 87.3991636,
+            "p50_us": 79.234,
+            "p95_us": 164.527
+          },
+          "event_record": {
+            "count": 2500,
+            "sum_ms_per_forward": 0.23528847,
+            "mean_us_per_call": 9.4115388,
+            "p50_us": 8.701,
+            "p95_us": 12.871
+          },
+          "event_wait": {
+            "count": 2500,
+            "sum_ms_per_forward": 0.67786528,
+            "mean_us_per_call": 27.1146112,
+            "p50_us": 11.87,
+            "p95_us": 127.936
+          },
+          "event_destroy": {
+            "count": 2500,
+            "sum_ms_per_forward": 0.21018632,
+            "mean_us_per_call": 8.4074528,
+            "p50_us": 3.18,
+            "p95_us": 17.791
+          }
+        },
+        "by_tid": {
+          "cache:3140043": {
+            "count": 1800,
+            "sum_ms_per_forward": 0.03540573,
+            "mean_us_per_call": 1.966985,
+            "p50_us": 1.77,
+            "p95_us": 2.8
+          },
+          "cache:3143284": {
+            "count": 604,
+            "sum_ms_per_forward": 0.01253953,
+            "mean_us_per_call": 2.0760811258278147,
+            "p50_us": 2.03,
+            "p95_us": 2.65
+          },
+          "prepare:3143284": {
+            "count": 604,
+            "sum_ms_per_forward": 0.07221677,
+            "mean_us_per_call": 11.956418874172185,
+            "p50_us": 11.62,
+            "p95_us": 14.931
+          },
+          "event_wait:3143252": {
+            "count": 2356,
+            "sum_ms_per_forward": 0.6410024,
+            "mean_us_per_call": 27.20723259762309,
+            "p50_us": 11.88,
+            "p95_us": 127.936
+          },
+          "cache:3143283": {
+            "count": 654,
+            "sum_ms_per_forward": 0.01348514,
+            "mean_us_per_call": 2.0619480122324156,
+            "p50_us": 2.02,
+            "p95_us": 2.681
+          },
+          "prepare:3143283": {
+            "count": 654,
+            "sum_ms_per_forward": 0.07805871,
+            "mean_us_per_call": 11.935582568807341,
+            "p50_us": 11.52,
+            "p95_us": 14.92
+          },
+          "cache:3143285": {
+            "count": 612,
+            "sum_ms_per_forward": 0.01279,
+            "mean_us_per_call": 2.0898692810457513,
+            "p50_us": 2.06,
+            "p95_us": 2.761
+          },
+          "prepare:3143285": {
+            "count": 612,
+            "sum_ms_per_forward": 0.07326001,
+            "mean_us_per_call": 11.970589869281046,
+            "p50_us": 11.491,
+            "p95_us": 15.161
+          },
+          "event_wait:3140043": {
+            "count": 144,
+            "sum_ms_per_forward": 0.03686288,
+            "mean_us_per_call": 25.599222222222224,
+            "p50_us": 11.75,
+            "p95_us": 120.265
+          },
+          "cache:3143286": {
+            "count": 630,
+            "sum_ms_per_forward": 0.01290959,
+            "mean_us_per_call": 2.04914126984127,
+            "p50_us": 2.03,
+            "p95_us": 2.64
+          },
+          "prepare:3143286": {
+            "count": 630,
+            "sum_ms_per_forward": 0.0748771,
+            "mean_us_per_call": 11.885253968253968,
+            "p50_us": 11.65,
+            "p95_us": 14.921
+          }
+        },
+        "cache_by_tid": {
+          "3140043": {
+            "hit": 1800
+          },
+          "3143284": {
+            "hit": 604
+          },
+          "3143283": {
+            "hit": 654
+          },
+          "3143285": {
+            "hit": 612
+          },
+          "3143286": {
+            "hit": 630
+          }
+        },
+        "worker_cache": {
+          "hit": 2500
+        },
+        "query_entry_count_whole_trace": 89,
+        "query_entry_count_roi": 0,
+        "prepare_span_peak_roi": 1,
+        "caller_submit_plus_admit_union_ms_per_forward": 2.71540018,
+        "event_wait_lanes": {
+          "3143252": {
+            "count": 2356,
+            "sum_ms_per_forward": 0.6410024,
+            "mean_us_per_call": 27.20723259762309,
+            "p50_us": 11.88,
+            "p95_us": 127.936,
+            "lane": "release_path"
+          },
+          "3140043": {
+            "count": 144,
+            "sum_ms_per_forward": 0.03686288,
+            "mean_us_per_call": 25.599222222222224,
+            "p50_us": 11.75,
+            "p95_us": 120.265,
+            "lane": "caller"
+          }
+        },
+        "event_wait_caller_count": 144,
+        "event_wait_release_path_count": 2356,
+        "unpaired_returns_rechecked": 0,
+        "unpaired_entries_rechecked": 0,
+        "expected_enabled_counts_passed": true,
+        "caution": "Instrumented spans; nested/cross-thread times cannot be added as uninstrumented E2E attribution.",
+        "perf_dump_returncode": 0,
+        "lost_records": [],
+        "perf_dump_stderr": ""
+      }
+    },
+    "mutex4": {
+      "summary": {
+        "schema": 1,
+        "performance_evidence": false,
+        "window_start_ns": 296942617713738,
+        "window_end_ns": 296942989800611,
+        "window_ns": 372086873,
+        "snapshot_entries": 4,
+        "snapshot_returns": 4,
+        "counts": {
+          "admit": 4300,
+          "fallback_drain": 1900,
+          "fallback_sync": 1800,
+          "cache": 4300,
+          "submit": 2500,
+          "event_create": 2500,
+          "prepare": 2500,
+          "event_record": 2500,
+          "event_wait": 2500,
+          "event_destroy": 2500
+        },
+        "tids": {
+          "admit": {
+            "3264228": 4300
+          },
+          "fallback_drain": {
+            "3264228": 1900
+          },
+          "fallback_sync": {
+            "3264228": 1800
+          },
+          "cache": {
+            "3264228": 1800,
+            "3266891": 565,
+            "3266893": 655,
+            "3266892": 668,
+            "3266890": 612
+          },
+          "submit": {
+            "3264228": 2500
+          },
+          "event_create": {
+            "3264228": 2500
+          },
+          "prepare": {
+            "3266891": 565,
+            "3266893": 655,
+            "3266892": 668,
+            "3266890": 612
+          },
+          "event_record": {
+            "3266882": 2499,
+            "3264228": 1
+          },
+          "event_wait": {
+            "3266882": 2499,
+            "3264228": 1
+          },
+          "event_destroy": {
+            "3266882": 2499,
+            "3264228": 1
+          }
+        },
+        "cache": {
+          "hit": 4300
+        },
+        "cache_by_tid": {
+          "3264228": {
+            "hit": 1800
+          },
+          "3266891": {
+            "hit": 565
+          },
+          "3266893": {
+            "hit": 655
+          },
+          "3266892": {
+            "hit": 668
+          },
+          "3266890": {
+            "hit": 612
+          }
+        },
+        "admit_results": {
+          "fallback": 1800,
+          "queued": 2500
+        },
+        "phases": {
+          "fallback_drain": {
+            "paired": 1900,
+            "sum_ns": 6456821,
+            "p50_ns": 1670,
+            "p95_ns": 15401
+          },
+          "fallback_sync": {
+            "paired": 1800,
+            "sum_ns": 23300957,
+            "p50_ns": 7881,
+            "p95_ns": 62343
+          },
+          "admit": {
+            "paired": 4300,
+            "sum_ns": 60293703,
+            "p50_ns": 12821,
+            "p95_ns": 39362
+          },
+          "cache": {
+            "paired": 4300,
+            "sum_ns": 8810347,
+            "p50_ns": 2080,
+            "p95_ns": 2681
+          },
+          "event_create": {
+            "paired": 2500,
+            "sum_ns": 7320610,
+            "p50_ns": 2731,
+            "p95_ns": 4010
+          },
+          "submit": {
+            "paired": 2500,
+            "sum_ns": 96177791,
+            "p50_ns": 35532,
+            "p95_ns": 61382
+          },
+          "prepare": {
+            "paired": 2500,
+            "sum_ns": 29766248,
+            "p50_ns": 11870,
+            "p95_ns": 13251
+          },
+          "event_record": {
+            "paired": 2500,
+            "sum_ns": 23386395,
+            "p50_ns": 8820,
+            "p95_ns": 14090
+          },
+          "event_wait": {
+            "paired": 2500,
+            "sum_ns": 85556857,
+            "p50_ns": 18281,
+            "p95_ns": 137526
+          },
+          "event_destroy": {
+            "paired": 2500,
+            "sum_ns": 18993729,
+            "p50_ns": 2540,
+            "p95_ns": 15230
+          }
+        },
+        "unpaired_returns": 0,
+        "unpaired_entries": 0,
+        "caution": "Nested/cross-thread durations overlap. Summed wall times are not additive E2E shares. Check perf lost events separately.",
+        "worker_cache": {
+          "hit": 2500
+        },
+        "expected_enabled_counts_passed": true
+      },
+      "worker_gates": {
+        "passed": true,
+        "native_timed_gate": {
+          "passed": true,
+          "queued": 2500,
+          "sdk_prepare_calls": 2500,
+          "sdk_query_calls": null,
+          "sdk_cache_hits": null,
+          "operators": {
+            "aclnnAddmm": {
+              "seen": 600,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 600,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_unregistered": 600
+              }
+            },
+            "aclnnBatchMatMul": {
+              "seen": 100,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 100,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_unregistered": 100
+              }
+            },
+            "aclnnCat": {
+              "seen": 200,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 200,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_unregistered": 200
+              }
+            },
+            "aclnnEmbeddingBag": {
+              "seen": 2600,
+              "eligible": 2500,
+              "queued": 2500,
+              "prepared": 2500,
+              "executed": 2500,
+              "returned": 2500,
+              "fallback": 100,
+              "sdk_prepare_calls": 2500,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "argument_contract_unadmitted": 100
+              }
+            },
+            "aclnnIndex": {
+              "seen": 100,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 100,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_unregistered": 100
+              }
+            },
+            "aclnnInplaceZero": {
+              "seen": 100,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 100,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_unregistered": 100
+              }
+            },
+            "aclnnRelu": {
+              "seen": 500,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 500,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_not_allowed": 500
+              }
+            },
+            "aclnnSigmoid": {
+              "seen": 100,
+              "eligible": 0,
+              "queued": 0,
+              "prepared": 0,
+              "executed": 0,
+              "returned": 0,
+              "fallback": 100,
+              "sdk_prepare_calls": 0,
+              "sdk_query_calls": null,
+              "sdk_cache_hits": null,
+              "fallback_reasons": {
+                "operator_unregistered": 100
+              }
+            }
+          },
+          "model_core_coverage": "partial",
+          "scope": "real owned EmbeddingBag Prepare through original PTA FIFO; fallbacks included in E2E"
+        },
+        "close_gate": {
+          "passed": true,
+          "admitted": 3750,
+          "order_evidence": {
+            "enabled": true,
+            "admitted_count": 3750,
+            "executed_count": 3750,
+            "admitted_sequence_hash": 14214396768644529360,
+            "executed_sequence_hash": 14214396768644529360,
+            "passed": true
+          }
+        },
+        "numeric_final": {
+          "passed": true,
+          "shape": [
+            128,
+            1
+          ],
+          "finite": true,
+          "rtol": 0.0001,
+          "atol": 1e-05,
+          "max_abs_error": 8.940696716308594e-08
+        },
+        "gil_enabled": false,
+        "samples": 100,
+        "warmup": 50
+      },
+      "registered_after_capture": false,
+      "perf_data_sha256": "8375fe0f660e7410d1b79bac93353c23f025e80c327f20abb0c766c8466c4656",
+      "summary_sha256": "de637f82c3903553922ce937c3bf0ee55b47adb5d33499b0b1304003904df416",
+      "detail": {
+        "performance_evidence": false,
+        "forward_count": 100,
+        "window_ms_per_forward": 3.72086873,
+        "expected_native_sha256": "d8943e56a5b234b2dc7cb0091861087a611437661b0ddd6479d5ca610a7ccaa4",
+        "phase_source": "same immutable raw perf trace; current repository production modifications are not inputs",
+        "phases": {
+          "fallback_drain": {
+            "count": 1900,
+            "sum_ms_per_forward": 0.06456821,
+            "mean_us_per_call": 3.3983268421052633,
+            "p50_us": 1.67,
+            "p95_us": 15.401
+          },
+          "fallback_sync": {
+            "count": 1800,
+            "sum_ms_per_forward": 0.23300957,
+            "mean_us_per_call": 12.944976111111112,
+            "p50_us": 7.881,
+            "p95_us": 62.343
+          },
+          "admit_fallback": {
+            "count": 1800,
+            "sum_ms_per_forward": 0.42979725,
+            "mean_us_per_call": 23.877625,
+            "p50_us": 16.071,
+            "p95_us": 82.944
+          },
+          "cache": {
+            "count": 4300,
+            "sum_ms_per_forward": 0.08810347,
+            "mean_us_per_call": 2.0489179069767443,
+            "p50_us": 2.08,
+            "p95_us": 2.681
+          },
+          "admit_queued": {
+            "count": 2500,
+            "sum_ms_per_forward": 0.17313978,
+            "mean_us_per_call": 6.9255911999999995,
+            "p50_us": 2.53,
+            "p95_us": 24.361
+          },
+          "event_create": {
+            "count": 2500,
+            "sum_ms_per_forward": 0.07320610000000001,
+            "mean_us_per_call": 2.9282440000000003,
+            "p50_us": 2.731,
+            "p95_us": 4.01
+          },
+          "submit": {
+            "count": 2500,
+            "sum_ms_per_forward": 0.96177791,
+            "mean_us_per_call": 38.4711164,
+            "p50_us": 35.532,
+            "p95_us": 61.382
+          },
+          "prepare": {
+            "count": 2500,
+            "sum_ms_per_forward": 0.29766248,
+            "mean_us_per_call": 11.9064992,
+            "p50_us": 11.87,
+            "p95_us": 13.251
+          },
+          "event_record": {
+            "count": 2500,
+            "sum_ms_per_forward": 0.23386395000000001,
+            "mean_us_per_call": 9.354558,
+            "p50_us": 8.82,
+            "p95_us": 14.09
+          },
+          "event_wait": {
+            "count": 2500,
+            "sum_ms_per_forward": 0.85556857,
+            "mean_us_per_call": 34.2227428,
+            "p50_us": 18.281,
+            "p95_us": 137.526
+          },
+          "event_destroy": {
+            "count": 2500,
+            "sum_ms_per_forward": 0.18993729,
+            "mean_us_per_call": 7.597491600000001,
+            "p50_us": 2.54,
+            "p95_us": 15.23
+          }
+        },
+        "by_tid": {
+          "cache:3264228": {
+            "count": 1800,
+            "sum_ms_per_forward": 0.03319402,
+            "mean_us_per_call": 1.8441122222222224,
+            "p50_us": 1.63,
+            "p95_us": 2.96
+          },
+          "cache:3266891": {
+            "count": 565,
+            "sum_ms_per_forward": 0.012430799999999999,
+            "mean_us_per_call": 2.200141592920354,
+            "p50_us": 2.2,
+            "p95_us": 2.66
+          },
+          "prepare:3266891": {
+            "count": 565,
+            "sum_ms_per_forward": 0.06797725,
+            "mean_us_per_call": 12.031371681415928,
+            "p50_us": 11.91,
+            "p95_us": 13.491
+          },
+          "event_wait:3266882": {
+            "count": 2499,
+            "sum_ms_per_forward": 0.8538944,
+            "mean_us_per_call": 34.169443777511006,
+            "p50_us": 18.281,
+            "p95_us": 137.476
+          },
+          "cache:3266893": {
+            "count": 655,
+            "sum_ms_per_forward": 0.014278879999999999,
+            "mean_us_per_call": 2.179981679389313,
+            "p50_us": 2.17,
+            "p95_us": 2.62
+          },
+          "prepare:3266893": {
+            "count": 655,
+            "sum_ms_per_forward": 0.07720595,
+            "mean_us_per_call": 11.787167938931297,
+            "p50_us": 11.79,
+            "p95_us": 13.2
+          },
+          "cache:3266892": {
+            "count": 668,
+            "sum_ms_per_forward": 0.01481292,
+            "mean_us_per_call": 2.2175029940119764,
+            "p50_us": 2.21,
+            "p95_us": 2.64
+          },
+          "prepare:3266892": {
+            "count": 668,
+            "sum_ms_per_forward": 0.08030702,
+            "mean_us_per_call": 12.022008982035928,
+            "p50_us": 11.97,
+            "p95_us": 13.22
+          },
+          "cache:3266890": {
+            "count": 612,
+            "sum_ms_per_forward": 0.01338685,
+            "mean_us_per_call": 2.187393790849673,
+            "p50_us": 2.2,
+            "p95_us": 2.63
+          },
+          "prepare:3266890": {
+            "count": 612,
+            "sum_ms_per_forward": 0.07217225999999999,
+            "mean_us_per_call": 11.79285294117647,
+            "p50_us": 11.81,
+            "p95_us": 13.111
+          },
+          "event_wait:3264228": {
+            "count": 1,
+            "sum_ms_per_forward": 0.00167417,
+            "mean_us_per_call": 167.417,
+            "p50_us": 167.417,
+            "p95_us": 167.417
+          }
+        },
+        "cache_by_tid": {
+          "3264228": {
+            "hit": 1800
+          },
+          "3266891": {
+            "hit": 565
+          },
+          "3266893": {
+            "hit": 655
+          },
+          "3266892": {
+            "hit": 668
+          },
+          "3266890": {
+            "hit": 612
+          }
+        },
+        "worker_cache": {
+          "hit": 2500
+        },
+        "query_entry_count_whole_trace": 89,
+        "query_entry_count_roi": 0,
+        "prepare_span_peak_roi": 1,
+        "caller_submit_plus_admit_union_ms_per_forward": 1.56471494,
+        "event_wait_lanes": {
+          "3266882": {
+            "count": 2499,
+            "sum_ms_per_forward": 0.8538944,
+            "mean_us_per_call": 34.169443777511006,
+            "p50_us": 18.281,
+            "p95_us": 137.476,
+            "lane": "release_path"
+          },
+          "3264228": {
+            "count": 1,
+            "sum_ms_per_forward": 0.00167417,
+            "mean_us_per_call": 167.417,
+            "p50_us": 167.417,
+            "p95_us": 167.417,
+            "lane": "caller"
+          }
+        },
+        "event_wait_caller_count": 1,
+        "event_wait_release_path_count": 2499,
+        "unpaired_returns_rechecked": 0,
+        "unpaired_entries_rechecked": 0,
+        "expected_enabled_counts_passed": true,
+        "caution": "Instrumented spans; nested/cross-thread times cannot be added as uninstrumented E2E attribution.",
+        "perf_dump_returncode": 0,
+        "lost_records": [],
+        "perf_dump_stderr": ""
+      }
+    }
+  },
+  "caution": "Inclusive spans overlap across threads and nesting; do not sum as E2E shares. Snapshot2return..Snapshot3entry also brackets a small amount of Python snapshot parsing/usage overhead.",
+  "paired_detail": {
+    "schema": 1,
+    "kind": "paired_instrumented_diag",
+    "performance_evidence": false,
+    "forwards_per_arm": 100,
+    "native_sha256": "d8943e56a5b234b2dc7cb0091861087a611437661b0ddd6479d5ca610a7ccaa4",
+    "native_identity_equal": true,
+    "mutex4": {
+      "roi_ms_per_forward": 3.72086873,
+      "prepare_span_peak": 1,
+      "worker_cache": {
+        "hit": 2500
+      },
+      "query_whole_trace": 89,
+      "query_roi": 0,
+      "caller_phase_union_ms_per_forward": 1.56471494,
+      "event_wait_lanes": {
+        "3266882": {
+          "count": 2499,
+          "sum_ms_per_forward": 0.8538944,
+          "mean_us_per_call": 34.169443777511006,
+          "p50_us": 18.281,
+          "p95_us": 137.476,
+          "lane": "release_path"
+        },
+        "3264228": {
+          "count": 1,
+          "sum_ms_per_forward": 0.00167417,
+          "mean_us_per_call": 167.417,
+          "p50_us": 167.417,
+          "p95_us": 167.417,
+          "lane": "caller"
+        }
+      },
+      "lost_records": [],
+      "unpaired_entries": 0,
+      "unpaired_returns": 0,
+      "counts_passed": true
+    },
+    "mpsc4": {
+      "roi_ms_per_forward": 4.9441948,
+      "prepare_span_peak": 1,
+      "worker_cache": {
+        "hit": 2500
+      },
+      "query_whole_trace": 89,
+      "query_roi": 0,
+      "caller_phase_union_ms_per_forward": 2.71540018,
+      "event_wait_lanes": {
+        "3143252": {
+          "count": 2356,
+          "sum_ms_per_forward": 0.6410024,
+          "mean_us_per_call": 27.20723259762309,
+          "p50_us": 11.88,
+          "p95_us": 127.936,
+          "lane": "release_path"
+        },
+        "3140043": {
+          "count": 144,
+          "sum_ms_per_forward": 0.03686288,
+          "mean_us_per_call": 25.599222222222224,
+          "p50_us": 11.75,
+          "p95_us": 120.265,
+          "lane": "caller"
+        }
+      },
+      "lost_records": [],
+      "unpaired_entries": 0,
+      "unpaired_returns": 0,
+      "counts_passed": true
+    },
+    "instrumented_roi_delta_ms_per_forward": 1.2233260700000002,
+    "phase_spans": [
+      {
+        "phase": "submit",
+        "mutex4_ms_per_forward": 0.96177791,
+        "mpsc4_ms_per_forward": 2.1849790899999997,
+        "mpsc_minus_mutex_ms_per_forward": 1.2232011799999998,
+        "mutex4_count": 2500,
+        "mpsc4_count": 2500
+      },
+      {
+        "phase": "prepare",
+        "mutex4_ms_per_forward": 0.29766248,
+        "mpsc4_ms_per_forward": 0.29841259000000003,
+        "mpsc_minus_mutex_ms_per_forward": 0.000750110000000026,
+        "mutex4_count": 2500,
+        "mpsc4_count": 2500
+      },
+      {
+        "phase": "cache",
+        "mutex4_ms_per_forward": 0.08810347,
+        "mpsc4_ms_per_forward": 0.08712999,
+        "mpsc_minus_mutex_ms_per_forward": -0.0009734799999999988,
+        "mutex4_count": 4300,
+        "mpsc4_count": 4300
+      },
+      {
+        "phase": "admit_queued",
+        "mutex4_ms_per_forward": 0.17313978,
+        "mpsc4_ms_per_forward": 0.15255291,
+        "mpsc_minus_mutex_ms_per_forward": -0.02058686999999998,
+        "mutex4_count": 2500,
+        "mpsc4_count": 2500
+      },
+      {
+        "phase": "admit_fallback",
+        "mutex4_ms_per_forward": 0.42979725,
+        "mpsc4_ms_per_forward": 0.37786818,
+        "mpsc_minus_mutex_ms_per_forward": -0.05192907000000002,
+        "mutex4_count": 1800,
+        "mpsc4_count": 1800
+      },
+      {
+        "phase": "fallback_drain",
+        "mutex4_ms_per_forward": 0.06456821,
+        "mpsc4_ms_per_forward": 0.05431672,
+        "mpsc_minus_mutex_ms_per_forward": -0.010251490000000002,
+        "mutex4_count": 1900,
+        "mpsc4_count": 1900
+      },
+      {
+        "phase": "fallback_sync",
+        "mutex4_ms_per_forward": 0.23300957,
+        "mpsc4_ms_per_forward": 0.19296951,
+        "mpsc_minus_mutex_ms_per_forward": -0.04004005999999999,
+        "mutex4_count": 1800,
+        "mpsc4_count": 1800
+      },
+      {
+        "phase": "event_create",
+        "mutex4_ms_per_forward": 0.07320610000000001,
+        "mpsc4_ms_per_forward": 0.07655253999999999,
+        "mpsc_minus_mutex_ms_per_forward": 0.0033464399999999783,
+        "mutex4_count": 2500,
+        "mpsc4_count": 2500
+      },
+      {
+        "phase": "event_record",
+        "mutex4_ms_per_forward": 0.23386395000000001,
+        "mpsc4_ms_per_forward": 0.23528847,
+        "mpsc_minus_mutex_ms_per_forward": 0.0014245199999999847,
+        "mutex4_count": 2500,
+        "mpsc4_count": 2500
+      },
+      {
+        "phase": "event_wait",
+        "mutex4_ms_per_forward": 0.85556857,
+        "mpsc4_ms_per_forward": 0.67786528,
+        "mpsc_minus_mutex_ms_per_forward": -0.17770328999999996,
+        "mutex4_count": 2500,
+        "mpsc4_count": 2500
+      },
+      {
+        "phase": "event_destroy",
+        "mutex4_ms_per_forward": 0.18993729,
+        "mpsc4_ms_per_forward": 0.21018632,
+        "mpsc_minus_mutex_ms_per_forward": 0.02024903,
+        "mutex4_count": 2500,
+        "mpsc4_count": 2500
+      }
+    ],
+    "cleanup": {
+      "groups": [
+        "r34p_3263457",
+        "r34p_3002017"
+      ],
+      "remaining_group_definitions": [],
+      "manifests_registered": [
+        false,
+        false
+      ],
+      "related_perf_processes": [],
+      "passed": true
+    },
+    "caution": "These are separate instrumented diagnostic windows. Nested and cross-thread spans cannot be summed into E2E shares; no fraction of uninstrumented regression is claimed."
+  }
+}

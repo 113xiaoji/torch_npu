@@ -1,9 +1,17 @@
 # R34 A3 verification status — 2026-11-15
 
-**No model performance result is available. Global lock freedom is not achieved.**
+**Performance comparison is now available; global lock freedom is not achieved.**
+The completed seven-arm pilot and reversed key-group repeat show no speedup for
+the tested D894 fixed-input warm-cache workload. See the measured tables and
+same-binary cache/phase evidence in [PERFORMANCE_20261115.md](PERFORMANCE_20261115.md).
+The earlier resource interruptions below are historical; they do not invalidate
+the later ten accepted uninstrumented performance windows.
 The new queue has now passed actual A3 DLRM correctness and four-caller order /
 retirement qualification. [The machine-readable results](evidence/real_queue_qualification_20261115.json)
 contain the unchanged model/input identities, counters and diagnostic spans.
+That qualification JSON is an earlier immutable snapshot: its zero performance
+windows apply to the interrupted19:32 retry. Current measured windows are in
+[performance_pilot_20261115.json](evidence/performance_pilot_20261115.json).
 The optional bounded MPSC ingress and dedicated FIFO publisher are implemented;
 the runtime still uses core/state mutexes, the original PTA FIFO and allocators.
 The original mutex ingress remains the default and the comparison uses one
@@ -45,7 +53,7 @@ executor destruction restores its HugeMem pool index before consumer cleanup.
 Every reviewed ragged table had a wave with four real SDK queries overlapping.
 This establishes SDK preparation concurrency, not model-level speedup.
 
-## Current resource block
+## Earlier resource interruptions
 
 The19:12 retry initially saw resident SGLang processes. When compute processes
 cleared, the first independent-container attempt still failed at aclInit507008:
@@ -89,12 +97,12 @@ The retry archive has58 payloads,164986 bytes, SHA256
 
 ## Remaining acceptance work
 
-1. Obtain an allocated device and a test container that stays available for
-   the complete comparison, approximately20minutes.
-2. Run the seven correctness arms and matched off(TQ1)/mutex/mpsc workers1/2/4
-   E2E campaign. Keep the original model, mixed inputs, cache and precision.
-3. Report medians, tails and CPU cost from accepted raw samples. A faster
-   queue microbenchmark or an SDK overlap interval is not model speedup.
+The seven correctness arms, seven performance windows, three reversed key
+repeats and two independent instrumented diagnostics have now completed.
+Further acceptance for a production optimization requires validating a new
+candidate that reduces these costs; the measured candidate did not accelerate
+this workload. A full balanced campaign and other workloads remain separate
+follow-up work.
 
 Join all callers before cold close; concurrent model/fallback and lifecycle
 calls remain outside the contract.

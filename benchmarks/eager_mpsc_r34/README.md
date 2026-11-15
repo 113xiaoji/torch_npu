@@ -3,8 +3,9 @@
 Current actual results and unfinished gates: [A3_VALIDATION.md](A3_VALIDATION.md).
 The candidate is compiled and CPU-tested; exact CANN9.1 v1 SDK qualification
 passed for the reviewed uniform and original ragged inputs. Actual A3 queue /
-model correctness and four-caller ordering also passed. Comparative E2E remains
-pending a stable device/container window. There is no R34 speedup claim.
+model correctness and four-caller ordering also passed. Comparative E2E is now
+complete for one seven-arm pilot and a reversed key-group repeat: the tested
+candidate was slower. See [PERFORMANCE_20261115.md](PERFORMANCE_20261115.md).
 
 The primary experiment calls the byte-pinned original DLRM with the R31 MetaSyn26
 input (`c4507e…`) directly. It compares seven arms in the **same newly built
