@@ -20,8 +20,13 @@ The first complete worker observed maximum absolute error
 cover Event wakeups/counting, cache ownership/bounds, private allocator pools,
 unsafe/recovery admission and effective native option receipts.
 
-A complete three-round NPU performance comparison remains in progress. Earlier
-partial timings are excluded from final performance claims. Host observation
+The complete three-round NPU performance comparison and independent final audit
+passed: 45 fresh windows, 135000 fresh outputs plus 1248 sealed correctness
+outputs. The best four-caller treatment improves matched-round throughput by
+8.41% (median) over D894 and 6.19% over rebuilt off. Its paired four/one scaling
+mean is 2.75, below the 3.6 milestone. See [R41_RESULTS.md](R41_RESULTS.md) for
+phase/latency values and the archive SHA. Earlier partial timings are excluded
+from final performance claims. Host observation
 tooling needed fixes for Docker18 CLI support, nested mounts under read-only
 parents, and /proc identities during process teardown. An owned CPU child
 reproduced cgroup reparenting during exit. Samplers preserve incomplete samples;
@@ -37,5 +42,7 @@ all provider/GIL/getter/numerical/state/close gates. The phase/scaling report
 must distinguish paired-round ratios from ratios of throughput medians.
 
 The CinderX FT build patches and CPU forward-only result are in
-[cinderx_ft_3146](cinderx_ft_3146/README.md). That narrow CPU treatment has no
-positive throughput gain. A generic user-class method experiment is separate.
+[cinderx_ft_3146](cinderx_ft_3146/README.md). Both that narrow treatment and the
+separate [generic user-class method experiment](cinderx_ft_3146/CLASS_METHODS_CPU_RESULTS.md)
+have no positive CPU throughput gain. Native hotspot diagnosis is needed before
+further runtime changes; these CPU results are not NPU performance evidence.

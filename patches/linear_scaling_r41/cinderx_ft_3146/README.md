@@ -48,3 +48,8 @@ actual user-model helper bodies. No NPU conclusion follows from this table.
 CPU evidence archive SHA256:
 `0b63efefa14873484e98b30ec8f087353a134fb9af97171d4dc291d0f6afce0f`.
 PSS was not collected in this CPU experiment.
+
+The separate [generic class-methods experiment](CLASS_METHODS_CPU_RESULTS.md)
+also has no CPU throughput gain, despite verified native activity for every
+actually called user-model method. Further optimization requires hotspot
+evidence rather than a compilation-state claim.
