@@ -21,6 +21,7 @@
 #include "torch_npu/csrc/core/npu/NPUException.h"
 #include "torch_npu/csrc/core/npu/register/OptionsManager.h"
 #include "torch_npu/csrc/core/npu/NPUStreamUtils.h"
+#include "torch_npu/csrc/core/npu/RuntimeResourceEpoch.h"
 #include "torch_npu/csrc/core/npu/sys_ctrl/npu_sys_ctrl.h"
 #include "torch_npu/csrc/core/npu/interface/AsyncTaskQueueInterface.h"
 #include "third_party/acl/inc/acl/acl_rt.h"
@@ -1042,6 +1043,7 @@ void checkCurrentStreamNotExternal(c10::DeviceIndex device_index, const char* ap
 
 void recovery_all_npu_streams(c10::DeviceIndex device_index)
 {
+    InvalidateRuntimeResources();
     if (!initialize_flag[device_index].load(std::memory_order_acquire)) {
         return;
     }

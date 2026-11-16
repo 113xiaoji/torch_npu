@@ -18,6 +18,11 @@
 
 #include "op_api_common_base.h"
 
+// Internal TQ1 workspaces only. The optional owner must travel with the queued
+// closure whenever the helper admits reuse; the allocation API stays unchanged.
+TORCH_NPU_API at::Tensor GetOpApiWorkspaceR41(
+    uint64_t bytes, aclrtStream stream, bool& retain_for_submission);
+
 constexpr int g_hash_buf_size = 8192;
 constexpr int g_hash_buf_max_size = g_hash_buf_size + 1024;
 extern thread_local char g_hash_buf[g_hash_buf_size];
@@ -182,11 +187,14 @@ template <typename... Args> bool hit_cache(aclrtStream acl_stream, const char *a
     }
     void *workspace_addr = nullptr;
     at::Tensor workspace_tensor;
+    bool retain_workspace = false;
     if (workspace_size != 0) {
-        workspace_tensor = at_npu::native::OpPreparation::unsafe_empty_workspace(workspace_size);
+        workspace_tensor = GetOpApiWorkspaceR41(workspace_size, acl_stream, retain_workspace);
         workspace_addr = const_cast<void *>(workspace_tensor.storage().data());
     }
-    auto acl_call = [workspace_addr, workspace_size, acl_stream, executor, phrase2]()->int {
+    auto acl_call = [workspace_addr, workspace_size, acl_stream, executor, phrase2,
+        workspace_owner = retain_workspace ? std::move(workspace_tensor) : at::Tensor{}]()->int {
+        (void)workspace_owner;
         OpApiFunc opApiFunc = reinterpret_cast<OpApiFunc>(phrase2);
         auto api_ret = opApiFunc(workspace_addr, workspace_size, executor, acl_stream);
         NPU_CHECK_ERROR(api_ret, "call failed");
@@ -347,11 +355,14 @@ auto DecodeDevice(Ts&... args) -> at::Device
         NPU_CHECK_ERROR(workspace_status, "call " #aclnn_api " failed");                                               \
         void *workspace_addr = nullptr;                                                                                \
         at::Tensor workspace_tensor;                                                                                   \
+        bool retain_workspace = false;                                                                                \
         if (workspace_size != 0) {                                                                                     \
-            workspace_tensor = at_npu::native::OpPreparation::unsafe_empty_workspace(workspace_size);                  \
+            workspace_tensor = GetOpApiWorkspaceR41(workspace_size, acl_stream, retain_workspace);                     \
             workspace_addr = const_cast<void *>(workspace_tensor.storage().data());                                    \
         }                                                                                                              \
-        auto acl_call = [converted_params, workspace_addr, workspace_size, acl_stream, executor]()->int {              \
+        auto acl_call = [converted_params, workspace_addr, workspace_size, acl_stream, executor,                        \
+            workspace_owner = retain_workspace ? std::move(workspace_tensor) : at::Tensor{}]()->int {                  \
+            (void)workspace_owner;                                                                                     \
             if (c10_npu::check_dequeue_need_use(acl_stream)) {                                                         \
                 c10_npu::UseStreamResInCurrentThread(acl_stream);                                                      \
             }                                                                                                          \
@@ -512,11 +523,14 @@ auto DecodeDevice(Ts&... args) -> at::Device
         NPU_CHECK_ERROR(workspace_status, "call " #aclnn_api " failed");                                               \
         void *workspace_addr = nullptr;                                                                                \
         at::Tensor workspace_tensor;                                                                                   \
+        bool retain_workspace = false;                                                                                \
         if (workspace_size != 0) {                                                                                     \
-            workspace_tensor = at_npu::native::OpPreparation::unsafe_empty_workspace(workspace_size);                  \
+            workspace_tensor = GetOpApiWorkspaceR41(workspace_size, acl_stream, retain_workspace);                     \
             workspace_addr = const_cast<void *>(workspace_tensor.storage().data());                                    \
         }                                                                                                              \
-        auto acl_call = [converted_params, workspace_addr, workspace_size, acl_stream, executor]()->int {              \
+        auto acl_call = [converted_params, workspace_addr, workspace_size, acl_stream, executor,                        \
+            workspace_owner = retain_workspace ? std::move(workspace_tensor) : at::Tensor{}]()->int {                  \
+            (void)workspace_owner;                                                                                     \
             if (c10_npu::check_dequeue_need_use(acl_stream)) {                                                         \
                 c10_npu::UseStreamResInCurrentThread(acl_stream);                                                      \
             }                                                                                                          \

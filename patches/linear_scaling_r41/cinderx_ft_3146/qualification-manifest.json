@@ -1,0 +1,78 @@
+{
+  "build_files": {
+    "/tools/cinderx-clang18-pylib/_cinderx.so": "b0809aac744059cfcf7069fae65ec2f1c6041231a81f1d4094b94384017d9315",
+    "/work/logs/CMakeCache-clang18-ft.txt": "25760c68d5b7bad0491426f6fd21cc14f0a07bfc993358e6848d117aba0adcaa",
+    "/work/logs/compile_commands-clang18-ft.json": "0dd48eb6adc9063fb1d2642971fc2650b07d2d2f54257d6a66a7a3657fc48d3f"
+  },
+  "compiler_version": "Ubuntu clang version 18.1.8 (++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144)\nTarget: aarch64-unknown-linux-gnu\nThread model: posix\nInstalledDir: /tools/clang18/usr/bin\n",
+  "dependency_archives": {
+    "/tools/downloads/capstone.tar.gz": "6427a724726d161d1e05fb49fff8cd0064f67836c04ffca3c11d6d859e719caa",
+    "/tools/downloads/fmt.tar.gz": "bc23066d87ab3168f27cef3e97d545fa63314f5c79df5ea444d41d56f962c6af",
+    "/tools/downloads/parallel-hashmap.tar.gz": "9a44071db1760ca18b56815ba719b61651d4b32efbd9f13e8e41fe9a5084f65d",
+    "/tools/downloads/usdt.tar.gz": "69467234c3c009952fea99dd057e5200160603c7e3e04ecb74458e29746e5b95"
+  },
+  "generator": {
+    "clang_diagnostics": [],
+    "clang_python_bindings": "14.0.6",
+    "driver_sha256": "774eb88857483d6394661e2d76c7e71d6e887f5c4d741778c98fc793fad59f22",
+    "libclang_sha256": "b5b4f3843e6b69058a73b22863159d961500c033f6a01215d07d9235962f7f4b",
+    "replay": "fresh generation byte-identical"
+  },
+  "image_sha256": "c5cf2deb674cd1c8aba10a70d8dcb3e413d3739f6a54808c568e11d711d2e263",
+  "patches": {
+    "/work/ft-borrows-3146.patch": "609b13fe564425c35c19963c9b82832b2d582dce2cb13b9895a9756b87b334f9",
+    "/work/ft-source-selection.patch": "2fa61568e6a7f255c563202702af9b07415b99f27023acf79ea9d85d6b7a610b"
+  },
+  "runtime_files": {
+    "/root/ft-pytorch-repro/prefixes/py314t/bin/python3.14t": "79db688405639c768cc9b975e98d21596a2040bd8f59496ce353d9a438be97cd",
+    "/root/ft-pytorch-repro/prefixes/py314t/include/python3.14t/Python.h": "e39aad93d70c3ea1a63b77ec5795ff59a5c177745aedace6f83bbf4275a20d9f",
+    "/root/ft-pytorch-repro/prefixes/py314t/include/python3.14t/internal/pycore_instruments.h": "2bf0f0e935f7115a6f612037d762ab2dfd4a47bcda7b8ffefc44d237af120fab",
+    "/root/ft-pytorch-repro/prefixes/py314t/include/python3.14t/pyconfig.h": "c4e449d00cc40ab5cb388ef0e88a4a0264c0950319354a7ebe5f25d5878f9dee",
+    "/work/clone3_compat": "0823d6a5349235e7797c2ca370b7654d2c274a6615b8466ed1a7543c7d6d4ff5"
+  },
+  "scope": "CPU FT qualification only; only CPython 3.14.6t certified, no future-micro/other-Python support claim",
+  "scripts": {
+    "/work/adapt_ft_borrows.py": "774eb88857483d6394661e2d76c7e71d6e887f5c4d741778c98fc793fad59f22",
+    "/work/build_clang18.sh": "ef72b3d7b6c740f4f34f9ff78bf40f18289061e0d1d61d26ecadf906894e5d67",
+    "/work/ft-python": "77c3cd4367ff4975109f4c6f9997566fa6d82b0b304a1bf4189aee7300fde87b",
+    "/work/prepare_borrow.sh": "18a53124a88b456b7012d01878ea1d0e59a08e0756dd7919bf625dd6ad270389",
+    "/work/prepare_clang18.sh": "a68dd5759552233d80be9c08925a64ae8635e2d9d971c49229e63bd6317d1ec6",
+    "/work/refine_ft_cmake.py": "cdbd3b79c0afab039900180772005b30e3478eec3433c7496aaef876ba35fe4b"
+  },
+  "selected_python_macros": [
+    "#define PY_VERSION \"3.14.6\"",
+    "#define PY_VERSION_HEX _Py_PACK_FULL_VERSION( PY_MAJOR_VERSION, PY_MINOR_VERSION, PY_MICRO_VERSION, PY_RELEASE_LEVEL, PY_RELEASE_SERIAL)",
+    "#define Py_GIL_DISABLED 1"
+  ],
+  "source_files": {
+    "/work/src/CMakeLists.txt": "25f844f597bf684bb486cc1e85604306a15069f5879f9771f41ccc5aa39883ab",
+    "/work/src/cinderx/UpstreamBorrow/borrowed-3.14.6.free-threading-instrumentation.c.template": "3e1fb71a7a8b1d871963bdfa4f062ac8cbc11b28a593de2a90b37a4639ea4279",
+    "/work/src/cinderx/UpstreamBorrow/borrowed-3.14.6.free-threading-instrumentation.gen_cached.h": "b2fb2aeeafdf09292cf8354f904ed8e3bc57ba3b535d2f49ddade23e98faa423",
+    "/work/src/cinderx/UpstreamBorrow/borrowed-3.14.free-threading.c.template": "102941360f51367a278bbab9bb9c8308f197d262e6a9c78088301bb831fd8dc4",
+    "/work/src/cinderx/UpstreamBorrow/borrowed-3.14.free-threading.gen_cached.c": "367d1454de8a27d1fb0a27fa777b8e1e4f062b5a2c6100377889eaab4c6de8de"
+  },
+  "source_head": "6b0e282c37a8725253e068295e90eb2e321d6876",
+  "toolchain_debs": {
+    "/tools/clang-debs/clang-18_1%3a18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_arm64.deb": "0e8fa82cfcbedad355f1dabc8e0b021ed466400f56cd43e2e47cc5612a029311",
+    "/tools/clang-debs/libclang-common-18-dev_1%3a18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_arm64.deb": "cb6008dc44d2e2fc63e3260acc8ef90a6460d092fa0e4dd3a11baa0912592467",
+    "/tools/clang-debs/libclang-cpp18_1%3a18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_arm64.deb": "1bfc9a974b87c7c62ff31b31deb5f327464220249662e9a38d12d5c21214cf41",
+    "/tools/clang-debs/libllvm18_1%3a18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_arm64.deb": "21c6e7ad67111a207cf3f0ef7324bb995406d6a373a193691dd7486b7eab0414",
+    "/tools/clang-debs/llvm-18-linker-tools_1%3a18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_arm64.deb": "f301e96cbeb0e2f5c0e459036737bac7a77da610d3873847e09385a940790b71",
+    "/tools/debs/cpp-13-aarch64-linux-gnu_13.4.0-6ubuntu1~22~ppa2_arm64.deb": "799fc061b90d134ad6254dee0049894852df41796b7d64e1fd06e9eb7a1677af",
+    "/tools/debs/cpp-13_13.4.0-6ubuntu1~22~ppa2_arm64.deb": "62cf14ede7a10cf25ccbb4db336eddd069d1e3d4ce13b245ce5fb9c4e320fdf7",
+    "/tools/debs/g++-13-aarch64-linux-gnu_13.4.0-6ubuntu1~22~ppa2_arm64.deb": "b19f70dd4ae3bbd0e6ce9301ed4546a0f442d66931adaeede76c6daf6fc02d96",
+    "/tools/debs/g++-13_13.4.0-6ubuntu1~22~ppa2_arm64.deb": "ced4597834eff65acabbc2fef7b1dd504c1d82babb6014c97ed652cb7f647c96",
+    "/tools/debs/gcc-13-aarch64-linux-gnu_13.4.0-6ubuntu1~22~ppa2_arm64.deb": "0dee804273a33b0a0522dd12f7a1f83ffbca46ff1cd61305a1fb9eca3bc0ab1e",
+    "/tools/debs/gcc-13-base_13.4.0-6ubuntu1~22~ppa2_arm64.deb": "ea855275e712db934adc349ba757888ab45cc4063d69485599216acb597747b4",
+    "/tools/debs/gcc-13_13.4.0-6ubuntu1~22~ppa2_arm64.deb": "b5d7bef564568bb8111d667cacace462b5167192228d7565c7ba2f3938d75479",
+    "/tools/debs/libgcc-13-dev_13.4.0-6ubuntu1~22~ppa2_arm64.deb": "819637518ec2c401126401e23fdcf656fccb9226383edd171e326362e22bbd5f",
+    "/tools/debs/libgcc-s1_16-20260315-1ubuntu1~22~ppa1_arm64.deb": "79d3e5c30578ddb13da7295dd47b10c4200faedba34ffbe34afb732cd52bebe2",
+    "/tools/debs/libstdc++-13-dev_13.4.0-6ubuntu1~22~ppa2_arm64.deb": "29eab39b16bdfacaa9210e3b76a76689757d8d1fbc9d40674bf427526a3c5ae7",
+    "/tools/debs/libstdc++6_16-20260315-1ubuntu1~22~ppa1_arm64.deb": "38004e9fa3046d2be2497ab6f5a6fd620488f2098502711f502875d158ab7c3b"
+  },
+  "upstream_cpython": {
+    "tag": "v3.14.6",
+    "tar_sha256": "7f77ccf3613ddadc74dfb8d6f8082581a8835115a25e1307d189f03aa750893e",
+    "url": "https://codeload.github.com/python/cpython/tar.gz/refs/tags/v3.14.6"
+  }
+}

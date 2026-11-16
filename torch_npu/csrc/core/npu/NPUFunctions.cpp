@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include "torch_npu/csrc/core/npu/NPUFunctions.h"
 #include "torch_npu/csrc/core/npu/NPUStream.h"
+#include "torch_npu/csrc/core/npu/RuntimeResourceEpoch.h"
 #include "torch_npu/csrc/core/npu/NPUAffinityController.h"
 #include "torch_npu/csrc/core/npu/register/OptionsManager.h"
 #include "torch_npu/csrc/core/npu/GetCANNInfo.h"
@@ -236,6 +237,7 @@ std::vector<int8_t> GetUsedDevices()
 
 aclError ResetUsedDevices()
 {
+    InvalidateRuntimeResources();
     std::lock_guard<std::recursive_mutex> lock(mtx);
     ContextResetGuard reset_guard;
     for (const auto it : used_devices) {
@@ -250,6 +252,7 @@ aclError ResetUsedDevices()
 
 aclError DestroyUsedStreams()
 {
+    InvalidateRuntimeResources();
     int32_t cur_device = 0;
     NPU_CHECK_ERROR_WITHOUT_UCE(GetDevice(&cur_device));
     std::lock_guard<std::recursive_mutex> lock(mtx);

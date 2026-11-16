@@ -1,0 +1,2 @@
+# Unified-diff blank context lines contain their required leading space.
+*.patch -whitespace

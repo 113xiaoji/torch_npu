@@ -1,13 +1,47 @@
 #include "torch_npu/csrc/core/npu/npu_log.h"
 #include "torch_npu/csrc/core/npu/NPUEventManager.h"
 #include "torch_npu/csrc/core/npu/register/OptionsManager.h"
+#include <cstdlib>
+#include <cstring>
 #ifndef BUILD_LIBTORCH
 #include "torch_npu/csrc/sanitizer/NPUTrace.h"
 #endif
 
 namespace c10_npu {
 
-NPUEventManager::NPUEventManager() : thread_pool_(std::make_shared<c10::TaskThreadPool>(5)){};
+namespace {
+enum class EventHostWaitMode { Spin, Condition, Invalid };
+
+EventHostWaitMode GetEventHostWaitMode() noexcept
+{
+    static const EventHostWaitMode mode = [] {
+        const char* value = std::getenv("TORCH_NPU_EVENT_HOST_WAIT");
+        if (value == nullptr || std::strcmp(value, "spin") == 0) {
+            return EventHostWaitMode::Spin;
+        }
+        if (std::strcmp(value, "condition") == 0) {
+            return EventHostWaitMode::Condition;
+        }
+        return EventHostWaitMode::Invalid;
+    }();
+    return mode;
+}
+} // namespace
+
+extern "C" TORCH_NPU_API const char* torch_npu_event_host_wait_mode() noexcept
+{
+    switch (GetEventHostWaitMode()) {
+        case EventHostWaitMode::Spin: return "spin";
+        case EventHostWaitMode::Condition: return "condition";
+        default: return "invalid";
+    }
+}
+
+NPUEventManager::NPUEventManager() : thread_pool_(std::make_shared<c10::TaskThreadPool>(5))
+{
+    TORCH_CHECK(GetEventHostWaitMode() != EventHostWaitMode::Invalid,
+        "TORCH_NPU_EVENT_HOST_WAIT must be spin or condition.", PTA_ERROR(ErrCode::PARAM));
+}
 
 NPUEventManager &NPUEventManager::GetInstance()
 {
@@ -133,6 +167,9 @@ void NPUEventManager::DecreaseUnrecordedCount(aclrtEvent event)
     if (it->second == 1) {
         event_unrecorded_count_.erase(event);
         ASCEND_LOGD("Event: unrecorded count decrease, now=%d.", 0);
+        if (GetEventHostWaitMode() == EventHostWaitMode::Condition) {
+            event_unrecorded_count_cv_.notify_all();
+        }
     } else {
         it->second--;
         ASCEND_LOGD("Event: unrecorded count decrease, now=%d.", it->second);
@@ -145,6 +182,23 @@ bool NPUEventManager::IsEventRecorded(aclrtEvent event)
 
     auto it = event_unrecorded_count_.find(event);
     return it == event_unrecorded_count_.end();
+}
+
+void NPUEventManager::WaitForEventRecorded(aclrtEvent event)
+{
+    if (GetEventHostWaitMode() == EventHostWaitMode::Spin) {
+        while (!IsEventRecorded(event)) {
+        }
+        return;
+    }
+
+    std::unique_lock<std::mutex> guard(event_unrecorded_count_mutex_);
+    // Use the live map predicate rather than a completion latch: an event may
+    // have several pending records, or be recorded again before we reacquire
+    // the mutex after a notification. The predicate also handles notify-before-wait.
+    event_unrecorded_count_cv_.wait(guard, [this, event] {
+        return event_unrecorded_count_.find(event) == event_unrecorded_count_.end();
+    });
 }
 
 void NPUEventManager::IncreaseUnwaitedCount(aclrtEvent event)
@@ -191,6 +245,11 @@ void NPUEventManager::ClearUnrecordedCount()
 {
     std::lock_guard<std::mutex> guard(event_unrecorded_count_mutex_);
     event_unrecorded_count_.clear();
+    // Preserve queue-error cleanup semantics: absence lets callers proceed to
+    // the existing SDK synchronization, which retains its own error handling.
+    if (GetEventHostWaitMode() == EventHostWaitMode::Condition) {
+        event_unrecorded_count_cv_.notify_all();
+    }
 }
 
 void NPUEventManager::AddIpcEvent(aclrtEvent event)

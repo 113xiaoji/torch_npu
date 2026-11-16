@@ -329,6 +329,8 @@ public:
 // is no different than loading a pointer.
 C10_NPU_API extern std::atomic<NPUAllocator*> allocator;
 
+// Exact top-level allocator identity. Private pool scopes need a separate gate.
+C10_NPU_API bool isNativeAllocator() noexcept;
 
 inline NPUAllocator* get()
 {

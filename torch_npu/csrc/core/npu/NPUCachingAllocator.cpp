@@ -31,6 +31,7 @@
 #include "torch_npu/csrc/core/npu/NPUAllocatorConfig.h"
 #include "torch_npu/csrc/core/npu/NPUWorkspaceAllocator.h"
 #include "torch_npu/csrc/core/npu/NPURecovery.h"
+#include "torch_npu/csrc/core/npu/RuntimeResourceEpoch.h"
 #include "torch_npu/csrc/core/npu/NPUGuard.h"
 #include "torch_npu/csrc/core/npu/NPUGraphsUtils.h"
 #include "NPUBlockHandle.h"
@@ -3688,6 +3689,7 @@ public:
 
     void markAllBlockUnsafe(int device) override
     {
+        c10_npu::InvalidateRuntimeResources();
         return device_allocator[device]->markAllBlockUnsafe();
     }
 
@@ -4277,6 +4279,11 @@ public:
 };
 
 NpuCachingAllocator caching_allocator;
+
+bool isNativeAllocator() noexcept
+{
+    return allocator.load(std::memory_order_acquire) == &caching_allocator;
+}
 
 bool IsNativeCapturedRetirementDataOnStream(const c10::DataPtr& pointer, const c10::Allocator* source,
     int device, aclrtStream stream) noexcept

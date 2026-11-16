@@ -21,10 +21,18 @@
 #include "op_api_sdk_profile_r22.h"
 #include "op_api_eager_sdk_profile_r34.h"
 #include "torch_npu/csrc/core/npu/HostRegionOpApiCommand.h"
+#include "torch_npu/csrc/core/npu/HostRegionCapture.h"
 #include <cstring>
 #include <atomic>
 #include <cstdlib>
 #include "op_api_eager_hostsim_r25.h"
+#include "op_api_workspace_cache_r41.h"
+#include "torch_npu/csrc/core/npu/NPUGraphsUtils.h"
+#include "torch_npu/csrc/core/npu/NPUStreamUtils.h"
+#include "torch_npu/csrc/core/npu/NPURecovery.h"
+#include "torch_npu/csrc/core/npu/NPUCachingAllocator.h"
+#include "torch_npu/csrc/core/npu/RuntimeResourceEpoch.h"
+#include "torch_npu/csrc/core/npu/sys_ctrl/npu_sys_ctrl.h"
 #ifdef TORCH_NPU_EAGER_PREPARE_HOST_SIM
 #include "EagerPrepareHostSimProfile.h"
 #endif
@@ -37,6 +45,85 @@ constexpr int g_rShift33Bits = 33;
 constexpr uint64_t MIX_STEP1 = 18397679294719823053LLU;
 constexpr uint64_t MIX_STEP2 = 14181476777654086739LLU;
 constexpr int OWNER_ROOT_UID = 0;
+
+namespace {
+bool WorkspaceCacheEnabledR41()
+{
+    static const bool enabled = [] {
+        const auto* value = std::getenv("TORCH_NPU_WORKSPACE_CACHE");
+        return value && std::strcmp(value, "1") == 0;
+    }();
+    return enabled;
+}
+
+op_api::workspace_r41::WorkspaceCache<at::Tensor>& ThreadWorkspaceCacheR41()
+{
+    // Bounded retained working set per host thread. Displaced buffers may still
+    // be owned by queued callbacks until actual ACL submission has completed.
+    thread_local op_api::workspace_r41::WorkspaceCache<at::Tensor> cache(64ULL * 1024 * 1024);
+    return cache;
+}
+} // namespace
+
+at::Tensor GetOpApiWorkspaceR41(uint64_t bytes, aclrtStream acl_stream, bool& retain_for_submission)
+{
+    retain_for_submission = false;
+    if (bytes == 0) return {};
+    if (!WorkspaceCacheEnabledR41()) {
+        return at_npu::native::OpPreparation::unsafe_empty_workspace(bytes);
+    }
+    // Only the native/default-pool allocation-stream lifetime has been audited.
+    // A resource transition permanently disables reuse in this process; raw
+    // stream addresses cannot establish that an old cache entry is still valid.
+    // This is deliberately not synchronization with concurrent reset/recovery.
+    if (!c10_npu::NpuSysCtrl::GetInstance().GetInitFlag() ||
+        !c10_npu::NPUCachingAllocator::isNativeAllocator() ||
+        c10_npu::option::OptionsManager::CheckForceUncached() ||
+        c10_npu::get_npu_data_unsafe_flag() || c10_npu::GetRuntimeResourceEpoch() != 0) {
+        return at_npu::native::OpPreparation::unsafe_empty_workspace(bytes);
+    }
+    const auto current = c10_npu::getCurrentNPUStream();
+    // use_mem_pool() enters an allocator pool without beginning SDK capture.
+    // Conservatively bypass whenever any pool scope exists on this device.
+    if (c10_npu::NPUCachingAllocator::hasCapturesUnderway(current.device_index())) {
+        return at_npu::native::OpPreparation::unsafe_empty_workspace(bytes);
+    }
+    op_api::workspace_r41::WorkspaceEligibility eligibility{
+        true,
+        c10_npu::option::OptionsManager::GetTaskQueueEnable(),
+        !c10_npu::detail::isCurrentStreamExternal(),
+        current.isSyncLaunchStream(),
+        false,
+        c10_npu::host_regions::IsCapturing(),
+        c10_npu::host_regions::OwnedOpApiEnabled() || c10_npu::eager_prepare::Enabled(),
+        current.stream(false) == acl_stream};
+    // No queue drain: querying capture uses the same non-draining raw stream.
+    if (op_api::workspace_r41::ReuseAllowed(eligibility)) {
+        eligibility.graph_capture = c10_npu::currentStreamCaptureStatusMayInitCtx() != c10_npu::CaptureStatus::None;
+    }
+    retain_for_submission = op_api::workspace_r41::ReuseAllowed(eligibility);
+    // ACL defines workspace as temporary Device computation storage, passed only
+    // to phase2. All its work is submitted to acl_stream; same-stream Device
+    // ordering permits scratch reuse after prior submission, without a wait.
+    // Keep each returned Tensor in its queued closure. After submission the
+    // existing NPUCachingAllocator's allocation-stream rules protect release at
+    // growth, eviction and producer thread exit. Never reuse on another stream.
+    return ThreadWorkspaceCacheR41().Acquire(
+        {current.device_index(), reinterpret_cast<uintptr_t>(acl_stream)}, bytes, retain_for_submission,
+        [](uint64_t requested) { return at_npu::native::OpPreparation::unsafe_empty_workspace(requested); });
+}
+
+// Caller-thread qualification only: [enabled, hits, allocations, growths,
+// evictions, bypasses, retained_bytes, entries]. No aggregate/atomic hot path.
+extern "C" TORCH_NPU_API void OpApiWorkspaceCacheStatsR41(uint64_t* counters, size_t count)
+{
+    if (!counters) return;
+    const bool enabled = WorkspaceCacheEnabledR41();
+    const auto stats = enabled ? ThreadWorkspaceCacheR41().Stats() : op_api::workspace_r41::WorkspaceStats{};
+    const uint64_t values[] = {enabled, stats.hits, stats.allocations, stats.growths,
+        stats.evictions, stats.bypasses, stats.retained_bytes, stats.entries};
+    for (size_t index = 0; index < count && index < 8; ++index) counters[index] = values[index];
+}
 
 namespace hdb_opapi {
 namespace {
@@ -2350,12 +2437,15 @@ bool ExecuteCachedOp(aclrtStream acl_stream, const char* aclnn_api, void* phrase
 
     void* workspace_addr = nullptr;
     at::Tensor workspace_tensor;
+    bool retain_workspace = false;
     if (workspace_size != 0) {
-        workspace_tensor = at_npu::native::OpPreparation::unsafe_empty_workspace(workspace_size);
+        workspace_tensor = GetOpApiWorkspaceR41(workspace_size, acl_stream, retain_workspace);
         workspace_addr = const_cast<void*>(workspace_tensor.storage().data());
     }
 
-    auto acl_call = [workspace_addr, workspace_size, acl_stream, executor, phrase2]()->int {
+    auto acl_call = [workspace_addr, workspace_size, acl_stream, executor, phrase2,
+        workspace_owner = retain_workspace ? std::move(workspace_tensor) : at::Tensor{}]()->int {
+        (void)workspace_owner;
         OpApiFunc opApiFunc = reinterpret_cast<OpApiFunc>(phrase2);
         auto api_ret = opApiFunc(workspace_addr, workspace_size, executor, acl_stream);
         NPU_CHECK_ERROR(api_ret, "call failed");

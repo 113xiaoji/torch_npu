@@ -46,6 +46,7 @@
 #include <torch_npu/csrc/core/npu/NPUQueue.h>
 #include <torch_npu/csrc/core/npu/NPUStream.h>
 #include <torch_npu/csrc/core/npu/NPUWorkspaceAllocator.h>
+#include <torch_npu/csrc/core/npu/RuntimeResourceEpoch.h>
 #include <torch_npu/csrc/core/npu/NpuVariables.h>
 #include <torch_npu/csrc/core/npu/interface/AclInterface.h>
 #include <torch_npu/csrc/core/npu/interface/OpInterface.h>
@@ -851,6 +852,7 @@ PyObject* THNPModule_setDevice_wrap(PyObject* self, PyObject* arg) {
 PyObject* THNPModule_stopDevice_wrap(PyObject* self, PyObject* arg) {
   HANDLE_TH_ERRORS
   int device = THPUtils_unpackLong(arg);
+  c10_npu::InvalidateRuntimeResources();
   setDefaultStreamsStatus(device, c10_npu::RepoStatus::STOP_EXIT);
   TORCH_NPU_RECOVERY_LOGI("NPU stop device start, device is %d.", device);
   int ret = c10_npu::acl::AclrtDeviceTaskAbort(device);
@@ -928,6 +930,7 @@ PyObject* THNPModule_get_uce_addr_wrap(PyObject* self, PyObject* noargs) {
 PyObject* THNPModule_restart_device_wrap(PyObject* self, PyObject* arg) {
   HANDLE_TH_ERRORS
   int device = THPUtils_unpackLong(arg);
+  c10_npu::InvalidateRuntimeResources();
   TORCH_NPU_RECOVERY_LOGI("NPU restart device start, device is %d.", device);
   if (!c10_npu::acl::IsExistAclrtRepairError()) {
     // If aclrtRepairError is not exist in CANN (older version), only repair UCE memory.
