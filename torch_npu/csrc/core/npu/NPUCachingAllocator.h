@@ -331,6 +331,7 @@ C10_NPU_API extern std::atomic<NPUAllocator*> allocator;
 
 // Exact top-level allocator identity. Private pool scopes need a separate gate.
 C10_NPU_API bool isNativeAllocator() noexcept;
+C10_NPU_API bool hasCapturesUnderwayFast(c10::DeviceIndex device);
 
 inline NPUAllocator* get()
 {

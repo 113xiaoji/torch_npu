@@ -47,6 +47,28 @@ constexpr uint64_t MIX_STEP2 = 14181476777654086739LLU;
 constexpr int OWNER_ROOT_UID = 0;
 
 namespace {
+enum class WorkspacePoolQueryR42 { Locked, Atomic, Invalid };
+
+WorkspacePoolQueryR42 PoolQueryModeR42() noexcept
+{
+    static const auto mode = [] {
+        const char* value = std::getenv("TORCH_NPU_WORKSPACE_POOL_QUERY");
+        if (!value || std::strcmp(value, "locked") == 0) return WorkspacePoolQueryR42::Locked;
+        if (std::strcmp(value, "atomic") == 0) return WorkspacePoolQueryR42::Atomic;
+        return WorkspacePoolQueryR42::Invalid;
+    }();
+    return mode;
+}
+
+bool WorkspacePoolActiveR42(c10::DeviceIndex device)
+{
+    const auto mode = PoolQueryModeR42();
+    TORCH_CHECK(mode != WorkspacePoolQueryR42::Invalid, "invalid TORCH_NPU_WORKSPACE_POOL_QUERY");
+    return mode == WorkspacePoolQueryR42::Atomic ?
+        c10_npu::NPUCachingAllocator::hasCapturesUnderwayFast(device) :
+        c10_npu::NPUCachingAllocator::hasCapturesUnderway(device);
+}
+
 bool WorkspaceCacheEnabledR41()
 {
     static const bool enabled = [] {
@@ -64,6 +86,15 @@ op_api::workspace_r41::WorkspaceCache<at::Tensor>& ThreadWorkspaceCacheR41()
     return cache;
 }
 } // namespace
+
+extern "C" TORCH_NPU_API const char* OpApiWorkspacePoolQueryR42() noexcept
+{
+    switch (PoolQueryModeR42()) {
+        case WorkspacePoolQueryR42::Locked: return "locked";
+        case WorkspacePoolQueryR42::Atomic: return "atomic";
+        default: return "invalid";
+    }
+}
 
 at::Tensor GetOpApiWorkspaceR41(uint64_t bytes, aclrtStream acl_stream, bool& retain_for_submission)
 {
@@ -85,7 +116,7 @@ at::Tensor GetOpApiWorkspaceR41(uint64_t bytes, aclrtStream acl_stream, bool& re
     const auto current = c10_npu::getCurrentNPUStream();
     // use_mem_pool() enters an allocator pool without beginning SDK capture.
     // Conservatively bypass whenever any pool scope exists on this device.
-    if (c10_npu::NPUCachingAllocator::hasCapturesUnderway(current.device_index())) {
+    if (WorkspacePoolActiveR42(current.device_index())) {
         return at_npu::native::OpPreparation::unsafe_empty_workspace(bytes);
     }
     op_api::workspace_r41::WorkspaceEligibility eligibility{

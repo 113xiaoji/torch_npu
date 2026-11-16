@@ -32,6 +32,7 @@
 #include "torch_npu/csrc/core/npu/NPUWorkspaceAllocator.h"
 #include "torch_npu/csrc/core/npu/NPURecovery.h"
 #include "torch_npu/csrc/core/npu/RuntimeResourceEpoch.h"
+#include "torch_npu/csrc/core/npu/CapturePoolActivity.h"
 #include "torch_npu/csrc/core/npu/NPUGuard.h"
 #include "torch_npu/csrc/core/npu/NPUGraphsUtils.h"
 #include "NPUBlockHandle.h"
@@ -1023,6 +1024,7 @@ private:
     // Most of the time it's empty, in which case malloc can avoid calling
     // aclrtStreamGetCaptureInfo in the hot path.
     std::vector<std::pair<MempoolId_t, std::function<bool(aclrtStream)>>> captures_underway;
+    c10_npu::detail::CapturePoolActivity capture_pool_activity_;
 
     // See free() for this thing's purpose
     std::vector<Block *> needs_events_deferred_until_no_capture;
@@ -2325,6 +2327,7 @@ public:
             TORCH_CHECK(it2->first != mempool_id, "beginAllocateToPool: already recording to mempool_id");
         }
         captures_underway.emplace_back(mempool_id, std::move(filter));
+        capture_pool_activity_.Publish(!captures_underway.empty());
     }
 
     // Called by NPUGraph::capture_end
@@ -2334,6 +2337,7 @@ public:
         for (auto it = captures_underway.begin(); it != captures_underway.end(); ++it) {
             if (it->first == mempool_id) {
                 captures_underway.erase(it);
+                capture_pool_activity_.Publish(!captures_underway.empty());
                 TORCH_NPU_MEMORY_LOGD("NPUCachingAllocator endAllocateToPool: mempool_id=(%lu,%lu)",
                                       mempool_id.first, mempool_id.second);
                 return;
@@ -2346,6 +2350,11 @@ public:
     {
         std::lock_guard<std::recursive_mutex> lock(mutex);
         return !captures_underway.empty();
+    }
+
+    bool hasCapturesUnderwayFast() const noexcept
+    {
+        return capture_pool_activity_.Active();
     }
 
     // Called by NPUGraph::reset
@@ -4016,6 +4025,12 @@ public:
         return device_allocator[device]->hasCapturesUnderway();
     }
 
+    bool hasCapturesUnderwayFast(c10::DeviceIndex device)
+    {
+        assertValidDevice(device);
+        return device_allocator[device]->hasCapturesUnderwayFast();
+    }
+
     c10::DataPtr allocate(size_t size) override
     {
         constexpr size_t one_exa_bytes = 1152921504606846976ULL;
@@ -4283,6 +4298,15 @@ NpuCachingAllocator caching_allocator;
 bool isNativeAllocator() noexcept
 {
     return allocator.load(std::memory_order_acquire) == &caching_allocator;
+}
+
+bool hasCapturesUnderwayFast(c10::DeviceIndex device)
+{
+    // A different allocator has no published native-pool state to certify.
+    if (!isNativeAllocator()) {
+        return true;
+    }
+    return caching_allocator.hasCapturesUnderwayFast(device);
 }
 
 bool IsNativeCapturedRetirementDataOnStream(const c10::DataPtr& pointer, const c10::Allocator* source,

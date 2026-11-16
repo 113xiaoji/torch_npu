@@ -30,6 +30,8 @@ inline void InvalidateRuntimeResources() noexcept {}
 }
 #endif
 using aclrtStream = void*;
+namespace c10 { using DeviceIndex = int; }
+#define TORCH_CHECK(condition, ...) do { if (!(condition)) throw std::runtime_error("option check"); } while (false)
 struct State {
     bool native_allocator = true, pool = false, force_uncached = false;
     bool unsafe = false, initialized = true, graph = false;
@@ -65,6 +67,7 @@ namespace eager_prepare { inline bool Enabled() { return false; } }
 namespace NPUCachingAllocator {
 inline bool isNativeAllocator() noexcept { return state.native_allocator; }
 inline bool hasCapturesUnderway(int) { return state.pool; }
+inline bool hasCapturesUnderwayFast(int) { return state.pool; }
 }
 inline bool get_npu_data_unsafe_flag() { return state.unsafe; }
 class NpuSysCtrl {
@@ -186,7 +189,7 @@ def verify_lifecycle_wiring():
 def main():
     compiler, env = compiler_environment()
     source = (ROOT / "patches/eager_mpsc_r34/op-plugin/op_plugin/utils/op_api_common.cpp").read_text(encoding="utf-8")
-    begin = source.index("namespace {\nbool WorkspaceCacheEnabledR41()")
+    begin = source.index("namespace {\nenum class WorkspacePoolQueryR42")
     end = source.index("// Caller-thread qualification only:", begin)
     with tempfile.TemporaryDirectory(prefix="workspace_admission_r41_") as temporary:
         build = Path(temporary)
@@ -205,7 +208,9 @@ def main():
                        f"-I{ROOT}", f"-I{helper}", *sources, "-o", str(executable)]
         subprocess.run(command, env=env, cwd=build, check=True, timeout=120)
         env["TORCH_NPU_WORKSPACE_CACHE"] = "1"
-        subprocess.run([str(executable)], env=env, check=True, timeout=30)
+        for mode in ("locked", "atomic"):
+            env["TORCH_NPU_WORKSPACE_POOL_QUERY"] = mode
+            subprocess.run([str(executable)], env=env, check=True, timeout=30)
     verify_lifecycle_wiring()
 
 
