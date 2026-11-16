@@ -36,4 +36,4 @@ forward 包含 Python/ATen/PTA 准备、下发和其中的隐式同步；完成�
 
 native SHA256：`43491001a25d7637e42ed74393a765f984907bfc53fd1812372e8807dfa16b95`。
 
-下一步分别验证无全局allocator查询锁的 workspace 资格发布，以及泛化编译实际用户方法；保留原模型/输入，用相同口径重新测量。
+后续 allocator 查询快路径仍待完整 NPU 性能对照。CinderX 的泛化用户方法编译在独立 CPU 对照中没有收益，见 [CPU 结果](cinderx_ft_3146/CLASS_METHODS_CPU_RESULTS.md)。在该 CinderX 基线上，保持精确调用计数、仅放宽计数原子操作内存序的实验，四调用者配对增益中位数为约 1.98%，一、二调用者没有一致收益，见 [补丁与结果](cinderx_ft_3146/relaxed_counter/RESULTS.md)。该 CPU 结果不能加到上面的 NPU 增益，也未替换默认运行库。

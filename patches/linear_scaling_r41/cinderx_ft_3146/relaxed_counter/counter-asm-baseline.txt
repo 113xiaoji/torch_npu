@@ -1,0 +1,17 @@
+
+/tmp/zyz-r41-cinderx-ft-20261116/tools/cinderx-clang18-pylib/_cinderx.so:     file format elf64-littleaarch64
+
+
+Disassembly of section .text:
+
+000000000037e7b8 <Ci_EvalFrame+0x1419c>:
+  37e7b8:	91008008 	add	x8, x0, #0x20
+  37e7bc:	aa0003f3 	mov	x19, x0
+  37e7c0:	88dffd08 	ldar	w8, [x8]
+  37e7c4:	37f00088 	tbnz	w8, #30, 37e7d4 <Ci_EvalFrame+0x141b8>
+  37e7c8:	52800020 	mov	w0, #0x1                   	// #1
+  37e7cc:	aa1303e1 	mov	x1, x19
+  37e7d0:	940a93ac 	bl	623680 <__aarch64_ldadd8_acq_rel>
+  37e7d4:	97ff6992 	bl	358e1c <Ci_GetDelayAdaptiveCode>
+  37e7d8:	5280003c 	mov	w28, #0x1                   	// #1
+  37e7dc:	360000a0 	tbz	w0, #0, 37e7f0 <Ci_EvalFrame+0x141d4>

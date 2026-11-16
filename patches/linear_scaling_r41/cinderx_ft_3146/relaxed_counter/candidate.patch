@@ -1,0 +1,18 @@
+--- a/cinderx/Common/code_extra.h
++++ b/cinderx/Common/code_extra.h
+@@ -61,12 +61,10 @@
+ // Under FT-Python, these use atomics to avoid data races.
+ #ifdef Py_GIL_DISABLED
+ 
+-// Note: _Py_atomic_add_uint64 uses seq_cst ordering, which might be stronger
+-// than needed for the calls counter. On x86-64, this is the same cost as
+-// relaxed (both emit lock xaddq). On ARM, a relaxed variant would be cheaper
+-// but there is no _Py_atomic_add_uint64_relaxed.
++// Calls is an exact scheduling/statistics count, not a publication marker.
++// Match the relaxed readers; lifetime and other state use separate locks/atomics.
+ static inline void Ci_code_extra_incr_calls(CodeExtra* extra) {
+-  _Py_atomic_add_uint64(&extra->calls, 1);
++  __atomic_fetch_add(&extra->calls, 1, __ATOMIC_RELAXED);
+ }
+ 
+ static inline uint64_t Ci_code_extra_get_calls(const CodeExtra* extra) {
