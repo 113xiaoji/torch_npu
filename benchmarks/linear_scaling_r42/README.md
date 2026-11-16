@@ -23,6 +23,11 @@ scaling result has been measured.
 - The scope stage was independently sealed after fresh verification of175
   runtime/source/SDK/actual-provider pins and21 raw evidence pins using the
   same exact image in an owned devices-empty CPU verifier.
+- Both modes completed the MLP/CNN/attention numerical stage:384 outputs,
+  unchanged weights/inputs, native options, providers/source and natural
+  GIL-off checks. Its sealed raw checkpoint was independently hash-verified.
+  Small MLP legitimately has no workspace activity; model-stage stats quality
+  accepts that while the operator and formal DLRM positive-hit gates remain.
 
 These checks cover this single original operator and ordered native scopes.
 They do not certify full DLRM graphs, unordered cross-thread pool transitions,
@@ -33,7 +38,10 @@ custom allocators or uninterrupted exclusive use of the accelerator.
 V4 consumes only complete sealed stages with matching native/source/runtime/
 SDK/environment/input bindings:
 
-`scope176 → fresh model384 → seal → fresh smoke288 → seal → STOP ready`
+`scope176 complete → model384 complete → fresh smoke288 → seal → STOP ready`
+
+Complete correctness is560 outputs. Full DLRM smoke remains0/9 and fresh
+performance0/27; no incomplete historical smoke or timing has been adopted.
 
 The cross-model stage is a four-task numerical check for each MLP/CNN/attention
 case. Its executor submits four task indices but records no native thread
